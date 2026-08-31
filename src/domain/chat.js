@@ -1,137 +1,246 @@
 // ============================================================
 //  EchoChat Rebuild · Chat Controller
-//  发送 / 流式 / 停止 / 重试 / 重生成 / 编辑
+//  聊天业务逻辑：发送/流式/停止/重试/消息操作
+//  解决：send() 80行混杂、状态不明确、错误处理不统一的问题
 // ============================================================
 
 import { store } from "../core/store.js";
 import { events, EVT } from "../core/events.js";
-import { uid } from "../core/utils.js";
+import { uid, sleep, rand } from "../core/utils.js";
 import { getRoleId, getPersona, getRoleName } from "./persona.js";
 import { buildMessages, streamChat, needsApiSetup } from "./provider.js";
-import { buildMemoryBlock, rememberMessage, maybeAutoSummary } from "./memory.js";
+import { buildMemoryBlock } from "./memory.js";
+import { buildWorldbookBlock } from "./worldbook.js";
 import { recordChatTurn } from "./relations.js";
-import { matchWorldbook } from "./worldbook.js";
+import { maybeAutoSummary } from "./memory.js";
 
 let abortCtrl = null;
+let sending = false;
 let streamingChatId = null;
 
 export function isSending() {
-  return !!abortCtrl;
+  return sending;
 }
 
 export function getStreamingChatId() {
   return streamingChatId;
 }
 
+// 构建系统提示词（人设 + 记忆 + 世界书）
 function buildSystemPrompt(chat) {
   const parts = [];
   const persona = getPersona(chat);
   if (persona) parts.push(persona);
+
   const roleId = getRoleId(chat);
-  const mem = buildMemoryBlock(roleId);
-  if (mem) parts.push(mem);
-  const wb = matchWorldbook(chat);
-  if (wb) parts.push(wb);
-  const globalP = store.getState().global?.persona;
-  if (globalP && globalP !== persona) parts.push("【用户侧】\n" + globalP);
+  const memoryBlock = roleId ? buildMemoryBlock(roleId) : null;
+  if (memoryBlock) parts.push(memoryBlock);
+
+  const wbBlock = buildWorldbookBlock(chat, chat.messages, roleId, persona);
+  if (wbBlock) parts.push(wbBlock);
+
   return parts.join("\n\n");
 }
 
-export async function sendMessage(chatId, text) {
-  if (!text || !chatId || abortCtrl) return;
-  const chat = store.getState().chats.find((c) => c.id === chatId);
-  if (!chat) return;
+// 发送消息
+export async function sendMessage(text) {
+  const chat = store.getCurrentChat();
+  if (!chat || sending || !text?.trim()) return;
+
   if (needsApiSetup(chat)) {
-    events.emit(EVT.TOAST, { type: "error", text: "请先配置 API Key 与模型" });
+    events.emit(EVT.TOAST, {
+      message: "请先配置 API 接口地址与 Key",
+      type: "error",
+      action: { label: "打开设置", handler: () => events.emit(EVT.MODAL_OPEN, "settings") },
+    });
     return;
   }
 
-  const userMsg = { id: uid(), role: "user", text: String(text).trim(), createdAt: Date.now() };
-  store.appendMessage(chatId, userMsg);
-  events.emit(EVT.MESSAGE_SENT, { chatId, message: userMsg });
-  rememberMessage(chat, userMsg.text);
+  // 1. 添加用户消息
+  const userMsg = store.addMessage(chat.id, { role: "me", text: text.trim(), status: "sent" });
+  events.emit(EVT.MESSAGE_SENT, { chatId: chat.id, message: userMsg });
 
-  const assistantId = uid();
-  const assistantMsg = { id: assistantId, role: "assistant", text: "", createdAt: Date.now(), streaming: true };
-  store.appendMessage(chatId, assistantMsg);
-
+  // 2. 设置发送状态
+  sending = true;
+  streamingChatId = chat.id;
   abortCtrl = new AbortController();
-  streamingChatId = chatId;
-  events.emit(EVT.STREAM_START, { chatId });
+
+  events.emit(EVT.STREAM_START, { chatId: chat.id });
 
   try {
-    const system = buildSystemPrompt(chat);
-    const messages = buildMessages(
-      { ...chat, messages: [...(chat.messages || []), userMsg] },
-      system
-    );
-    const full = await streamChat(chat, messages, abortCtrl.signal, (delta, all) => {
-      store.updateMessage(chatId, assistantId, { text: all });
-      events.emit(EVT.STREAM_DELTA, { chatId, delta, text: all });
+    // 3. 心理停顿（亲密话语）
+    if (isIntimate(text)) {
+      await sleep(rand(1200, 2600));
+      await sleep(1000);
+    }
+
+    // 4. 构建请求
+    const systemPrompt = buildSystemPrompt(chat);
+    const messages = buildMessages(chat, systemPrompt);
+
+    // 5. 创建临时 AI 消息（流式中）
+    const tempMsg = store.addMessage(chat.id, {
+      role: "her",
+      text: "",
+      status: "streaming",
     });
-    store.updateMessage(chatId, assistantId, { text: full || "…", streaming: false });
-    events.emit(EVT.STREAM_DONE, { chatId, text: full });
-    events.emit(EVT.MESSAGE_RECEIVED, { chatId, message: { id: assistantId, text: full } });
-    recordChatTurn(getRoleId(chat));
-    maybeAutoSummary({ ...chat, messages: [...(chat.messages || []), userMsg, { ...assistantMsg, text: full }] });
-  } catch (e) {
-    if (e.name === "AbortError") {
-      events.emit(EVT.STREAM_ABORT, { chatId });
-    } else {
-      store.updateMessage(chatId, assistantId, {
-        text: `（生成失败）${e.message || e}`,
-        streaming: false,
-        error: true,
+
+    // 6. 流式请求
+    const reply = await streamChat(chat, messages, abortCtrl.signal, (full) => {
+      store.updateMessage(chat.id, tempMsg.id, { text: full, status: "streaming" });
+    });
+
+    // 7. 完成
+    if (reply?.trim()) {
+      store.updateMessage(chat.id, tempMsg.id, {
+        text: reply.trim(),
+        status: "sent",
       });
-      events.emit(EVT.STREAM_ERROR, { chatId, error: e });
+      events.emit(EVT.MESSAGE_RECEIVED, { chatId: chat.id, message: tempMsg });
+
+      // 8. 记录关系
+      const roleId = getRoleId(chat);
+      if (roleId) {
+        recordChatTurn(roleId, getRoleName(chat));
+        events.emit(EVT.RELATION_UPDATE, { roleId });
+      }
+
+      // 9. 自动摘要（非阻塞）
+      maybeAutoSummary(store.getCurrentChat() || chat);
+    } else {
+      store.deleteMessage(chat.id, tempMsg.id);
+    }
+  } catch (e) {
+    // 错误处理
+    if (e.name === "AbortError") {
+      events.emit(EVT.STREAM_ABORT, { chatId: chat.id });
+      events.emit(EVT.TOAST, { message: "已停止生成", type: "info" });
+    } else {
+      events.emit(EVT.STREAM_ERROR, { chatId: chat.id, error: e });
+      events.emit(EVT.TOAST, {
+        message: String(e.message || "请求失败"),
+        type: "error",
+        action: { label: "重试", handler: () => retryLastMessage() },
+      });
+    }
+    // 清理临时消息
+    const current = store.getCurrentChat();
+    if (current) {
+      const lastMsg = current.messages[current.messages.length - 1];
+      if (lastMsg?.status === "streaming") {
+        store.updateMessage(current.id, lastMsg.id, {
+          status: e.name === "AbortError" ? "stopped" : "error",
+        });
+      }
     }
   } finally {
-    abortCtrl = null;
+    sending = false;
     streamingChatId = null;
+    abortCtrl = null;
+    events.emit(EVT.STREAM_DONE, { chatId: chat.id });
   }
 }
 
+// 停止生成
 export function stopGeneration() {
   if (abortCtrl) {
     abortCtrl.abort();
-    abortCtrl = null;
   }
 }
 
-export async function retryLastMessage(chatId) {
-  const chat = store.getState().chats.find((c) => c.id === chatId);
-  if (!chat || !chat.messages?.length) return;
-  const msgs = chat.messages.slice();
-  // 删除末尾 assistant，重新发最后一条 user
-  while (msgs.length && msgs[msgs.length - 1].role === "assistant") msgs.pop();
-  const lastUser = [...msgs].reverse().find((m) => m.role === "user");
-  if (!lastUser) return;
-  store.setChatMessages(chatId, msgs.filter((m) => m.id !== lastUser.id));
-  await sendMessage(chatId, lastUser.text);
+// 重试最后一条消息
+export function retryLastMessage() {
+  const chat = store.getCurrentChat();
+  if (!chat || sending) return;
+
+  // 找到最后一条用户消息
+  let lastUserIdx = -1;
+  for (let i = chat.messages.length - 1; i >= 0; i--) {
+    if (chat.messages[i].role === "me") {
+      lastUserIdx = i;
+      break;
+    }
+  }
+  if (lastUserIdx < 0) return;
+
+  const userText = chat.messages[lastUserIdx].text;
+
+  // 删除最后一条用户消息之后的所有消息
+  store.set((s) => ({
+    ...s,
+    chats: s.chats.map((c) =>
+      c.id === chat.id ? { ...c, messages: c.messages.slice(0, lastUserIdx) } : c
+    ),
+  }));
+
+  // 重新发送
+  sendMessage(userText);
 }
 
-export async function regenerate(chatId) {
-  return retryLastMessage(chatId);
+// 重新生成 AI 回复
+export function regenerate(messageIndex) {
+  const chat = store.getCurrentChat();
+  if (!chat || sending) return;
+
+  // 找到该消息之前的用户消息
+  let userText = null;
+  for (let i = messageIndex - 1; i >= 0; i--) {
+    if (chat.messages[i].role === "me") {
+      userText = chat.messages[i].text;
+      break;
+    }
+  }
+  if (!userText) return;
+
+  // 删除从该条开始的所有消息
+  store.set((s) => ({
+    ...s,
+    chats: s.chats.map((c) =>
+      c.id === chat.id ? { ...c, messages: c.messages.slice(0, messageIndex) } : c
+    ),
+  }));
+
+  sendMessage(userText);
 }
 
-export function editMessage(chatId, msgId, newText) {
-  store.updateMessage(chatId, msgId, { text: newText });
-}
-
-export function deleteMessage(chatId, msgId) {
-  const chat = store.getState().chats.find((c) => c.id === chatId);
+// 编辑消息（删除后重新输入）
+export function editMessage(messageIndex) {
+  const chat = store.getCurrentChat();
   if (!chat) return;
-  store.setChatMessages(
-    chatId,
-    (chat.messages || []).filter((m) => m.id !== msgId)
-  );
+  const msg = chat.messages[messageIndex];
+  if (!msg || msg.role !== "me") return;
+
+  store.set((s) => ({
+    ...s,
+    chats: s.chats.map((c) =>
+      c.id === chat.id ? { ...c, messages: c.messages.slice(0, messageIndex) } : c
+    ),
+  }));
+
+  return msg.text;
 }
 
-export function copyMessage(text) {
-  if (!text) return;
-  if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(text).catch(() => {});
+// 删除消息
+export function deleteMessage(messageIndex) {
+  const chat = store.getCurrentChat();
+  if (!chat) return;
+  const msgId = chat.messages[messageIndex]?.id;
+  if (msgId) store.deleteMessage(chat.id, msgId);
+}
+
+// 复制消息
+export async function copyMessage(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    events.emit(EVT.TOAST, { message: "已复制", type: "success" });
+  } catch (e) {
+    events.emit(EVT.TOAST, { message: "复制失败", type: "error" });
   }
+}
+
+const INTIMATE_WORDS = ["我爱你", "想你了", "抱抱", "亲亲", "喜欢你", "想念你", "爱你", "么么"];
+function isIntimate(text) {
+  return INTIMATE_WORDS.some((w) => text.includes(w));
 }
 
 export const Chat = {
@@ -144,4 +253,5 @@ export const Chat = {
   editMessage,
   deleteMessage,
   copyMessage,
+  buildSystemPrompt,
 };

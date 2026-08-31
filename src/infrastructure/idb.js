@@ -4,7 +4,7 @@
 // ============================================================
 
 const DB_NAME = "echodownload_assets";
-const DB_VER = 2;
+const DB_VER = 2; // v2: 增加版本号，支持未来迁移
 const STORE = "blobs";
 
 const mem = new Map();
@@ -36,8 +36,9 @@ function openDB() {
       if (!db.objectStoreNames.contains(STORE)) {
         db.createObjectStore(STORE, { keyPath: "id" });
       }
+      // v2 迁移：未来可在这里加索引
       if (e.oldVersion < 2) {
-        // 预留
+        // 预留：添加元数据索引等
       }
     };
     req.onsuccess = () => {
@@ -113,16 +114,20 @@ export async function deleteBlob(id) {
 }
 
 export async function listBlobIds() {
+  const ids = new Set(mem.keys());
   const db = await openDB();
-  if (!db) return Array.from(mem.keys());
+  if (!db) return [...ids];
   return new Promise((resolve) => {
     try {
       const tx = db.transaction(STORE, "readonly");
       const req = tx.objectStore(STORE).getAllKeys();
-      req.onsuccess = () => resolve(req.result || []);
-      req.onerror = () => resolve([]);
+      req.onsuccess = () => {
+        (req.result || []).forEach((k) => ids.add(k));
+        resolve([...ids]);
+      };
+      req.onerror = () => resolve([...ids]);
     } catch (e) {
-      resolve([]);
+      resolve([...ids]);
     }
   });
 }
@@ -157,6 +162,7 @@ export function dataURLToBlob(dataURL) {
 
 export async function ingestImage(file, prefix = "img_", maxSide = 512, quality = 0.82) {
   if (!file) return "";
+  // SVG 不压缩
   if ((file.type || "").includes("svg")) {
     const key = prefix + Date.now().toString(36);
     await putBlob(key, file);

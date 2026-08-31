@@ -85,17 +85,19 @@ export const todayStr = (ts) => {
 };
 
 export const dayDiff = (a, b) => {
-  const da = new Date(todayStr(a));
-  const db = new Date(todayStr(b));
-  return Math.round((db - da) / 86400000);
+  const ta = Date.parse(a + "T00:00:00");
+  const tb = Date.parse(b + "T00:00:00");
+  if (!Number.isFinite(ta) || !Number.isFinite(tb)) return 999;
+  return Math.round((tb - ta) / 86400000);
 };
 
+// 轻量 Markdown 渲染（行内 + 代码块 + 列表）
 export function renderMarkdown(text, opts = {}) {
   if (!text) return "";
-  let t = esc(text);
+  let t = String(text);
   // 代码块
-  t = t.replace(/```([\s\S]*?)```/g, (_, code) => {
-    return `<pre class="md-code"><code>${code.trim()}</code></pre>`;
+  t = t.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+    return `<pre class="md-pre"><code class="md-code">${esc(code.trim())}</code></pre>`;
   });
   // 行内代码
   t = t.replace(/`([^`]+)`/g, '<code class="md-inline">$1</code>');
@@ -111,6 +113,7 @@ export function renderMarkdown(text, opts = {}) {
 
 export function estimateTokens(text) {
   if (!text) return 0;
+  // 中文约 1.5 字/token，英文约 4 字符/token
   const chinese = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
   const other = text.length - chinese;
   return Math.round(chinese / 1.5 + other / 4);

@@ -1,135 +1,205 @@
 // ============================================================
-//  EchoChat Rebuild · Character Moments
-//  角色动态流：发布 / 点赞 / 评论 / 导入导出
+//  EchoChat Rebuild · Moments (从 baseline 迁移为 ES Module)
+//  角色动态流 CRUD + 点赞/评论 + 摘要解析
+//  改进：支持 roleId（稳定 ID）
 // ============================================================
 
-import { store } from "../core/store.js";
-import { events, EVT } from "../core/events.js";
-import { uid } from "../core/utils.js";
-import { getRoleId, getRoleName, getRoleAvatar } from "./persona.js";
+import { storage, KEYS } from "../core/storage.js";
+import { uid, todayStr } from "../core/utils.js";
 
-const KEY = "moments";
+const MAX_MOMENTS = 200;
+const CONTENT_SOFT_CAP = 80;
 
-function ensureArray(v) {
-  return Array.isArray(v) ? v : [];
+function defaultStore() {
+  return { version: 2, moments: [] };
 }
 
 export function loadMoments() {
-  return ensureArray(store.getState().moments);
+  try {
+    const d = storage.get(KEYS.MOMENTS, null);
+    if (!d) return defaultStore();
+    if (!Array.isArray(d.moments)) d.moments = [];
+    d.version = 2;
+    return d;
+  } catch (e) {
+    return defaultStore();
+  }
 }
 
-export function saveMoments(list) {
-  store.set((s) => ({ ...s, moments: ensureArray(list) }));
+export function saveMoments(data) {
+  const d = data || loadMoments();
+  d.version = 2;
+  if (!Array.isArray(d.moments)) d.moments = [];
+  if (d.moments.length > MAX_MOMENTS) d.moments = d.moments.slice(-MAX_MOMENTS);
+  return storage.set(KEYS.MOMENTS, d);
 }
 
-export function listMoments(limit) {
-  const list = loadMoments().slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  return limit ? list.slice(0, limit) : list;
+function normalizeMoment(partial) {
+  const p = partial || {};
+  return {
+    id: p.id || uid(),
+    roleId: p.roleId || p.roleKey || "",
+    roleKey: p.roleKey || "",
+    roleName: String(p.roleName || "角色"),
+    content: String(p.content || "").trim().slice(0, CONTENT_SOFT_CAP),
+    image: p.image == null ? null : p.image,
+    createdAt: Number(p.createdAt) || Date.now(),
+    likes: Math.max(0, Number(p.likes) || 0),
+    likedByUser: !!p.likedByUser,
+    likeNames: Array.isArray(p.likeNames) ? p.likeNames.map(String) : [],
+    comments: Array.isArray(p.comments)
+      ? p.comments
+          .map((c) => ({
+            id: c.id || uid(),
+            from: c.from === "her" ? "her" : "me",
+            text: String(c.text || "").trim(),
+            createdAt: Number(c.createdAt) || Date.now(),
+          }))
+          .filter((c) => c.text)
+      : [],
+    source: p.source === "manual" ? "manual" : "auto_summary",
+    relatedMemoryId: p.relatedMemoryId != null ? String(p.relatedMemoryId) : null,
+  };
+}
+
+export function listMoments(filterRoleId) {
+  const all = loadMoments().moments.slice().sort((a, b) => b.createdAt - a.createdAt);
+  if (!filterRoleId || filterRoleId === "all") return all;
+  return all.filter((m) => m.roleId === filterRoleId || m.roleKey === filterRoleId);
 }
 
 export function listRoleOptions() {
-  const chats = store.getState().chats || [];
-  const seen = new Set();
-  const out = [];
-  for (const c of chats) {
-    const id = getRoleId(c);
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
-    out.push({ roleId: id, name: getRoleName(c), avatar: getRoleAvatar(c) });
-  }
-  return out;
+  const map = new Map();
+  loadMoments().moments.forEach((m) => {
+    const id = m.roleId || m.roleKey;
+    if (!id) return;
+    if (!map.has(id)) map.set(id, m.roleName || "角色");
+  });
+  return [...map.entries()].map(([roleId, roleName]) => ({ roleId, roleName }));
 }
 
 export function getMoment(id) {
-  return loadMoments().find((m) => m.id === id) || null;
+  return loadMoments().moments.find((m) => m.id === id) || null;
 }
 
-export function addMoment(roleId, content, opts = {}) {
-  if (!roleId || !content) return null;
-  const item = {
-    id: uid(),
-    roleId,
-    roleName: opts.roleName || "",
-    avatar: opts.avatar || "",
-    content: String(content).trim(),
-    likes: 0,
-    liked: false,
-    comments: [],
-    source: opts.source || "manual",
-    createdAt: Date.now(),
-  };
-  const list = [item, ...loadMoments()];
-  saveMoments(list);
-  events.emit(EVT.MOMENT_ADDED, { roleId, content: item.content });
-  return item;
+export function addMoment(partial) {
+  const m = normalizeMoment(partial);
+  if (!m.content || !m.roleId) return null;
+  const st = loadMoments();
+  st.moments.push(m);
+  saveMoments(st);
+  return m;
 }
 
 export function updateMoment(id, patch) {
-  const list = loadMoments().map((m) => (m.id === id ? { ...m, ...patch } : m));
-  saveMoments(list);
+  const st = loadMoments();
+  const i = st.moments.findIndex((m) => m.id === id);
+  if (i < 0) return null;
+  st.moments[i] = normalizeMoment(Object.assign({}, st.moments[i], patch, { id }));
+  saveMoments(st);
+  return st.moments[i];
 }
 
 export function deleteMoment(id) {
-  saveMoments(loadMoments().filter((m) => m.id !== id));
+  const st = loadMoments();
+  const n = st.moments.length;
+  st.moments = st.moments.filter((m) => m.id !== id);
+  if (st.moments.length === n) return false;
+  saveMoments(st);
+  return true;
 }
 
-export function toggleLike(id) {
-  const m = getMoment(id);
-  if (!m) return;
-  const liked = !m.liked;
-  updateMoment(id, {
-    liked,
-    likes: Math.max(0, (m.likes || 0) + (liked ? 1 : -1)),
-  });
-}
-
-export function addComment(id, text) {
-  const m = getMoment(id);
-  if (!m || !text) return;
-  const comments = [...(m.comments || []), { id: uid(), text: String(text).trim(), createdAt: Date.now() }];
-  updateMoment(id, { comments });
-}
-
-export function parseSummaryAndMoment(text) {
-  const summaries = [];
-  let moment = "";
-  const lines = String(text || "").split(/\n/);
-  let mode = "";
-  for (const line of lines) {
-    const t = line.trim();
-    if (/^SUMMARY[:：]/i.test(t)) {
-      mode = "s";
-      continue;
-    }
-    if (/^MOMENT[:：]/i.test(t)) {
-      mode = "m";
-      continue;
-    }
-    if (mode === "s" && t.startsWith("-")) {
-      summaries.push(t.replace(/^-\s*/, ""));
-    } else if (mode === "m" && t) {
-      moment += (moment ? "\n" : "") + t;
-    }
+export function toggleLike(id, userLabel) {
+  const st = loadMoments();
+  const m = st.moments.find((x) => x.id === id);
+  if (!m) return null;
+  const label = String(userLabel || "我");
+  if (m.likedByUser) {
+    m.likedByUser = false;
+    m.likes = Math.max(0, (Number(m.likes) || 1) - 1);
+    m.likeNames = (m.likeNames || []).filter((n) => n !== label);
+  } else {
+    m.likedByUser = true;
+    m.likes = (Number(m.likes) || 0) + 1;
+    m.likeNames = m.likeNames || [];
+    if (!m.likeNames.includes(label)) m.likeNames.push(label);
   }
-  return { summaries, moment: moment.trim() };
+  saveMoments(st);
+  return m;
+}
+
+export function addComment(id, from, text) {
+  const st = loadMoments();
+  const m = st.moments.find((x) => x.id === id);
+  if (!m) return null;
+  const t = String(text || "").trim();
+  if (!t) return null;
+  const c = {
+    id: uid(),
+    from: from === "her" ? "her" : "me",
+    text: t.slice(0, 200),
+    createdAt: Date.now(),
+  };
+  m.comments = m.comments || [];
+  m.comments.push(c);
+  saveMoments(st);
+  return { moment: m, comment: c };
+}
+
+export function parseSummaryAndMoment(raw) {
+  const text = String(raw || "").replace(/\[emotion:[a-z]+\]/gi, "").trim();
+  if (!text) return { summary: "", moment: "" };
+  const dyn =
+    text.match(/【\s*动态\s*】\s*([\s\S]*)$/i) ||
+    text.match(/\[moment\]\s*([\s\S]*)$/i) ||
+    text.match(/动态[：:]\s*([^\n【\[]{2,80})/i);
+  const sum =
+    text.match(/【\s*摘要\s*】\s*([\s\S]*?)(?=【\s*动态\s*】|\[moment\]|$)/i) ||
+    text.match(/\[summary\]\s*([\s\S]*?)(?=【\s*动态\s*】|\[moment\]|$)/i);
+  let summary = sum ? sum[1].trim() : "";
+  let moment = dyn ? dyn[1].trim() : "";
+  if (!summary && !moment) summary = text;
+  if (!summary && moment) summary = "";
+  moment = moment.replace(/\n+/g, " ").trim().slice(0, CONTENT_SOFT_CAP);
+  return { summary, moment };
 }
 
 export function exportMoments() {
-  return JSON.stringify({ version: 1, moments: loadMoments() }, null, 2);
+  return JSON.stringify(loadMoments(), null, 2);
 }
 
-export function importMoments(json) {
+export function importMoments(raw, mode) {
+  let incoming;
   try {
-    const obj = typeof json === "string" ? JSON.parse(json) : json;
-    const list = ensureArray(obj.moments || obj);
-    saveMoments([...list, ...loadMoments()]);
-    return list.length;
+    incoming = typeof raw === "string" ? JSON.parse(raw) : raw;
   } catch (e) {
-    return 0;
+    return { ok: false, error: "parse" };
   }
+  if (!incoming || typeof incoming !== "object") return { ok: false, error: "shape" };
+  const list = Array.isArray(incoming.moments) ? incoming.moments : Array.isArray(incoming) ? incoming : null;
+  if (!list) return { ok: false, error: "shape" };
+  const replace = mode === "replace";
+  const st = replace ? defaultStore() : loadMoments();
+  const ids = new Set(st.moments.map((m) => m.id));
+  list.forEach((item) => {
+    const m = normalizeMoment(item);
+    if (!m.content || !m.roleId) return;
+    if (ids.has(m.id)) {
+      if (replace) {
+        const i = st.moments.findIndex((x) => x.id === m.id);
+        if (i >= 0) st.moments[i] = m;
+      }
+      return;
+    }
+    ids.add(m.id);
+    st.moments.push(m);
+  });
+  saveMoments(st);
+  return { ok: true, count: st.moments.length };
 }
 
 export const EchoMoments = {
+  defaultStore,
   loadMoments,
   saveMoments,
   listMoments,
@@ -143,4 +213,5 @@ export const EchoMoments = {
   parseSummaryAndMoment,
   exportMoments,
   importMoments,
+  normalizeMoment,
 };

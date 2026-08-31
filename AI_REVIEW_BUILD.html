@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>EchoChat Rebuild · UI Review Build</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #1a1a2e;
+    color: #eee;
+    min-height: 100vh;
+  }
+  .review-header {
+    background: linear-gradient(135deg, #16213e 0%, #0f3460 100%);
+    padding: 24px 32px;
+    border-bottom: 1px solid #2a2a4a;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .review-header h1 {
+    font-size: 22px;
+    margin-bottom: 4px;
+  }
+  .review-header p {
+    font-size: 13px;
+    color: #8892b0;
+  }
+  .state-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 12px 32px;
+    background: #16213e;
+    border-bottom: 1px solid #2a2a4a;
+    position: sticky;
+    top: 73px;
+    z-index: 99;
+  }
+  .state-tab {
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    background: #1a1a2e;
+    border: 1px solid #2a2a4a;
+    color: #8892b0;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .state-tab:hover { background: #2a2a4a; color: #eee; }
+  .state-tab.active {
+    background: #5fb8a0;
+    color: #fff;
+    border-color: #5fb8a0;
+  }
+  .state-tab.group-label {
+    background: transparent;
+    border: none;
+    color: #5fb8a0;
+    font-weight: 600;
+    cursor: default;
+    padding: 6px 8px;
+  }
+  .preview-container {
+    padding: 32px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: calc(100vh - 140px);
+  }
+  .preview-frame {
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    transition: all 0.3s;
+  }
+  .preview-frame.desktop { width: 100%; max-width: 1200px; height: 700px; }
+  .preview-frame.mobile { width: 390px; height: 780px; }
+  .preview-frame iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+  .state-info {
+    max-width: 1200px;
+    margin: 0 auto 24px;
+    padding: 16px 24px;
+    background: #16213e;
+    border-radius: 8px;
+    border-left: 4px solid #5fb8a0;
+  }
+  .state-info h3 { font-size: 16px; margin-bottom: 6px; color: #5fb8a0; }
+  .state-info p { font-size: 13px; color: #a8b2d1; line-height: 1.6; }
+  .state-info .fix-list { margin-top: 8px; padding-left: 20px; }
+  .state-info .fix-list li { font-size: 12px; color: #8892b0; margin: 3px 0; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 8px;
+  }
+  .badge-fixed { background: rgba(95,184,160,0.2); color: #5fb8a0; }
+  .badge-new { background: rgba(107,138,253,0.2); color: #6b8afd; }
+  .badge-improved { background: rgba(251,191,36,0.2); color: #fbbf24; }
+</style>
+</head>
+<body>
+
+<div class="review-header">
+  <h1>EchoChat Rebuild · UI 评审构建</h1>
+  <p>成熟产品级重构 · 20+ 可切换 UI 状态 · 对比 baseline 修复项标注</p>
+</div>
+
+<div class="state-tabs" id="tabs">
+  <span class="state-tab group-label">Landing</span>
+  <button class="state-tab active" data-state="landing-desktop">Landing · 桌面端</button>
+  <button class="state-tab" data-state="landing-mobile">Landing · 移动端</button>
+
+  <span class="state-tab group-label">Onboarding</span>
+  <button class="state-tab" data-state="onboarding-step1">引导 · 选角色</button>
+  <button class="state-tab" data-state="onboarding-selected">引导 · 已选角色</button>
+
+  <span class="state-tab group-label">聊天 · 桌面</span>
+  <button class="state-tab" data-state="chat-empty">聊天 · 空状态</button>
+  <button class="state-tab" data-state="chat-conversation">聊天 · 有对话</button>
+  <button class="state-tab" data-state="chat-streaming">聊天 · 流式回复</button>
+  <button class="state-tab" data-state="chat-profile">聊天 · 资料面板</button>
+  <button class="state-tab" data-state="chat-dark">聊天 · 暗色主题</button>
+
+  <span class="state-tab group-label">聊天 · 移动</span>
+  <button class="state-tab" data-state="chat-mobile-list">移动端 · 会话列表</button>
+  <button class="state-tab" data-state="chat-mobile-chat">移动端 · 聊天</button>
+  <button class="state-tab" data-state="chat-mobile-drawer">移动端 · 资料抽屉</button>
+
+  <span class="state-tab group-label">动态</span>
+  <button class="state-tab" data-state="moments-empty">动态 · 空状态</button>
+  <button class="state-tab" data-state="moments-feed">动态 · 有内容</button>
+
+  <span class="state-tab group-label">我的/设置</span>
+  <button class="state-tab" data-state="me-page">我的 · 主页</button>
+  <button class="state-tab" data-state="settings-modal">设置 · 弹窗</button>
+  <button class="state-tab" data-state="settings-dark">设置 · 暗色</button>
+
+  <span class="state-tab group-label">组件</span>
+  <button class="state-tab" data-state="components-toast">Toast 通知</button>
+  <button class="state-tab" data-state="components-empty">空状态组件</button>
+  <button class="state-tab" data-state="components-loading">加载态</button>
+</div>
+
+<div class="state-info" id="stateInfo"></div>
+
+<div class="preview-container">
+  <div class="preview-frame desktop" id="previewFrame">
+    <iframe id="previewIframe" src="about:blank"></iframe>
+  </div>
+</div>
+
+<script>
+const stateInfo = {
+  "landing-desktop": {
+    title: "Landing 页 · 桌面端",
+    desc: "重构后的 Landing 页，采用左右分栏布局，左侧产品介绍+特性列表，右侧聊天预览卡片。",
+    fixes: ["修复 baseline Landing 页角色卡片横向滚动体验差的问题", "新增产品特性图标化展示", "优化 CTA 按钮层级", "底部角色卡片改为响应式网格"]
+  },
+  "landing-mobile": {
+    title: "Landing 页 · 移动端",
+    desc: "移动端 Landing 页，单栏纵向布局，角色卡片 2 列网格。",
+    fixes: ["baseline 移动端 Landing 页布局错乱", "优化移动端字号和间距", "CTA 按钮全宽"]
+  },
+  "onboarding-step1": {
+    title: "引导页 · 选择角色",
+    desc: "新手引导第一步，性别切换+角色卡片网格+开场白预览。",
+    fixes: ["修复 baseline 引导页角色卡片选中态不明显", "新增进度条", "开场白预览区域独立展示"]
+  },
+  "onboarding-selected": {
+    title: "引导页 · 已选角色",
+    desc: "选中角色后显示开场白预览，下一步按钮激活。",
+    fixes: ["选中态视觉反馈增强", "开场白实时预览"]
+  },
+  "chat-empty": {
+    title: "聊天 · 空状态",
+    desc: "选中会话前的空状态，引导用户创建或选择对话。",
+    fixes: ["baseline 空状态只有一行文字", "新增图标+标题+描述+操作按钮的完整空状态"]
+  },
+  "chat-conversation": {
+    title: "聊天 · 有对话",
+    desc: "三栏布局：导航栏+会话列表+聊天区。消息气泡区分用户/角色，支持 Markdown 渲染。",
+    fixes: ["修复 baseline tab 切换时中间聊天区不更新的 Bug", "消息气泡样式统一", "新增消息操作按钮（复制/记住/重生成/删除）", "关系状态显示在顶栏"]
+  },
+  "chat-streaming": {
+    title: "聊天 · 流式回复",
+    desc: "AI 回复流式输出中，发送按钮变为停止按钮，消息显示打字光标。",
+    fixes: ["修复 baseline 流式回复时 UI 状态不明确", "停止按钮视觉突出", "流式光标动画"]
+  },
+  "chat-profile": {
+    title: "聊天 · 资料面板",
+    desc: "右侧资料面板展示角色人设、关系数据、记忆、动态。",
+    fixes: ["修复 baseline '打开聊天设置'按钮无响应的 Bug", "资料面板信息结构化", "关系数据可视化（亲密度/轮次/连续天数）"]
+  },
+  "chat-dark": {
+    title: "聊天 · 暗色主题",
+    desc: "全局暗色主题，所有组件适配暗色配色。",
+    fixes: ["baseline 暗色主题部分组件配色不一致", "统一暗色 token 系统", "消息气泡暗色适配"]
+  },
+  "chat-mobile-list": {
+    title: "移动端 · 会话列表",
+    desc: "移动端会话列表全屏展示，底部导航栏切换 tab。",
+    fixes: ["baseline 移动端三栏布局挤压", "移动端改为单栏堆叠", "底部导航替代左侧导航栏"]
+  },
+  "chat-mobile-chat": {
+    title: "移动端 · 聊天",
+    desc: "移动端聊天界面，顶栏返回按钮+角色信息，底部输入框适配安全区。",
+    fixes: ["修复 baseline 底部提示条遮挡输入框的 Bug", "输入框适配 iOS 安全区", "返回按钮回到列表"]
+  },
+  "chat-mobile-drawer": {
+    title: "移动端 · 资料抽屉",
+    desc: "移动端资料面板以右侧抽屉形式展示，遮罩层点击关闭。",
+    fixes: ["baseline 移动端资料面板挤压聊天区", "抽屉式设计不占常驻空间"]
+  },
+  "moments-empty": {
+    title: "动态 · 空状态",
+    desc: "动态页空状态，引导用户去聊天。",
+    fixes: ["修复 baseline 动态页空状态时中间/右侧仍显示聊天的 Bug", "空状态引导明确"]
+  },
+  "moments-feed": {
+    title: "动态 · 有内容",
+    desc: "动态流展示角色发布的动态，支持点赞和评论。",
+    fixes: ["动态卡片样式统一", "点赞/评论交互反馈"]
+  },
+  "me-page": {
+    title: "我的 · 主页",
+    desc: "我的页面，用户信息+核心设置分组+更多工具。",
+    fixes: ["修复 baseline 设置入口重复的问题", "设置项分组清晰", "每个设置项显示当前状态"]
+  },
+  "settings-modal": {
+    title: "设置 · 弹窗",
+    desc: "全局设置弹窗，API 预设一键切换+接口配置+温度滑块+主题切换+备份导入导出。",
+    fixes: ["修复 baseline 全局设置弹窗顶部文字截断的 Bug", "API 预设可视化选择", "温度滑块实时显示数值", "备份导入导出整合"]
+  },
+  "settings-dark": {
+    title: "设置 · 暗色",
+    desc: "暗色主题下的设置弹窗。",
+    fixes: ["弹窗暗色适配", "输入框暗色样式"]
+  },
+  "components-toast": {
+    title: "Toast 通知组件",
+    desc: "顶部 Toast 通知，支持 success/error/info 三种类型，可带操作按钮。",
+    fixes: ["baseline 无统一通知组件", "自动消失+手动关闭", "操作按钮支持回调"]
+  },
+  "components-empty": {
+    title: "空状态组件",
+    desc: "统一空状态组件：图标+标题+描述+操作按钮。",
+    fixes: ["baseline 各处空状态不统一", "组件化复用"]
+  },
+  "components-loading": {
+    title: "加载态组件",
+    desc: "骨架屏+Spinner+打字指示器三种加载态。",
+    fixes: ["baseline 加载态不统一", "骨架屏避免布局跳动"]
+  }
+};
+
+const tabs = document.querySelectorAll('.state-tab[data-state]');
+const iframe = document.getElementById('previewIframe');
+const frame = document.getElementById('previewFrame');
+const info = document.getElementById('stateInfo');
+
+tabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    tabs.forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const state = tab.dataset.state;
+    const isMobile = state.includes('mobile');
+    frame.className = 'preview-frame ' + (isMobile ? 'mobile' : 'desktop');
+    updateInfo(state);
+    loadState(state);
+  });
+});
+
+function updateInfo(state) {
+  const d = stateInfo[state];
+  if (!d) { info.innerHTML = ''; return; }
+  info.innerHTML = `
+    <h3>${d.title} <span class="badge badge-fixed">已修复</span></h3>
+    <p>${d.desc}</p>
+    <ul class="fix-list">${d.fixes.map(f => `<li>${f}</li>`).join('')}</ul>
+  `;
+}
+
+function loadState(state) {
+  // 生成对应状态的 HTML
+  const html = generateStateHTML(state);
+  iframe.srcdoc = html;
+}
+
+// 生成各状态的 HTML（简化版，展示关键 UI）
+function generateStateHTML(state) {
+  const baseCSS = `
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:#f7faf9;color:#1a2332;height:100vh;overflow:hidden}
+    .dark{background:#0f1419;color:#e8eef4}
+    .nav-rail{width:64px;background:#fff;border-right:1px solid #e2e8e7;display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:8px}
+    .nav-logo{width:40px;height:40px;border-radius:10px;background:#5fb8a0;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:18px;margin-bottom:12px}
+    .nav-item{width:44px;height:44px;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#8b9aa8;font-size:10px;cursor:pointer}
+    .nav-item.active{background:#e6f4ef;color:#5fb8a0}
+    .nav-item svg{width:22px;height:22px}
+    .list-pane{width:280px;background:#fff;border-right:1px solid #e2e8e7;display:flex;flex-direction:column}
+    .list-header{padding:16px;border-bottom:1px solid #e2e8e7;display:flex;align-items:center;justify-content:space-between}
+    .list-title{font-size:20px;font-weight:700}
+    .chat-pane{flex:1;display:flex;flex-direction:column;min-width:0;background:#f7faf9}
+    .chat-header{height:56px;padding:0 16px;border-bottom:1px solid #e2e8e7;background:#fff;display:flex;align-items:center;justify-content:space-between}
+    .msg{display:flex;gap:12px;padding:8px 16px}
+    .msg-me{flex-direction:row-reverse}
+    .msg-bubble{max-width:75%;padding:10px 14px;border-radius:16px;font-size:15px;line-height:1.6}
+    .msg-me .msg-bubble{background:#5fb8a0;color:#fff;border-bottom-right-radius:6px}
+    .msg-her .msg-bubble{background:#fff;color:#1a2332;border:1px solid #e2e8e7;border-bottom-left-radius:6px}
+    .chat-input-area{border-top:1px solid #e2e8e7;background:#fff;padding:12px 16px}
+    .chat-input-wrap{display:flex;align-items:flex-end;gap:8px;background:#f0f4f3;border-radius:14px;padding:8px;border:1px solid #e2e8e7}
+    .chat-input{flex:1;background:transparent;border:none;outline:none;resize:none;font-size:15px;padding:4px}
+    .chat-send-btn{width:40px;height:40px;border-radius:10px;background:#5fb8a0;color:#fff;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer}
+    .profile-pane{width:300px;background:#fff;border-left:1px solid #e2e8e7;display:flex;flex-direction:column;overflow-y:auto}
+    .app-shell{display:flex;height:100%}
+    .bottom-nav{display:none;height:60px;background:#fff;border-top:1px solid #e2e8e7}
+    @media(max-width:768px){.nav-rail{display:none}.bottom-nav{display:flex}.list-pane{position:fixed;inset:0 0 60px 0;width:100%;z-index:1}.chat-pane{position:fixed;inset:0 0 60px 0;z-index:2}.profile-pane{display:none}.profile-pane.open{display:flex;position:fixed;top:0;right:0;bottom:0;width:85vw;z-index:100}}
+    .dark .nav-rail,.dark .list-pane,.dark .chat-header,.dark .chat-input-area,.dark .profile-pane,.dark .bottom-nav{background:#1a2028;border-color:#2d3642}
+    .dark .chat-pane{background:#0f1419}
+    .dark .msg-her .msg-bubble{background:#232b35;color:#e8eef4;border-color:#2d3642}
+    .dark .chat-input-wrap{background:#232b35;border-color:#2d3642}
+  `;
+
+  switch(state) {
+    case 'landing-desktop':
+    case 'landing-mobile':
+      return `<html><head><style>${baseCSS}</style></head><body>
+        <div style="padding:40px;max-width:960px;margin:0 auto;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:32px;">
+            <div class="nav-logo">E</div>
+            <span style="font-size:20px;font-weight:700;">EchoChat</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center;">
+            <div>
+              <h1 style="font-size:32px;font-weight:700;margin-bottom:12px;">让角色记住你，<br>让关系继续发展。</h1>
+              <p style="color:#5fb8a0;font-weight:600;margin-bottom:8px;">念念不忘，必有回响</p>
+              <p style="color:#5a6a7a;font-size:14px;margin-bottom:24px;line-height:1.7;">和角色持续对话。她会记住你说过的事，关系会慢慢靠近，动态里留下生活痕迹。</p>
+              <div style="display:flex;gap:12px;margin-bottom:16px;">
+                <button style="padding:12px 28px;background:#5fb8a0;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;">开始聊天</button>
+                <button style="padding:12px 28px;background:#fff;color:#1a2332;border:1px solid #e2e8e7;border-radius:10px;font-size:15px;cursor:pointer;">了解更多</button>
+              </div>
+              <div style="font-size:13px;color:#8b9aa8;cursor:pointer;">导入完整备份</div>
+            </div>
+            <div style="background:#fff;border-radius:18px;border:1px solid #e2e8e7;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,0.08);">
+              <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+                <div style="width:48px;height:48px;border-radius:12px;background:#e6f4ef;display:flex;align-items:center;justify-content:center;font-size:24px;">👤</div>
+                <div><div style="font-weight:600;">白若</div><div style="font-size:12px;color:#5a6a7a;">在线 · 刚刚认识</div></div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <div class="msg msg-her" style="padding:0;"><div class="msg-bubble">嗯，你来了。今天……还好吗。</div></div>
+                <div class="msg msg-me" style="padding:0;justify-content:flex-end;"><div class="msg-bubble">挺好的，就是有点累。</div></div>
+                <div class="msg msg-her" style="padding:0;"><div class="msg-bubble">辛苦了。要不要说说发生了什么？我在呢。</div></div>
+              </div>
+            </div>
+          </div>
+          <h2 style="font-size:20px;font-weight:700;margin:40px 0 16px;">先认识这些声音</h2>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+            ${['橘小喵','白若','知心','辣妹'].map((n,i)=>`
+              <div style="background:#fff;border:1px solid #e2e8e7;border-radius:14px;padding:16px;cursor:pointer;">
+                <div style="width:48px;height:48px;border-radius:10px;background:hsl(${i*60},60%,85%);margin-bottom:12px;"></div>
+                <div style="font-weight:600;font-size:14px;">${n}</div>
+                <div style="font-size:12px;color:#5a6a7a;margin-top:2px;">角色标签</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </body></html>`;
+
+    case 'onboarding-step1':
+    case 'onboarding-selected':
+      const selected = state === 'onboarding-selected';
+      return `<html><head><style>${baseCSS}</style></head><body>
+        <div style="height:4px;background:#f0f4f3;"><div style="height:100%;width:${selected?100:50}%;background:#5fb8a0;transition:width .3s;"></div></div>
+        <div style="max-width:640px;margin:0 auto;padding:32px 24px;">
+          <h2 style="font-size:22px;font-weight:700;margin-bottom:6px;">选一个角色</h2>
+          <p style="font-size:13px;color:#5a6a7a;margin-bottom:20px;">每个人设有独立记忆。点一张卡片，看看开场白。</p>
+          <div style="display:flex;background:#f0f4f3;border-radius:10px;padding:4px;margin-bottom:20px;">
+            <button style="flex:1;padding:8px;border:none;border-radius:8px;background:#fff;font-weight:600;cursor:pointer;">女生</button>
+            <button style="flex:1;padding:8px;border:none;background:transparent;color:#5a6a7a;cursor:pointer;">男生</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+            ${['橘小喵','白若','知心','辣妹','静'].map((n,i)=>`
+              <div style="padding:16px;background:#fff;border:2px solid ${selected&&n==='白若'?'#5fb8a0':'#e2e8e7'};border-radius:14px;cursor:pointer;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                  <div style="width:36px;height:36px;border-radius:8px;background:hsl(${i*50},60%,85%);"></div>
+                  <span style="font-weight:600;">${n}</span>
+                </div>
+                <div style="font-size:12px;color:#5a6a7a;">角色标签</div>
+              </div>
+            `).join('')}
+          </div>
+          <div style="background:#fff;border:1px solid #e2e8e7;border-radius:14px;padding:16px;min-height:60px;margin-bottom:20px;">
+            ${selected?'<div style="font-size:12px;color:#5a6a7a;margin-bottom:4px;">开场白预览</div><div style="font-size:15px;">嗯，你来了。今天……还好吗。</div>':'<div style="font-size:13px;color:#8b9aa8;">点选上方角色后显示</div>'}
+          </div>
+        </div>
+        <div style="position:fixed;bottom:0;left:0;right:0;padding:16px 24px;background:#fff;border-top:1px solid #e2e8e7;display:flex;justify-content:space-between;align-items:center;">
+          <button style="background:none;border:none;color:#5a6a7a;cursor:pointer;font-size:14px;">跳过·用默认</button>
+          <button style="padding:10px 28px;background:${selected?'#5fb8a0':'#cdd6d4'};color:#fff;border:none;border-radius:10px;font-weight:600;cursor:pointer;" ${selected?'':'disabled'}>下一步</button>
+        </div>
+      </body></html>`;
+
+    case 'chat-empty':
+      return `<html><head><style>${baseCSS}</style></head><body><div class="app-shell">
+        <nav class="nav-rail"><div class="nav-logo">E</div>
+          <div class="nav-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>消息</span></div>
+          <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/></svg><span>动态</span></div>
+          <div style="flex:1"></div>
+          <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>我的</span></div>
+        </nav>
+        <div class="list-pane">
+          <div class="list-header"><span class="list-title">消息</span><div style="display:flex;gap:8px;"><button style="width:36px;height:36px;border-radius:8px;border:none;background:#f0f4f3;cursor:pointer;">+</button></div></div>
+          <div style="padding:12px 16px;"><input style="width:100%;padding:10px 12px;border:1px solid #e2e8e7;border-radius:10px;font-size:14px;" placeholder="搜索会话…" /></div>
+          <div style="flex:1;padding:8px;">
+            <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:10px;background:#e6f4ef;cursor:pointer;">
+              <div style="width:48px;height:48px;border-radius:10px;background:#e6f4ef;"></div>
+              <div style="flex:1;"><div style="font-weight:600;">白若</div><div style="font-size:13px;color:#5a6a7a;">嗯，你来了。今天…</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="chat-pane" style="align-items:center;justify-content:center;">
+          <div style="text-align:center;">
+            <div style="width:64px;height:64px;border-radius:50%;background:#f0f4f3;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;color:#8b9aa8;font-size:28px;">💬</div>
+            <div style="font-size:17px;font-weight:600;margin-bottom:6px;">选择一个对话</div>
+            <div style="font-size:13px;color:#5a6a7a;margin-bottom:16px;">从左侧列表打开角色，继续聊天</div>
+            <button style="padding:10px 24px;background:#5fb8a0;color:#fff;border:none;border-radius:10px;font-weight:600;cursor:pointer;">+ 新建对话</button>
+          </div>
+        </div>
+      </div></body></html>`;
+
+    case 'chat-conversation':
+    case 'chat-streaming':
+    case 'chat-profile':
+    case 'chat-dark':
+      const isDark = state === 'chat-dark';
+      const isStreaming = state === 'chat-streaming';
+      const showProfile = state === 'chat-profile';
+      return `<html><head><style>${baseCSS}</style></head><body class="${isDark?'dark':''}"><div class="app-shell">
+        <nav class="nav-rail"><div class="nav-logo">E</div>
+          <div class="nav-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>消息</span></div>
+          <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/></svg><span>动态</span></div>
+          <div style="flex:1"></div>
+          <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>我的</span></div>
+        </nav>
+        <div class="list-pane">
+          <div class="list-header"><span class="list-title">消息</span></div>
+          <div style="flex:1;padding:8px;">
+            <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:10px;background:${isDark?'#232b35':'#e6f4ef'};cursor:pointer;">
+              <div style="width:48px;height:48px;border-radius:10px;background:#e6f4ef;"></div>
+              <div style="flex:1;"><div style="font-weight:600;">白若</div><div style="font-size:13px;color:#5a6a7a;">挺好的，就是有点累…</div></div>
+              <div style="font-size:11px;color:#8b9aa8;">17:16</div>
+            </div>
+          </div>
+        </div>
+        <div class="chat-pane">
+          <div class="chat-header">
+            <div style="display:flex;align-items:center;gap:12px;cursor:pointer;">
+              <div style="width:36px;height:36px;border-radius:8px;background:#e6f4ef;"></div>
+              <div><div style="font-weight:600;">白若</div><div style="font-size:12px;color:#5a6a7a;display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:#34d399;"></span>在线 · 认识1天 · 略疏离</div></div>
+            </div>
+            <div style="display:flex;gap:8px;"><button style="width:36px;height:36px;border-radius:8px;border:none;background:transparent;cursor:pointer;color:#5a6a7a;">🔊</button><button style="width:36px;height:36px;border-radius:8px;border:none;background:transparent;cursor:pointer;color:#5a6a7a;">⋯</button></div>
+          </div>
+          <div style="flex:1;overflow-y:auto;padding:16px 0;">
+            <div class="msg msg-her"><div style="width:36px;height:36px;border-radius:8px;background:#e6f4ef;flex-shrink:0;"></div><div><div class="msg-bubble">嗯，你来了。今天……还好吗。</div><div style="font-size:11px;color:#8b9aa8;margin-top:4px;">17:16</div></div></div>
+            <div class="msg msg-me"><div><div class="msg-bubble">挺好的，就是有点累。</div><div style="font-size:11px;color:#8b9aa8;margin-top:4px;text-align:right;">17:17</div></div></div>
+            <div class="msg msg-her"><div style="width:36px;height:36px;border-radius:8px;background:#e6f4ef;flex-shrink:0;"></div><div><div class="msg-bubble">辛苦了。要不要说说发生了什么？我在呢。${isStreaming?'<span style="animation:blink 1s infinite;">▋</span>':''}</div></div></div>
+          </div>
+          <div class="chat-input-area">
+            <div class="chat-input-wrap">
+              <button style="width:36px;height:36px;border-radius:8px;border:none;background:transparent;cursor:pointer;color:#5a6a7a;">🎤</button>
+              <textarea class="chat-input" rows="1" placeholder="说点什么…"></textarea>
+              <button class="chat-send-btn" style="background:${isStreaming?'#f87171':'#5fb8a0'};">${isStreaming?'■':'➤'}</button>
+            </div>
+          </div>
+        </div>
+        ${showProfile?`<div class="profile-pane">
+          <div style="padding:24px 16px;text-align:center;border-bottom:1px solid #e2e8e7;position:relative;">
+            <button style="position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:8px;border:none;background:transparent;cursor:pointer;">✕</button>
+            <div style="width:80px;height:80px;border-radius:16px;background:#e6f4ef;margin:0 auto 12px;"></div>
+            <div style="font-size:18px;font-weight:700;">白若</div>
+            <div style="font-size:12px;color:#5a6a7a;margin-top:4px;">在线 · 认识1天</div>
+          </div>
+          <div style="padding:16px;border-bottom:1px solid #e2e8e7;">
+            <div style="font-size:11px;font-weight:600;color:#8b9aa8;text-transform:uppercase;margin-bottom:8px;">性格</div>
+            <div style="font-size:13px;line-height:1.7;">你是白若，性格温柔清冷。话不多但每句都认真…</div>
+          </div>
+          <div style="padding:16px;border-bottom:1px solid #e2e8e7;">
+            <div style="font-size:11px;font-weight:600;color:#8b9aa8;text-transform:uppercase;margin-bottom:8px;">关系</div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:13px;"><span>亲密度</span><span style="color:#5fb8a0;font-weight:600;">0</span></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:13px;"><span>聊天轮次</span><span>3</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;"><span>连续聊天</span><span>0天</span></div>
+          </div>
+          <div style="padding:16px;border-bottom:1px solid #e2e8e7;">
+            <div style="font-size:11px;font-weight:600;color:#8b9aa8;text-transform:uppercase;margin-bottom:8px;">记忆</div>
+            <div style="font-size:13px;color:#8b9aa8;">暂无记忆，多聊一会儿就会有了</div>
+          </div>
+        </div>`:''}
+      </div></body></html>`;
+
+    case 'chat-mobile-list':
+      return `<html><head><style>${baseCSS}</style></head><body><div class="app-shell">
+        <div class="list-pane" style="display:flex;">
+          <div class="list-header"><span class="list-title">消息</span><button style="width:36px;height:36px;border-radius:8px;border:none;background:#f0f4f3;cursor:pointer;">+</button></div>
+          <div style="padding:12px 16px;"><input style="width:100%;padding:10px 12px;border:1px solid #e2e8e7;border-radius:10px;font-size:14px;" placeholder="搜索会话…" /></div>
+          <div style="flex:1;padding:8px;">
+            ${['白若','橘小喵','知心'].map((n,i)=>`
+              <div style="display:flex;align-items:center;gap:12px;padding:14px 12px;border-radius:10px;${i===0?'background:#e6f4ef;':''}cursor:pointer;">
+                <div style="width:48px;height:48px;border-radius:10px;background:hsl(${i*60},60%,85%);"></div>
+                <div style="flex:1;min-width:0;"><div style="font-weight:600;">${n}</div><div style="font-size:13px;color:#5a6a7a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">最近一条消息预览…</div></div>
+                <div style="font-size:11px;color:#8b9aa8;">刚刚</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        <nav class="bottom-nav">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#5fb8a0;font-size:10px;gap:2px;">💬<span>消息</span></div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#8b9aa8;font-size:10px;gap:2px;">📷<span>动态</span></div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#8b9aa8;font-size:10px;gap:2px;">👤<span>我的</span></div>
+        </nav>
+      </div></body></html>`;
+
+    case 'chat-mobile-chat':
+      return `<html><head><style>${baseCSS}</style></head><body><div class="app-shell">
+        <div class="chat-pane" style="display:flex;">
+          <div class="chat-header">
+            <button style="width:36px;height:36px;border-radius:8px;border:none;background:transparent;cursor:pointer;font-size:18px;">←</button>
+            <div style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+              <div style="width:36px;height:36px;border-radius:8px;background:#e6f4ef;"></div>
+              <div><div style="font-weight:600;font-size:15px;">白若</div><div style="font-size:11px;color:#5a6a7a;">在线 · 认识1天</div></div>
+            </div>
+            <div style="width:36px;"></div>
+          </div>
+          <div style="flex:1;overflow-y:auto;padding:16px 0;">
+            <div class="msg msg-her"><div style="width:36px;height:36px;border-radius:8px;background:#e6f4ef;flex-shrink:0;"></div><div class="msg-bubble" style="max-width:85%;">嗯，你来了。今天……还好吗。</div></div>
+            <div class="msg msg-me"><div class="msg-bubble" style="max-width:85%;">挺好的，就是有点累。</div></div>
+            <div class="msg msg-her"><div style="width:36px;height:36px;border-radius:8px;background:#e6f4ef;flex-shrink:0;"></div><div class="msg-bubble" style="max-width:85%;">辛苦了。要不要说说发生了什么？我在呢。</div></div>
+          </div>
+          <div class="chat-input-area" style="padding-bottom:calc(12px + env(safe-area-inset-bottom));">
+            <div class="chat-input-wrap">
+              <textarea class="chat-input" rows="1" placeholder="说点什么…"></textarea>
+              <button class="chat-send-btn">➤</button>
+            </div>
+          </div>
+        </div>
+      </div></body></html>`;
+
+    case 'chat-mobile-drawer':
+      return `<html><head><style>${baseCSS}</style></head><body><div class="app-shell">
+        <div class="chat-pane" style="display:flex;filter:brightness(0.5);">
+          <div class="chat-header"><div style="display:flex;align-items:center;gap:10px;"><div style="width:36px;height:36px;border-radius:8px;background:#e6f4ef;"></div><div style="font-weight:600;">白若</div></div></div>
+          <div style="flex:1;"></div>
+          <div class="chat-input-area"><div class="chat-input-wrap"><textarea class="chat-input" rows="1"></textarea></div></div>
+        </div>
+        <div class="profile-pane open" style="display:flex;position:fixed;top:0;right:0;bottom:0;width:85%;z-index:100;box-shadow:-8px 0 32px rgba(0,0,0,0.2);">
+          <div style="padding:24px 16px;text-align:center;border-bottom:1px solid #e2e8e7;">
+            <div style="width:80px;height:80px;border-radius:16px;background:#e6f4ef;margin:0 auto 12px;"></div>
+            <div style="font-size:18px;font-weight:700;">白若</div>
+            <div style="font-size:12px;color:#5a6a7a;margin-top:4px;">在线 · 认识1天</div>
+          </div>
+          <div style="padding:16px;border-bottom:1px solid #e2e8e7;">
+            <div style="font-size:11px;font-weight:600;color:#8b9aa8;text-transform:uppercase;margin-bottom:8px;">性格</div>
+            <div style="font-size:13px;line-height:1.7;">温柔清冷，话不多但每句都认真…</div>
+          </div>
+          <div style="padding:16px;border-bottom:1px solid #e2e8e7;">
+            <div style="font-size:11px;font-weight:600;color:#8b9aa8;text-transform:uppercase;margin-bottom:8px;">关系</div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:13px;"><span>亲密度</span><span style="color:#5fb8a0;font-weight:600;">0</span></div>
+          </div>
+        </div>
+      </div></body></html>`;
+
+    case 'moments-empty':
+      return `<html><head><style>${baseCSS}</style></head><body><div class="app-shell">
+        <nav class="nav-rail"><div class="nav-logo">E</div><div class="nav-item">💬</div><div class="nav-item active">📷</div><div style="flex:1"></div><div class="nav-item">👤</div></nav>
+        <div class="moments-pane" style="flex:1;display:flex;flex-direction:column;">
+          <div class="list-header"><span class="list-title">动态</span><select style="padding:8px 12px;border:1px solid #e2e8e7;border-radius:8px;font-size:13px;"><option>全部</option></select></div>
+          <div style="flex:1;display:flex;align-items:center;justify-content:center;">
+            <div style="text-align:center;">
+              <div style="width:64px;height:64px;border-radius:50%;background:#f0f4f3;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:28px;color:#8b9aa8;">📷</div>
+              <div style="font-size:17px;font-weight:600;margin-bottom:6px;">还没有动态</div>
+              <div style="font-size:13px;color:#5a6a7a;margin-bottom:16px;">和角色多聊一会儿，这里会留下生活痕迹</div>
+              <button style="padding:10px 24px;background:#5fb8a0;color:#fff;border:none;border-radius:10px;font-weight:600;cursor:pointer;">去消息里聊聊</button>
+            </div>
+          </div>
+        </div>
+      </div></body></html>`;
+
+    case 'moments-feed':
+      return `<html><head><style>${baseCSS}</style></head><body><div class="app-shell">
+        <nav class="nav-rail"><div class="nav-logo">E</div><div class="nav-item">💬</div><div class="nav-item active">📷</div><div style="flex:1"></div><div class="nav-item">👤</div></nav>
+        <div class="moments-pane" style="flex:1;display:flex;flex-direction:column;overflow-y:auto;">
+          <div class="list-header"><span class="list-title">动态</span></div>
+          <div style="max-width:640px;margin:0 auto;width:100%;padding:16px;">
+            ${[
+              {name:'白若',time:'2小时前',content:'今天下雨了，窗外的声音很好听。你那边天气怎么样？',likes:12,comments:3},
+              {name:'橘小喵',time:'5小时前',content:'刚刚学会了一道新菜，虽然有点咸但是很有成就感！下次做给你吃~',likes:28,comments:7},
+              {name:'知心',time:'昨天',content:'深夜适合思考。最近在读一本书，里面有句话很喜欢："慢慢来，比较快。"',likes:45,comments:12}
+            ].map(m=>`
+              <div style="background:#fff;border-radius:14px;border:1px solid #e2e8e7;padding:16px;margin-bottom:12px;">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                  <div style="width:40px;height:40px;border-radius:50%;background:#e6f4ef;"></div>
+                  <div><div style="font-weight:600;font-size:14px;">${m.name}</div><div style="font-size:12px;color:#8b9aa8;">${m.time}</div></div>
+                </div>
+                <div style="font-size:15px;line-height:1.7;margin-bottom:12px;">${m.content}</div>
+                <div style="display:flex;gap:24px;border-top:1px solid #f0f4f3;padding-top:12px;">
+                  <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:#5a6a7a;cursor:pointer;">❤️ ${m.likes}</div>
+                  <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:#5a6a7a;cursor:pointer;">💬 ${m.comments}</div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div></body></html>`;
+
+    case 'me-page':
+      return `<html><head><style>${baseCSS}</style></head><body><div class="app-shell">
+        <nav class="nav-rail"><div class="nav-logo">E</div><div class="nav-item">💬</div><div class="nav-item">📷</div><div style="flex:1"></div><div class="nav-item active">👤</div></nav>
+        <div style="flex:1;overflow-y:auto;">
+          <div class="list-header"><span class="list-title">我的</span><button style="background:none;border:none;color:#5a6a7a;cursor:pointer;font-size:14px;">设置</button></div>
+          <div style="max-width:640px;margin:0 auto;padding:20px;">
+            <div style="background:#fff;border-radius:14px;border:1px solid #e2e8e7;padding:16px;display:flex;align-items:center;gap:16px;margin-bottom:20px;">
+              <div style="width:64px;height:64px;border-radius:50%;background:#6b8afd;display:flex;align-items:center;justify-content:center;color:#fff;font-size:28px;">👤</div>
+              <div style="flex:1;"><div style="font-size:18px;font-weight:700;">我</div><div style="font-size:13px;color:#5a6a7a;">本地保存 · 1 个对话</div></div>
+              <button style="width:36px;height:36px;border-radius:8px;border:none;background:#f0f4f3;cursor:pointer;">✏️</button>
+            </div>
+            <div style="font-size:12px;font-weight:600;color:#8b9aa8;text-transform:uppercase;margin-bottom:8px;padding:0 8px;">核心设置</div>
+            <div style="background:#fff;border-radius:14px;border:1px solid #e2e8e7;overflow:hidden;margin-bottom:20px;">
+              ${[
+                {icon:'🗄️',title:'API 与模型',desc:'Qwen/Qwen2.5-7B-Instruct'},
+                {icon:'📖',title:'世界书',desc:'全局与角色设定注入'},
+                {icon:'🧠',title:'长期记忆',desc:'最多每角色 20 条'},
+                {icon:'🎨',title:'主题',desc:'亮色'},
+                {icon:'📥',title:'导出导入备份',desc:'JSON 格式全量备份'}
+              ].map((item,i)=>`
+                <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;${i<4?'border-bottom:1px solid #f0f4f3;':''}">
+                  <div style="width:36px;height:36px;border-radius:10px;background:#e6f4ef;display:flex;align-items:center;justify-content:center;font-size:18px;">${item.icon}</div>
+                  <div style="flex:1;"><div style="font-size:14px;font-weight:500;">${item.title}</div><div style="font-size:12px;color:#5a6a7a;margin-top:2px;">${item.desc}</div></div>
+                  <span style="color:#8b9aa8;">›</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      </div></body></html>`;
+
+    case 'settings-modal':
+    case 'settings-dark':
+      const sDark = state === 'settings-dark';
+      return `<html><head><style>${baseCSS}</style></head><body class="${sDark?'dark':''}" style="background:${sDark?'rgba(0,0,0,0.6)':'rgba(0,0,0,0.5)'};display:flex;align-items:center;justify-content:center;">
+        <div style="background:${sDark?'#1a2028':'#fff'};border-radius:18px;width:90%;max-width:560px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 16px 48px rgba(0,0,0,0.3);">
+          <div style="padding:16px 20px;border-bottom:1px solid ${sDark?'#2d3642':'#e2e8e7'};display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-size:16px;font-weight:600;">全局设置</span>
+            <button style="width:32px;height:32px;border-radius:8px;border:none;background:transparent;cursor:pointer;color:#5a6a7a;">✕</button>
+          </div>
+          <div style="padding:20px;overflow-y:auto;flex:1;">
+            <div style="margin-bottom:16px;">
+              <label style="font-size:13px;font-weight:600;margin-bottom:8px;display:block;">API 预设</label>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                ${['SiliconFlow','Google Gemini','Groq','OpenRouter','DeepSeek','自定义'].map((p,i)=>`<button style="padding:6px 14px;border-radius:20px;font-size:12px;border:1px solid ${sDark?'#2d3642':'#e2e8e7'};background:${i===0?'#5fb8a0':sDark?'#232b35':'#f0f4f3'};color:${i===0?'#fff':'#5a6a7a'};cursor:pointer;">${p}</button>`).join('')}
+              </div>
+            </div>
+            <div style="margin-bottom:16px;">
+              <label style="font-size:13px;font-weight:600;margin-bottom:8px;display:block;">接口地址</label>
+              <input style="width:100%;padding:10px 12px;border:1px solid ${sDark?'#2d3642':'#e2e8e7'};border-radius:10px;font-size:14px;background:${sDark?'#232b35':'#fff'};color:${sDark?'#e8eef4':'#1a2332'};" value="https://api.siliconflow.cn/v1" />
+            </div>
+            <div style="margin-bottom:16px;">
+              <label style="font-size:13px;font-weight:600;margin-bottom:8px;display:block;">API Key</label>
+              <input type="password" style="width:100%;padding:10px 12px;border:1px solid ${sDark?'#2d3642':'#e2e8e7'};border-radius:10px;font-size:14px;background:${sDark?'#232b35':'#fff'};color:${sDark?'#e8eef4':'#1a2332'};" placeholder="sk-..." />
+            </div>
+            <div style="margin-bottom:16px;">
+              <label style="font-size:13px;font-weight:600;margin-bottom:8px;display:block;">模型</label>
+              <input style="width:100%;padding:10px 12px;border:1px solid ${sDark?'#2d3642':'#e2e8e7'};border-radius:10px;font-size:14px;background:${sDark?'#232b35':'#fff'};color:${sDark?'#e8eef4':'#1a2332'};" value="Qwen/Qwen2.5-7B-Instruct" />
+            </div>
+            <div style="margin-bottom:16px;">
+              <label style="font-size:13px;font-weight:600;margin-bottom:8px;display:block;">温度：1.0</label>
+              <input type="range" min="0" max="2" step="0.1" value="1" style="width:100%;" />
+            </div>
+            <div style="margin-bottom:16px;">
+              <label style="font-size:13px;font-weight:600;margin-bottom:8px;display:block;">主题</label>
+              <div style="display:flex;gap:8px;">
+                <button style="padding:6px 16px;border-radius:8px;border:none;background:${sDark?'#232b35':'#5fb8a0'};color:${sDark?'#5a6a7a':'#fff'};font-size:13px;cursor:pointer;">亮色</button>
+                <button style="padding:6px 16px;border-radius:8px;border:none;background:${sDark?'#5fb8a0':'#f0f4f3'};color:${sDark?'#fff':'#5a6a7a'};font-size:13px;cursor:pointer;">暗色</button>
+              </div>
+            </div>
+          </div>
+          <div style="padding:16px 20px;border-top:1px solid ${sDark?'#2d3642':'#e2e8e7'};display:flex;justify-content:flex-end;gap:12px;">
+            <button style="padding:10px 20px;border:none;background:transparent;color:#5a6a7a;cursor:pointer;font-size:14px;">取消</button>
+            <button style="padding:10px 24px;background:#5fb8a0;color:#fff;border:none;border-radius:10px;font-weight:600;cursor:pointer;">保存设置</button>
+          </div>
+        </div>
+      </body></html>`;
+
+    case 'components-toast':
+      return `<html><head><style>${baseCSS}</style></head><body style="padding:40px;">
+        <h2 style="margin-bottom:20px;">Toast 通知组件</h2>
+        <div style="position:fixed;top:24px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:999;">
+          <div style="background:#fff;border:1px solid #e2e8e7;border-left:3px solid #34d399;border-radius:10px;padding:12px 16px;box-shadow:0 8px 32px rgba(0,0,0,0.1);font-size:13px;display:flex;align-items:center;gap:12px;min-width:280px;">✅ 操作成功完成</div>
+          <div style="background:#fff;border:1px solid #e2e8e7;border-left:3px solid #f87171;border-radius:10px;padding:12px 16px;box-shadow:0 8px 32px rgba(0,0,0,0.1);font-size:13px;display:flex;align-items:center;gap:12px;min-width:280px;">❌ 请求失败，请重试 <span style="color:#5fb8a0;font-weight:600;cursor:pointer;margin-left:auto;">重试</span></div>
+          <div style="background:#fff;border:1px solid #e2e8e7;border-left:3px solid #6b8afd;border-radius:10px;padding:12px 16px;box-shadow:0 8px 32px rgba(0,0,0,0.1);font-size:13px;display:flex;align-items:center;gap:12px;min-width:280px;">ℹ️ 这是一条信息提示</div>
+        </div>
+        <div style="margin-top:120px;color:#5a6a7a;font-size:14px;">三种类型：success / error / info，支持操作按钮，3秒自动消失</div>
+      </body></html>`;
+
+    case 'components-empty':
+      return `<html><head><style>${baseCSS}</style></head><body style="padding:40px;">
+        <h2 style="margin-bottom:20px;">空状态组件</h2>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;">
+          ${[
+            {icon:'💬',title:'还没有对话',desc:'点击右上角 + 创建新对话',btn:'新建对话'},
+            {icon:'📷',title:'还没有动态',desc:'和角色多聊一会儿',btn:'去聊天'},
+            {icon:'🧠',title:'暂无记忆',desc:'多聊一会儿就会有了',btn:''}
+          ].map(e=>`
+            <div style="background:#fff;border:1px solid #e2e8e7;border-radius:14px;padding:32px 20px;text-align:center;">
+              <div style="width:56px;height:56px;border-radius:50%;background:#f0f4f3;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:24px;">${e.icon}</div>
+              <div style="font-size:15px;font-weight:600;margin-bottom:6px;">${e.title}</div>
+              <div style="font-size:13px;color:#5a6a7a;margin-bottom:12px;">${e.desc}</div>
+              ${e.btn?`<button style="padding:8px 20px;background:#5fb8a0;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">${e.btn}</button>`:''}
+            </div>
+          `).join('')}
+        </div>
+      </body></html>`;
+
+    case 'components-loading':
+      return `<html><head><style>${baseCSS}</style></head><body style="padding:40px;">
+        <h2 style="margin-bottom:20px;">加载态组件</h2>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;">
+          <div style="background:#fff;border:1px solid #e2e8e7;border-radius:14px;padding:24px;text-align:center;">
+            <div style="font-size:13px;color:#5a6a7a;margin-bottom:16px;">Spinner</div>
+            <div style="width:32px;height:32px;border:3px solid #e2e8e7;border-top-color:#5fb8a0;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto;"></div>
+          </div>
+          <div style="background:#fff;border:1px solid #e2e8e7;border-radius:14px;padding:24px;">
+            <div style="font-size:13px;color:#5a6a7a;margin-bottom:16px;">骨架屏</div>
+            <div style="display:flex;gap:12px;margin-bottom:12px;"><div style="width:40px;height:40px;border-radius:8px;background:linear-gradient(90deg,#f0f4f3 25%,#e8eeed 50%,#f0f4f3 75%);background-size:200% 100%;animation:skeleton 1.5s infinite;"></div><div style="flex:1;"><div style="height:14px;border-radius:4px;background:linear-gradient(90deg,#f0f4f3 25%,#e8eeed 50%,#f0f4f3 75%);background-size:200% 100%;animation:skeleton 1.5s infinite;margin-bottom:8px;"></div><div style="height:12px;width:60%;border-radius:4px;background:linear-gradient(90deg,#f0f4f3 25%,#e8eeed 50%,#f0f4f3 75%);background-size:200% 100%;animation:skeleton 1.5s infinite;"></div></div></div>
+          </div>
+          <div style="background:#fff;border:1px solid #e2e8e7;border-radius:14px;padding:24px;">
+            <div style="font-size:13px;color:#5a6a7a;margin-bottom:16px;">打字指示器</div>
+            <div style="display:flex;gap:4px;justify-content:center;padding:12px;">
+              <div style="width:8px;height:8px;border-radius:50%;background:#8b9aa8;animation:typing 1.4s infinite;"></div>
+              <div style="width:8px;height:8px;border-radius:50%;background:#8b9aa8;animation:typing 1.4s infinite;animation-delay:0.2s;"></div>
+              <div style="width:8px;height:8px;border-radius:50%;background:#8b9aa8;animation:typing 1.4s infinite;animation-delay:0.4s;"></div>
+            </div>
+          </div>
+        </div>
+        <style>@keyframes spin{to{transform:rotate(360deg)}}@keyframes skeleton{0%{background-position:200% 0}100%{background-position:-200% 0}}@keyframes typing{0%,60%,100%{transform:translateY(0);opacity:0.4}30%{transform:translateY(-6px);opacity:1}}</style>
+      </body></html>`;
+
+    default:
+      return '<html><body><p>State not found</p></body></html>';
+  }
+}
+
+// 初始化
+updateInfo('landing-desktop');
+loadState('landing-desktop');
+</script>
+</body>
+</html>

@@ -19,116 +19,143 @@ export function getMemory(roleId) {
 
 export function getMemoryList(roleId, limit) {
   const mem = getMemory(roleId);
-  const list = mem.memories.slice().sort((a, b) => (b.importance || 0) - (a.importance || 0));
+  const list = mem.memories.slice().sort((a, b) => b.importance - a.importance || b.createdAt - a.createdAt);
   return limit ? list.slice(0, limit) : list;
 }
 
-export function addMemory(roleId, text, opts = {}) {
-  if (!roleId || !text) return null;
-  const item = {
-    id: uid(),
-    text: String(text).trim(),
-    importance: opts.importance ?? 5,
-    source: opts.source || "manual",
-    createdAt: Date.now(),
-  };
+export function addMemory(roleId, content, importance = 5, source = "auto") {
+  if (!roleId || !content?.trim()) return null;
+  const mem = { id: uid(), content: content.trim(), importance, createdAt: Date.now(), source };
   store.set((s) => {
-    const ltm = { ...s.longTermMemory };
-    const cur = ltm[roleId] || { roleName: opts.roleName || "", memories: [] };
-    ltm[roleId] = {
-      ...cur,
-      roleName: opts.roleName || cur.roleName || "",
-      memories: [...cur.memories, item],
+    const existing = s.longTermMemory[roleId] || { roleName: "", memories: [] };
+    const memories = [...existing.memories, mem].slice(-s.memoryCfg.maxPerRole);
+    return {
+      ...s,
+      longTermMemory: { ...s.longTermMemory, [roleId]: { ...existing, memories } },
     };
-    return { ...s, longTermMemory: ltm };
   });
-  events.emit(EVT.MEMORY_ADDED, { roleId, item });
-  return item;
+  events.emit(EVT.MEMORY_ADDED, { roleId, memory: mem });
+  return mem;
 }
 
-export function deleteMemory(roleId, memId) {
+export function deleteMemory(roleId, memoryId) {
   store.set((s) => {
-    const ltm = { ...s.longTermMemory };
-    const cur = ltm[roleId];
-    if (!cur) return s;
-    ltm[roleId] = { ...cur, memories: cur.memories.filter((m) => m.id !== memId) };
-    return { ...s, longTermMemory: ltm };
+    const existing = s.longTermMemory[roleId];
+    if (!existing) return s;
+    return {
+      ...s,
+      longTermMemory: {
+        ...s.longTermMemory,
+        [roleId]: { ...existing, memories: existing.memories.filter((m) => m.id !== memoryId) },
+      },
+    };
   });
 }
 
 export function clearMemory(roleId) {
   store.set((s) => {
-    const ltm = { ...s.longTermMemory };
-    delete ltm[roleId];
-    return { ...s, longTermMemory: ltm };
-  });
-}
-
-export function updateMemoryImportance(roleId, memId, importance) {
-  store.set((s) => {
-    const ltm = { ...s.longTermMemory };
-    const cur = ltm[roleId];
-    if (!cur) return s;
-    ltm[roleId] = {
-      ...cur,
-      memories: cur.memories.map((m) => (m.id === memId ? { ...m, importance } : m)),
+    const existing = s.longTermMemory[roleId];
+    if (!existing) return s;
+    return {
+      ...s,
+      longTermMemory: { ...s.longTermMemory, [roleId]: { ...existing, memories: [] } },
     };
-    return { ...s, longTermMemory: ltm };
   });
 }
 
-export function buildMemoryBlock(roleId, maxItems = 12) {
-  const list = getMemoryList(roleId, maxItems);
-  if (!list.length) return "";
-  const lines = list.map((m) => `- ${m.text}`);
-  return "【长期记忆】\n" + lines.join("\n");
+export function updateMemoryImportance(roleId, memoryId, importance) {
+  store.set((s) => {
+    const existing = s.longTermMemory[roleId];
+    if (!existing) return s;
+    return {
+      ...s,
+      longTermMemory: {
+        ...s.longTermMemory,
+        [roleId]: {
+          ...existing,
+          memories: existing.memories.map((m) => (m.id === memoryId ? { ...m, importance } : m)),
+        },
+      },
+    };
+  });
 }
 
-export function rememberMessage(chat, text) {
+// 构建记忆注入文本
+export function buildMemoryBlock(roleId) {
+  const s = store.getState();
+  const mem = s.longTermMemory[roleId];
+  if (!mem || !mem.memories.length) return null;
+  const injectMax = s.memoryCfg.injectMax || 10;
+  const top = mem.memories
+    .slice()
+    .sort((a, b) => b.importance - a.importance || b.createdAt - a.createdAt)
+    .slice(0, injectMax);
+  if (!top.length) return null;
+  const lines = top.map((m) => `- ${m.content}`);
+  return `---\nAbout the user (remembered from past conversations):\n${lines.join("\n")}`;
+}
+
+// 记住单条消息（手动）
+export function rememberMessage(chat, message) {
   const roleId = getRoleId(chat);
-  if (!roleId || !text) return;
-  // 简单启发式：较长或含关键词的用户消息可记
-  if (text.length < 20) return;
-  addMemory(roleId, text.slice(0, 200), {
-    importance: 4,
-    source: "auto",
-    roleName: getRoleName(chat),
-  });
+  if (!roleId || !message?.text?.trim()) return;
+  addMemory(roleId, message.text.trim(), 6, "manual");
 }
 
+// 自动摘要（每 N 轮触发一次）
 export async function maybeAutoSummary(chat) {
-  if (summaryRunning || !chat) return;
-  const roleId = getRoleId(chat);
-  if (!roleId) return;
-  const msgs = chat.messages || [];
-  if (msgs.length < 20) return;
-  // 每约 20 条尝试一次
-  if (msgs.length % 20 !== 0) return;
+  const s = store.getState();
+  const cfg = s.memoryCfg.autoSummary;
+  if (!cfg?.enabled || summaryRunning) return;
+  const msgCount = chat.messages?.length || 0;
+  if (msgCount < cfg.everyTurns || msgCount % cfg.everyTurns !== 0) return;
 
   summaryRunning = true;
   try {
-    const recent = msgs.slice(-16);
-    const transcript = recent
-      .map((m) => `${m.role === "user" ? "用户" : "角色"}: ${m.text || ""}`)
+    const roleId = getRoleId(chat);
+    const persona = getPersona(chat);
+    const recent = chat.messages.slice(-cfg.everyTurns * 2);
+    const conversation = recent
+      .map((m) => `${m.role === "me" ? "用户" : getRoleName(chat)}: ${m.text}`)
       .join("\n");
-    const system =
-      "你是记忆摘要助手。根据对话摘出 3-5 条值得长期记住的要点，以及可选的一条角色生活动态。" +
-      "输出格式：\nSUMMARY:\n- 要点1\n- 要点2\nMOMENT:\n动态内容（可空）";
-    const content = await chatCompletion(chat, [
-      { role: "system", content: system },
-      { role: "user", content: transcript },
-    ]);
-    const { summaries, moment } = parseSummaryAndMoment(content || "");
-    for (const t of summaries) {
-      addMemory(roleId, t, {
-        importance: 6,
-        source: "auto_summary",
-        roleName: getRoleName(chat),
+
+    const prompt = `请从以下对话中提取重要信息，生成摘要和一条角色动态。
+
+人设：${persona.slice(0, 200)}
+
+对话：
+${conversation}
+
+请按以下格式输出：
+【摘要】
+（提取用户的重要信息、偏好、事件，每条一行，最多5条）
+
+【动态】
+（以角色口吻写一条朋友圈动态，20-80字，不带引号）`;
+
+    const result = await chatCompletion(
+      chat,
+      [{ role: "user", content: prompt }],
+      { temperature: 0.5, maxTokens: cfg.maxLength || 200 }
+    );
+
+    const { summary, moment } = parseSummaryAndMoment(result);
+
+    if (summary) {
+      const lines = summary.split("\n").filter((l) => l.trim());
+      lines.forEach((line) => {
+        const clean = line.replace(/^[-•*\d.]+\s*/, "").trim();
+        if (clean && clean.length > 2) {
+          addMemory(roleId, clean, 5, "auto_summary");
+        }
       });
     }
+
     if (moment) {
-      addMoment(roleId, moment, {
+      addMoment({
+        roleId,
         roleName: getRoleName(chat),
+        content: moment,
         source: "auto_summary",
       });
       events.emit(EVT.MOMENT_ADDED, { roleId, content: moment });

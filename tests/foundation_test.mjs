@@ -1,5 +1,14 @@
 import { strict as assert } from "node:assert";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
+// 跨环境路径解析：基于测试文件位置，不依赖开发机器绝对路径
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = join(__dirname, "..");
+function srcPath(relativePath) {
+  return join(PROJECT_ROOT, relativePath);
+}
 
 // 浏览器环境 Mock（Node 环境下运行测试需要）
 const localStorageMock = (() => {
@@ -299,21 +308,21 @@ console.log("\n=== 4. Architecture Boundary ===");
 
 test("Domain layer: character.js does not import localStorage directly", () => {
   
-  const content = readFileSync("/home/user/.super_doubao/super-doubao-runtime/workspace/echat-ui-lab/src/domain/character.js", "utf-8");
+  const content = readFileSync(srcPath("src/domain/character.js"), "utf-8");
   assert.ok(!content.includes("localStorage.getItem"), "character.js should not use localStorage.getItem");
   assert.ok(!content.includes("localStorage.setItem"), "character.js should not use localStorage.setItem");
 });
 
 test("Domain layer: asset.js does not import idb directly", () => {
   
-  const content = readFileSync("/home/user/.super_doubao/super-doubao-runtime/workspace/echat-ui-lab/src/domain/asset.js", "utf-8");
+  const content = readFileSync(srcPath("src/domain/asset.js"), "utf-8");
   assert.ok(!content.includes("idb.putBlob"), "asset.js should not use idb.putBlob directly");
   assert.ok(!content.includes("idb.getBlob"), "asset.js should not use idb.getBlob directly");
 });
 
 test("Repository layer: interfaces defined", () => {
   
-  const content = readFileSync("/home/user/.super_doubao/super-doubao-runtime/workspace/echat-ui-lab/src/repository/interfaces.js", "utf-8");
+  const content = readFileSync(srcPath("src/repository/interfaces.js"), "utf-8");
   assert.ok(content.includes("CharacterRepository"));
   assert.ok(content.includes("ConversationRepository"));
   assert.ok(content.includes("MessageRepository"));
@@ -322,7 +331,7 @@ test("Repository layer: interfaces defined", () => {
 
 test("Infrastructure: Dexie schema defined", () => {
   
-  const content = readFileSync("/home/user/.super_doubao/super-doubao-runtime/workspace/echat-ui-lab/src/infrastructure/dexie-db.js", "utf-8");
+  const content = readFileSync(srcPath("src/infrastructure/dexie-db.js"), "utf-8");
   assert.ok(content.includes("characters"));
   assert.ok(content.includes("conversations"));
   assert.ok(content.includes("messages"));
@@ -381,13 +390,13 @@ console.log("\n=== 6. Known Legacy Modules (Deferred) ===");
 
 test("moments.js uses storage (deferred to Phase 11)", () => {
   
-  const content = readFileSync("/home/user/.super_doubao/super-doubao-runtime/workspace/echat-ui-lab/src/domain/moments.js", "utf-8");
+  const content = readFileSync(srcPath("src/domain/moments.js"), "utf-8");
   assert.ok(content.includes("storage.get"), "moments.js uses storage (known legacy, deferred)");
 });
 
 test("relations.js uses storage (deferred to Phase 9)", () => {
   
-  const content = readFileSync("/home/user/.super_doubao/super-doubao-runtime/workspace/echat-ui-lab/src/domain/relations.js", "utf-8");
+  const content = readFileSync(srcPath("src/domain/relations.js"), "utf-8");
   assert.ok(content.includes("storage.get"), "relations.js uses storage (known legacy, deferred)");
 });
 

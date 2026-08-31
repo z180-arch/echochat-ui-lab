@@ -124,7 +124,7 @@ export function runMigrations() {
 
   migrationLog.steps.push("source validated");
 
-  // ---- Step 2: Transform ----
+  // ---- Step 2: Transform (全部在内存中完成，不修改 localStorage) ----
   let migratedData = { ...data };
   for (let v = currentVersion; v < SCHEMA_VERSION; v++) {
     if (migrations[v]) {
@@ -136,49 +136,64 @@ export function runMigrations() {
       } catch (e) {
         migrationLog.errors.push(`transform v${v} failed: ${e.message}`);
         console.error(`[Migration] transform v${v}→v${v + 1} failed:`, e);
-        // 转换失败：不写入任何数据，保留原始数据
         return failMigration(currentVersion, migrationLog, `数据转换失败: ${e.message}`);
       }
     }
   }
 
-  // ---- Step 3: Validate Transformed Result ----
+  // 在内存 snapshot 中完成所有 roleKey → roleId 转换（不读写 localStorage，不吞异常）
+  if (migratedData._roleIdMap) {
+    try {
+      migratedData.worldbook = transformWorldbookRoleKeysInMemory(
+        migratedData.worldbook,
+        migratedData._roleIdMap
+      );
+      migratedData.moments = transformMomentsRoleKeysInMemory(
+        migratedData.moments,
+        migratedData._roleIdMap
+      );
+      migratedData.relations = transformRelationsRoleKeysInMemory(
+        migratedData.relations,
+        migratedData._roleIdMap
+      );
+      migrationLog.steps.push("roleKey transform in-memory ok");
+    } catch (e) {
+      migrationLog.errors.push(`roleKey transform failed: ${e.message}`);
+      console.error("[Migration] roleKey in-memory transform failed:", e);
+      return failMigration(currentVersion, migrationLog, `roleKey 转换失败: ${e.message}`);
+    }
+  }
+
+  // ---- Step 3: Validate Complete Snapshot (所有模块验证通过后才能 commit) ----
   if (migratedData.state && typeof migratedData.state !== "object") {
     return failMigration(currentVersion, migrationLog, "转换后 state 格式无效");
   }
-  // 验证 chats 数组结构
   if (migratedData.state?.chats && !Array.isArray(migratedData.state.chats)) {
     return failMigration(currentVersion, migrationLog, "转换后 chats 不是数组");
   }
-  migrationLog.steps.push("transformed result validated");
+  if (migratedData.worldbook && typeof migratedData.worldbook !== "object") {
+    return failMigration(currentVersion, migrationLog, "转换后 worldbook 格式无效");
+  }
+  if (migratedData.moments && typeof migratedData.moments !== "object") {
+    return failMigration(currentVersion, migrationLog, "转换后 moments 格式无效");
+  }
+  if (migratedData.relations && typeof migratedData.relations !== "object") {
+    return failMigration(currentVersion, migrationLog, "转换后 relations 格式无效");
+  }
+  migrationLog.steps.push("complete snapshot validated");
 
-  // ---- Step 4: Commit (写入所有数据) ----
+  // ---- Step 4: Commit (原子写入所有数据，此阶段不做任何转换) ----
   const writeResults = [];
   if (migratedData.state !== null) writeResults.push(safeSet(KEYS.STATE, migratedData.state));
   if (migratedData.worldbook !== null) writeResults.push(safeSet(KEYS.WORLDBOOK, migratedData.worldbook));
   if (migratedData.moments !== null) writeResults.push(safeSet(KEYS.MOMENTS, migratedData.moments));
   if (migratedData.relations !== null) writeResults.push(safeSet(KEYS.RELATIONS, migratedData.relations));
 
-  // 迁移世界书/动态/关系中的 roleKey → roleId
-  if (migratedData._roleIdMap) {
-    try {
-      migrateWorldbookRoleKeys(migratedData._roleIdMap);
-      migrateMomentsRoleKeys(migratedData._roleIdMap);
-      migrateRelationsRoleKeys(migratedData._roleIdMap);
-      migrationLog.steps.push("roleKey migration ok");
-    } catch (e) {
-      migrationLog.errors.push(`roleKey migration failed: ${e.message}`);
-      // 注意：此时主数据已写入，但 roleKey 迁移失败
-      // 不标记 schema version，允许下次重试
-      return failMigration(currentVersion, migrationLog, `roleKey 迁移失败: ${e.message}`);
-    }
-  }
-
-  // 检查所有写入是否成功
+  // 任一写入失败都不标记 schema version
   if (writeResults.some((r) => r === false)) {
     return failMigration(currentVersion, migrationLog, "部分数据写入失败（存储可能已满）");
   }
-  migrationLog.steps.push("all data committed");
+  migrationLog.steps.push("all data committed atomically");
 
   // ---- Step 5: Mark Schema Version (只有完整成功后才升级) ----
   writeMeta({
@@ -208,50 +223,38 @@ function failMigration(fromVersion, log, reason) {
   return { migrated: false, from: fromVersion, to: SCHEMA_VERSION, success: false, reason };
 }
 
-function migrateWorldbookRoleKeys(roleIdMap) {
-  try {
-    const wb = safeParse(localStorage.getItem(KEYS.WORLDBOOK));
-    if (!wb || !Array.isArray(wb.books)) return;
-    wb.books.forEach((book) => {
-      if (book.scope === "character" && book.roleKey && roleIdMap[book.roleKey]) {
-        book.roleId = roleIdMap[book.roleKey];
-      }
-    });
-    safeSet(KEYS.WORLDBOOK, wb);
-  } catch (e) {
-    console.warn("[Storage] worldbook roleKey migration failed:", e);
-  }
+// 纯内存转换：worldbook 中 roleKey → roleId（不读写 localStorage，不吞异常）
+function transformWorldbookRoleKeysInMemory(worldbook, roleIdMap) {
+  if (!worldbook || !Array.isArray(worldbook.books)) return worldbook;
+  worldbook.books.forEach((book) => {
+    if (book.scope === "character" && book.roleKey && roleIdMap[book.roleKey]) {
+      book.roleId = roleIdMap[book.roleKey];
+    }
+  });
+  return worldbook;
 }
 
-function migrateMomentsRoleKeys(roleIdMap) {
-  try {
-    const mo = safeParse(localStorage.getItem(KEYS.MOMENTS));
-    if (!mo || !Array.isArray(mo.moments)) return;
-    mo.moments.forEach((m) => {
-      if (m.roleKey && roleIdMap[m.roleKey]) {
-        m.roleId = roleIdMap[m.roleKey];
-      }
-    });
-    safeSet(KEYS.MOMENTS, mo);
-  } catch (e) {
-    console.warn("[Storage] moments roleKey migration failed:", e);
-  }
+// 纯内存转换：moments 中 roleKey → roleId
+function transformMomentsRoleKeysInMemory(moments, roleIdMap) {
+  if (!moments || !Array.isArray(moments.moments)) return moments;
+  moments.moments.forEach((m) => {
+    if (m.roleKey && roleIdMap[m.roleKey]) {
+      m.roleId = roleIdMap[m.roleKey];
+    }
+  });
+  return moments;
 }
 
-function migrateRelationsRoleKeys(roleIdMap) {
-  try {
-    const rel = safeParse(localStorage.getItem(KEYS.RELATIONS));
-    if (!rel || !rel.roles) return;
-    const newRoles = {};
-    Object.keys(rel.roles).forEach((oldKey) => {
-      const newId = roleIdMap[oldKey] || oldKey;
-      newRoles[newId] = rel.roles[oldKey];
-    });
-    rel.roles = newRoles;
-    safeSet(KEYS.RELATIONS, rel);
-  } catch (e) {
-    console.warn("[Storage] relations roleKey migration failed:", e);
-  }
+// 纯内存转换：relations 中 roleKey → roleId
+function transformRelationsRoleKeysInMemory(relations, roleIdMap) {
+  if (!relations || !relations.roles) return relations;
+  const newRoles = {};
+  Object.keys(relations.roles).forEach((oldKey) => {
+    const newId = roleIdMap[oldKey] || oldKey;
+    newRoles[newId] = relations.roles[oldKey];
+  });
+  relations.roles = newRoles;
+  return relations;
 }
 
 function safeParse(raw) {

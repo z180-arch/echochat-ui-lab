@@ -1,0 +1,238 @@
+/* ============================================================
+   EchoChat Rebuild · Responsive Styles
+   断点：<768px 移动端 / 768-1024px 平板 / >1024px 桌面
+   ============================================================ */
+
+/* ---- 桌面端（默认）---- */
+@media (min-width: 1024px) {
+  .nav-rail {
+    display: flex;
+  }
+  .bottom-nav {
+    display: none;
+  }
+  .profile-pane {
+    display: flex;
+  }
+  .list-pane {
+    display: flex;
+  }
+}
+
+/* ---- 平板端（768-1024px）---- */
+@media (min-width: 768px) and (max-width: 1023px) {
+  :root {
+    --list-width: 260px;
+    --profile-width: 280px;
+  }
+  .nav-rail {
+    display: flex;
+  }
+  .bottom-nav {
+    display: none;
+  }
+  .profile-pane {
+    display: none; /* 平板默认隐藏资料面板，通过按钮打开抽屉 */
+  }
+  .profile-pane.open {
+    display: flex;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: var(--z-drawer);
+    box-shadow: var(--shadow-lg);
+  }
+}
+
+/* ---- 移动端（<768px）---- */
+@media (max-width: 767px) {
+  :root {
+    --sidebar-width: 0px;
+    --topbar-height: 52px;
+    --input-height: 48px;
+  }
+
+  .nav-rail {
+    display: none;
+  }
+  .bottom-nav {
+    display: flex;
+  }
+
+  /* 会话列表：全屏覆盖 */
+  .list-pane {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: var(--bottom-nav-height);
+    width: 100%;
+    z-index: var(--z-base);
+    border-right: none;
+  }
+  .list-pane.hidden-mobile {
+    display: none;
+  }
+
+  /* 聊天区：默认隐藏，选中会话后显示 */
+  .chat-pane {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: var(--bottom-nav-height);
+    z-index: var(--z-sticky);
+    background: var(--color-bg);
+  }
+  .chat-pane.hidden-mobile {
+    display: none;
+  }
+
+  /* 资料面板：抽屉 */
+  .profile-pane {
+    display: none;
+  }
+  .profile-pane.open {
+    display: flex;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 85vw;
+    max-width: 320px;
+    z-index: var(--z-drawer);
+    box-shadow: var(--shadow-lg);
+    animation: drawer-in var(--dur-normal) var(--ease-out);
+  }
+
+  /* Landing 响应式 */
+  .landing-hero {
+    grid-template-columns: 1fr;
+    gap: var(--space-6);
+    padding: var(--space-6) var(--space-4);
+    min-height: auto;
+  }
+  .landing-title {
+    font-size: 28px;
+  }
+  .landing-preview {
+    min-height: 240px;
+  }
+  .landing-roles-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Onboarding */
+  .onboarding-body {
+    padding: var(--space-4);
+  }
+  .onboarding-footer {
+    padding: var(--space-3) var(--space-4);
+    padding-bottom: calc(var(--space-3) + var(--safe-bottom));
+  }
+
+  /* 弹窗：底部 Sheet */
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .modal {
+    max-width: 100%;
+    max-height: 90vh;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    animation: sheet-in var(--dur-normal) var(--ease-out);
+  }
+  @keyframes sheet-in {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  /* 消息气泡最大宽度 */
+  .msg-bubble {
+    max-width: 85%;
+  }
+
+  /* 动态页 */
+  .moments-feed {
+    padding: var(--space-3);
+  }
+
+  /* 我的页 */
+  .me-content {
+    padding: var(--space-4);
+  }
+
+  /* Toast：底部显示 */
+  .toast-container {
+    top: auto;
+    bottom: calc(var(--bottom-nav-height) + var(--space-4) + var(--safe-bottom));
+  }
+}
+
+/* ---- 超小屏（<380px）---- */
+@media (max-width: 379px) {
+  :root {
+    --font-body: 14px;
+    --font-section: 16px;
+    --font-title: 18px;
+  }
+  .landing-roles-grid {
+    grid-template-columns: 1fr;
+  }
+  .msg-bubble {
+    max-width: 90%;
+  }
+}
+
+/* ---- 横屏移动端 ---- */
+@media (max-height: 500px) and (orientation: landscape) {
+  .bottom-nav {
+    display: none;
+  }
+  .nav-rail {
+    display: flex;
+    width: 56px;
+  }
+  .list-pane {
+    position: static;
+    width: 240px;
+    bottom: 0;
+  }
+  .chat-pane {
+    position: static;
+    bottom: 0;
+  }
+}
+
+/* ---- 大屏优化（>1440px）---- */
+@media (min-width: 1440px) {
+  :root {
+    --list-width: 300px;
+    --profile-width: 320px;
+  }
+  .landing-hero {
+    max-width: 1100px;
+  }
+  .chat-messages {
+    padding: var(--space-5) 0;
+  }
+}
+
+/* ---- 打印样式 ---- */
+@media print {
+  .nav-rail,
+  .bottom-nav,
+  .chat-input-area,
+  .list-pane,
+  .profile-pane {
+    display: none !important;
+  }
+  .chat-pane {
+    position: static;
+  }
+}

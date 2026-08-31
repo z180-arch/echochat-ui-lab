@@ -13,6 +13,7 @@ import { buildMemoryBlock } from "./memory.js";
 import { buildWorldbookBlock } from "./worldbook.js";
 import { recordChatTurn } from "./relations.js";
 import { maybeAutoSummary } from "./memory.js";
+import { messageStore } from "./message-store.js";
 
 let abortCtrl = null;
 let sending = false;
@@ -57,7 +58,7 @@ export async function sendMessage(text) {
   }
 
   // 1. 添加用户消息
-  const userMsg = store.addMessage(chat.id, { role: "me", text: text.trim(), status: "sent" });
+  const userMsg = await messageStore.addMessage(chat.id, { role: "me", text: text.trim(), status: "sent" });
   events.emit(EVT.MESSAGE_SENT, { chatId: chat.id, message: userMsg });
 
   // 2. 设置发送状态
@@ -79,7 +80,7 @@ export async function sendMessage(text) {
     const messages = buildMessages(chat, systemPrompt);
 
     // 5. 创建临时 AI 消息（流式中）
-    const tempMsg = store.addMessage(chat.id, {
+    const tempMsg = await messageStore.addMessage(chat.id, {
       role: "her",
       text: "",
       status: "streaming",
@@ -87,12 +88,12 @@ export async function sendMessage(text) {
 
     // 6. 流式请求
     const reply = await streamChat(chat, messages, abortCtrl.signal, (full) => {
-      store.updateMessage(chat.id, tempMsg.id, { text: full, status: "streaming" });
+      messageStore.updateMessage(chat.id, tempMsg.id, { text: full, status: "streaming" });
     });
 
     // 7. 完成
     if (reply?.trim()) {
-      store.updateMessage(chat.id, tempMsg.id, {
+      messageStore.updateMessage(chat.id, tempMsg.id, {
         text: reply.trim(),
         status: "sent",
       });
@@ -108,7 +109,7 @@ export async function sendMessage(text) {
       // 9. 自动摘要（非阻塞）
       maybeAutoSummary(store.getCurrentChat() || chat);
     } else {
-      store.deleteMessage(chat.id, tempMsg.id);
+      messageStore.deleteMessage(chat.id, tempMsg.id);
     }
   } catch (e) {
     // 错误处理
@@ -128,7 +129,7 @@ export async function sendMessage(text) {
     if (current) {
       const lastMsg = current.messages[current.messages.length - 1];
       if (lastMsg?.status === "streaming") {
-        store.updateMessage(current.id, lastMsg.id, {
+        messageStore.updateMessage(current.id, lastMsg.id, {
           status: e.name === "AbortError" ? "stopped" : "error",
         });
       }
@@ -149,7 +150,7 @@ export function stopGeneration() {
 }
 
 // 重试最后一条消息
-export function retryLastMessage() {
+export async function retryLastMessage() {
   const chat = store.getCurrentChat();
   if (!chat || sending) return;
 
@@ -165,20 +166,15 @@ export function retryLastMessage() {
 
   const userText = chat.messages[lastUserIdx].text;
 
-  // 删除最后一条用户消息之后的所有消息
-  store.set((s) => ({
-    ...s,
-    chats: s.chats.map((c) =>
-      c.id === chat.id ? { ...c, messages: c.messages.slice(0, lastUserIdx) } : c
-    ),
-  }));
+  // 删除最后一条用户消息之后的所有消息（双写：localStorage + Dexie）
+  await messageStore.truncateMessages(chat.id, lastUserIdx);
 
   // 重新发送
   sendMessage(userText);
 }
 
 // 重新生成 AI 回复
-export function regenerate(messageIndex) {
+export async function regenerate(messageIndex) {
   const chat = store.getCurrentChat();
   if (!chat || sending) return;
 
@@ -192,30 +188,21 @@ export function regenerate(messageIndex) {
   }
   if (!userText) return;
 
-  // 删除从该条开始的所有消息
-  store.set((s) => ({
-    ...s,
-    chats: s.chats.map((c) =>
-      c.id === chat.id ? { ...c, messages: c.messages.slice(0, messageIndex) } : c
-    ),
-  }));
+  // 删除从该条开始的所有消息（双写）
+  await messageStore.truncateMessages(chat.id, messageIndex);
 
   sendMessage(userText);
 }
 
 // 编辑消息（删除后重新输入）
-export function editMessage(messageIndex) {
+export async function editMessage(messageIndex) {
   const chat = store.getCurrentChat();
   if (!chat) return;
   const msg = chat.messages[messageIndex];
   if (!msg || msg.role !== "me") return;
 
-  store.set((s) => ({
-    ...s,
-    chats: s.chats.map((c) =>
-      c.id === chat.id ? { ...c, messages: c.messages.slice(0, messageIndex) } : c
-    ),
-  }));
+  // 删除从该条开始的所有消息（双写）
+  await messageStore.truncateMessages(chat.id, messageIndex);
 
   return msg.text;
 }
@@ -225,7 +212,7 @@ export function deleteMessage(messageIndex) {
   const chat = store.getCurrentChat();
   if (!chat) return;
   const msgId = chat.messages[messageIndex]?.id;
-  if (msgId) store.deleteMessage(chat.id, msgId);
+  if (msgId) messageStore.deleteMessage(chat.id, msgId);
 }
 
 // 复制消息

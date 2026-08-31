@@ -45,6 +45,16 @@ const App = {
       events.emit(EVT.TOAST, { message: "数据迁移遇到问题，已保留原始数据", type: "warning" });
     }
 
+    // 1.5 Phase 3: 异步迁移消息到 Dexie（不阻塞启动，后台执行）
+    import("./domain/message-store.js")
+      .then(({ messageStore }) => messageStore.migrateAllMessages())
+      .then((result) => {
+        if (result.totalMigrated > 0) {
+          console.log(`[App] Messages migrated to Dexie: ${result.totalMigrated}`);
+        }
+      })
+      .catch((e) => console.warn("[App] Dexie message migration skipped:", e.message));
+
     // 2. 注册 Service Worker + 监听更新
     this.registerServiceWorker();
 

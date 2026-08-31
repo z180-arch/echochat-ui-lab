@@ -1,11 +1,59 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-Hans">
 <head>
-  <meta charset="UTF-8">
-  <title>EchoChat UI Lab</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#f7faf9" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="EchoChat" />
+  <title>EchoChat — 念念不忘，必有回响</title>
+  <script>
+    window.__errors = [];
+    window.onerror = function(msg, url, line, col, err) {
+      window.__errors.push({msg, url, line, col, stack: err && err.stack});
+      var pre = document.createElement('pre');
+      pre.style.cssText = 'position:fixed;inset:0;background:#fff;color:#c00;padding:20px;z-index:9999;overflow:auto;white-space:pre-wrap;font-size:13px;';
+      pre.textContent = 'ERROR: ' + msg + '\n' + url + ':' + line + ':' + col + '\n\n' + (err && err.stack || '');
+      document.body.appendChild(pre);
+    };
+    window.addEventListener('unhandledrejection', function(e) {
+      window.__errors.push({msg: 'unhandledrejection', reason: e.reason});
+      var pre = document.createElement('pre');
+      pre.style.cssText = 'position:fixed;inset:0;background:#fff;color:#c00;padding:20px;z-index:9999;overflow:auto;white-space:pre-wrap;font-size:13px;';
+      pre.textContent = 'UNHANDLED: ' + (e.reason && e.reason.message || e.reason) + '\n\n' + (e.reason && e.reason.stack || '');
+      document.body.appendChild(pre);
+    });
+  </script>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="icon-192.png" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="stylesheet" href="src/styles/tokens.css" />
+  <link rel="stylesheet" href="src/styles/base.css" />
+  <link rel="stylesheet" href="src/styles/components.css" />
+  <link rel="stylesheet" href="src/styles/layouts.css" />
+  <link rel="stylesheet" href="src/styles/responsive.css" />
 </head>
 <body>
-  <div id="app"></div>
+  <div id="app">
+    <!-- 应用内容由 main.js 渲染 -->
+    <div style="display:flex;align-items:center;justify-content:center;height:100vh;">
+      <div class="spinner"></div>
+    </div>
+  </div>
+
+  <!-- 配置文件（用户复制 config.example.js 为 config.js） -->
+  <script src="config.js"></script>
+
+  <!-- 主应用入口（ES Module） -->
   <script type="module" src="src/main.js"></script>
+
+  <!-- Service Worker -->
+  <script>
+    if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js").catch(() => {});
+      });
+    }
+  </script>
 </body>
 </html>

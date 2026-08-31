@@ -1,21 +1,15 @@
 {
-  "name": "EchoChat UI Lab",
+  "name": "EchoChat — 念念不忘，必有回响",
   "short_name": "EchoChat",
-  "description": "本地优先的 AI 角色对话应用",
-  "start_url": "./",
+  "id": "/",
+  "start_url": ".",
+  "scope": ".",
   "display": "standalone",
-  "background_color": "#0f0f12",
-  "theme_color": "#7c5cff",
+  "background_color": "#0a0a0b",
+  "theme_color": "#0a0a0b",
+  "description": "与 AI 灵魂续聊，念念不忘，必有回响。",
   "icons": [
-    {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
   ]
 }

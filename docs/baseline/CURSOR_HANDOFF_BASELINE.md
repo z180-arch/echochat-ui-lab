@@ -1,363 +1,379 @@
 # EchoChat Cursor Handoff Baseline
 
-> 文档日期：2026-08-31
-> 状态：Phase 0-6 Foundation Complete
-> 下一步：Independent Foundation Gate Review → Cursor 接管
+> **这是你（Cursor）打开这个仓库后应该读的第一份文件。**
+> 最后更新：2026-08-31
+> 当前阶段：**Foundation Closure → STAGE 0 Verification**
 
-## 1. 当前稳定架构
+---
 
-### 1.1 架构分层
+## 1. 你是谁
+
+你是 EchoChat Lite 的**主开发 Agent（Cursor）**。
+
+你的任务不是重新设计架构，不是写漂亮文档，而是：
+> 按照已批准的路线，逐步把 EchoChat 从 Foundation 阶段推进到可用的产品阶段。
+
+---
+
+## 2. 你现在接手什么
+
+EchoChat 是一个 **Local-first AI Character Chat Application**。
+
+核心产品价值：
+> 用户创建、导入、塑造并长期陪伴 AI Character。聊天只是交互方式之一，真正的核心是 Character + Memory + Relationship + Social Life。
+
+### 已完成的 Foundation（Phase 0-6）
+
+- ✅ Repository 层（12 个 Repository 接口 + Legacy Adapter）
+- ✅ Dexie 数据库（13 表 schema + Adapter + Migration）
+- ✅ Message 双写过渡（localStorage + Dexie）
+- ✅ Character 一级实体（Domain + Repository）
+- ✅ Conversation Domain（一角色多对话）
+- ✅ Asset 系统（Metadata + Binary 分离）
+- ✅ Migration 安全机制（90/90 测试）
+- ✅ PWA 更新系统
+
+### 未完成（你的工作）
+
+- ❌ Message 读取路径切换到 Dexie（STAGE 1）
+- ❌ Conversation 存储切换（STAGE 2）
+- ❌ Character 最终迁移 + Asset Cleanup（STAGE 3）
+- ❌ Character Experience / Hub（STAGE 4）
+- ❌ Character Reconstruction（STAGE 5）
+- ❌ Memory / Relationship / Behavior / Moments（STAGE 6-10）
+- ❌ CI/CD / E2E 测试（STAGE 0）
+
+---
+
+## 3. 当前状态（一句话）
+
+**基础设施已建好，但 UI 仍在 V1 Legacy。你的第一个任务是验证 Foundation，然后逐步切换存储。**
+
+详细状态见：[`docs/baseline/CURRENT_STATE.md`](./CURRENT_STATE.md)
+
+---
+
+## 4. 权威文档在哪里
+
+| 文档 | 路径 | 什么时候读 |
+|------|------|-----------|
+| **Master Roadmap** | `docs/roadmap/ECHOCHAT_CURSOR_MASTER_ROADMAP.md` | **每天开工前读**，明确当前 Stage |
+| **Current State** | `docs/baseline/CURRENT_STATE.md` | 了解真实代码状态 |
+| **Foundation Gate** | `docs/baseline/PHASE_0_6_FOUNDATION_GATE_REPORT.md` | 了解 Foundation 验收结果 |
+| **长期架构** | `docs/architecture/ECHOCHAT_LONG_TERM_ARCHITECTURE.md` | 需要做架构决策时参考 |
+| **接线审计** | `docs/baseline/PHASE_0_6_WIRING_AUDIT.md` | 需要修改存储层时参考 |
+| **性能基线** | `docs/baseline/PHASE_0_6_PERFORMANCE_BASELINE.md` | 需要做性能优化时参考 |
+
+**规则**：Master Roadmap 是最高级执行路线。任何与它冲突的旧文档，以 Master Roadmap 为准。
+
+---
+
+## 5. 当前阶段
+
+**STAGE 0 — Foundation Verification**
+
+目标：证明当前 Foundation 真的可靠，不是"代码写出来了"。
+
+你的第一个任务：
+1. 确认测试可跨环境运行（已修复硬编码路径）
+2. 建立 GitHub Actions CI
+3. 跑完整测试（114 tests）
+4. 核心浏览器流程手工验证
+5. STOP → 等待审查
+
+**不要跳过 STAGE 0 直接开始 STAGE 1。**
+
+---
+
+## 6. 下一步任务（唯一）
 
 ```
-UI (src/ui/)
+STAGE 0 — Foundation Verification
   ↓
-Application / Domain (src/domain/)
+  1. 建立 .github/workflows/ci.yml
+     - Node.js 环境
+     - 运行 tests/migration_atomicity_test.mjs
+     - 运行 tests/foundation_test.mjs
+     - 语法检查所有 .js 文件
   ↓
-Repository (src/repository/)
+  2. 本地跑完整测试，确认 114/114 PASS
   ↓
-Storage Adapter (src/infrastructure/)
+  3. 启动本地服务器，手工验证核心流程：
+     创建角色 → 聊天 → 刷新 → 数据保留
   ↓
-Platform Storage
-  ├── Web: Dexie / IndexedDB
-  ├── Legacy: localStorage
-  └── Future: Desktop → SQLite, Mobile → SQLite
+  4. 更新 docs/baseline/CURRENT_STATE.md
+  ↓
+  5. STOP. 提交，等待审查。
 ```
 
-### 1.2 当前数据存储
+**不要同时做多个 Stage。不要"顺手"做 STAGE 1 的事情。**
 
-| 数据类型 | 存储位置 | 状态 |
-|----------|----------|------|
-| Chats / Conversations | localStorage (store) | Legacy，Phase 4 后续迁移 |
-| Messages | localStorage + Dexie（双写） | 过渡，Phase 3.3 切换读取 |
-| Characters | localStorage (推导) + Dexie | 过渡，Phase 5 完成 |
-| Memories | localStorage (store.longTermMemory) | Legacy，Phase 7 |
-| Relationships | localStorage (relations_v1) | Legacy，Phase 9 |
-| Moments | localStorage (moments_v1) | Legacy，Phase 11 |
-| Worldbook | localStorage (worldbook_v1) | Legacy，Phase 8 |
-| Assets / Blobs | IndexedDB (idb.js) | 稳定 |
-| Asset Metadata | Dexie (assets 表) | Phase 6 新增 |
-| Settings | localStorage (store.settings) | 稳定 |
-| Migration metadata | localStorage (meta_v2) | 稳定 |
+---
 
-### 1.3 关键文件
+## 7. 禁止事项（绝对不能做）
+
+### 架构
+- ❌ Full Rebuild / Full Rewrite
+- ❌ 切换到 React / Vue / 大型框架
+- ❌ 全量 TypeScript 重写
+- ❌ Monorepo
+- ❌ Full Event Sourcing
+- ❌ SQLite WASM（Web 端）
+
+### 产品
+- ❌ Plugin System
+- ❌ Cloud / Account / Sync
+- ❌ Community / 社交平台
+- ❌ Desktop Native（Tauri/Electron）
+- ❌ Mobile Native
+- ❌ 排行榜 / 竞争 / 社交竞争
+
+### AI
+- ❌ 复杂 Agent Framework
+- ❌ 复杂 Multi-Agent
+- ❌ 向量数据库 / Embedding 基础设施（STAGE 6 前）
+- ❌ 复杂 RAG 平台
+
+### 开发纪律
+- ❌ "顺手重构"
+- ❌ 因为发现未来问题就提前实现未来系统
+- ❌ 把"代码写出来"定义成完成
+- ❌ 超过 200 行的非必要修改不解释原因
+- ❌ 发现架构问题直接重构（必须先报告）
+
+---
+
+## 8. 报告规则
+
+以下事情**不能自主决定**，必须先报告：
 
 ```
-src/
-├── core/
-│   ├── store.js          # V1 全局状态（localStorage 持久化）
-│   ├── storage.js        # Migration + localStorage 封装
-│   ├── events.js         # 事件总线
-│   ├── version.js        # APP_VERSION = "1.0.0"
-│   └── utils.js
-├── domain/
-│   ├── chat.js           # 聊天逻辑（已改用 messageStore）
-│   ├── message-store.js  # 消息存储抽象（双写过渡）
-│   ├── character.js      # Character 领域（通过 Repository）
-│   ├── conversation.js   # Conversation 领域
-│   ├── asset.js          # Asset 领域（通过 Repository）
-│   ├── persona.js        # V1 角色模板
-│   ├── provider.js       # AI Provider（V1 Legacy）
-│   ├── memory.js         # Memory（V1 Legacy，Phase 7 重构）
-│   ├── moments.js        # Moments（V1 Legacy，Phase 11 重构）
-│   └── relations.js      # Relations（V1 Legacy，Phase 9 重构）
-├── repository/
-│   ├── interfaces.js     # 12 个 Repository 接口定义
-│   ├── legacy-adapter.js # Legacy Storage Adapter
-│   ├── character.js      # CharacterRepository（Dexie + Legacy）
-│   ├── conversation.js   # ConversationRepository
-│   ├── message.js        # MessageRepository
-│   ├── memory.js         # MemoryRepository
-│   ├── relationship.js   # RelationshipRepository
-│   ├── moment.js         # MomentRepository
-│   ├── worldbook.js      # WorldbookRepository
-│   ├── asset.js          # AssetRepository（Dexie + IndexedDB）
-│   ├── settings.js       # SettingsRepository
-│   └── index.js
-├── infrastructure/
-│   ├── dexie-db.js       # Dexie 数据库实例 + 13 表 schema
-│   ├── dexie-adapter.js  # Dexie Adapter（12 实体 CRUD）
-│   ├── dexie-migration.js # localStorage→Dexie 迁移
-│   ├── dexie-verify.js   # 浏览器端验证脚本
-│   ├── idb.js            # IndexedDB blob 存储
-│   └── vendor/
-│       └── dexie.mjs     # Dexie v4.0.10（本地 vendor）
-├── ui/
-│   └── views/index.js    # V1 UI（600+ 行，待重构）
-├── main.js               # 应用入口
-└── sw.js                 # Service Worker（PWA 更新系统）
+Explain（解释要做什么）
+→ Impact（影响是什么）
+→ Alternative（有什么替代方案）
+→ Recommendation（你的建议）
+→ Wait（等待批准）
 ```
 
-## 2. Phase 0-6 完成内容
+需要报告的事情：
+- ⚠️ 修改数据 Schema
+- ⚠️ 修改 Repository Interface
+- ⚠️ 修改 Migration Strategy
+- ⚠️ 删除 Legacy Storage
+- ⚠️ 修改数据删除策略
+- ⚠️ 修改隐私模型
+- ⚠️ 修改 API Contract
+- ⚠️ 修改 Character 核心模型
+- ⚠️ 修改 Message/Conversation 数据契约
+- ⚠️ 引入新外部依赖
+- ⚠️ 改变 UI Information Architecture
 
-### Phase 0 — Baseline Lock ✅
-- `docs/baseline/V1_BASELINE.md`：架构/数据/测试/性能基线
-- V1 可运行确认
+---
 
-### Phase 1 — Repository Boundary ✅
-- 12 个 Repository 接口定义
-- Legacy Storage Adapter（包装 localStorage + store + IndexedDB）
-- Repository 职责边界：只做 CRUD+查询+分页+事务，不做业务逻辑
+## 9. 停止规则
 
-### Phase 2 — Web Storage / Dexie ✅
-- Dexie v4.0.10 本地 vendor（244KB ESM）
-- 数据库 schema：13 张表，索引优化
-- Dexie Adapter：12 实体完整 CRUD + 分页 + 搜索 + 事务
-- localStorage→Dexie 迁移机制：6 实体，回滚，重试
-- PWA precache 更新
+### 什么时候必须 STOP
 
-### Phase 3 — Message Independence ✅（双写过渡）
-- `message-store.js`：消息存储抽象层
-- 双写策略：先写 localStorage（同步），再写 Dexie（异步）
-- chat.js 全部消息操作改用 messageStore
-- 应用启动自动迁移旧消息（后台异步，不阻塞）
-- 支持分页/搜索/分支/截断
-- 性能测试脚本（100/500/1000/5000 消息）
+1. **每个 Stage 完成后**：必须 STOP，等待独立审查，不得自动进入下一阶段
+2. **发现数据损坏风险**：立即 STOP，报告
+3. **Migration 不安全**：立即 STOP，报告
+4. **Privacy Boundary 被破坏**：立即 STOP，报告
+5. **核心数据契约冲突**：立即 STOP，报告
+6. **无法兼容旧数据**：立即 STOP，报告
+7. **重大性能退化**：立即 STOP，报告
+8. **需要改变已冻结的核心架构决策**：立即 STOP，报告
 
-### Phase 4 — Conversation Model ✅（Domain 层）
-- `conversation.js`：Character → Conversation → Message
-- 支持一个 Character 多个 Conversation
-- Archive/Rename/Delete/Restore/Search/Pin/Export
-- Delete Conversation ≠ Delete Character
+### 什么时候不能成为暂停理由
 
-### Phase 5 — Character First-Class Entity ✅（Domain 层）
-- `character.js`：Character 聚合根
-- 从 chats 推导（过渡）+ Dexie 存储（目标）
-- 级联删除策略：软删除 → 回收站 → 永久删除
-- Character 统计 + 迁移到 Dexie
+- ❌ 代码不够漂亮
+- ❌ 文件可以拆得更细
+- ❌ 命名可以更好
+- ❌ 架构还有理论优化空间
+- ❌ 某个成熟项目用了其他技术
 
-### Phase 6 — Asset System ✅（基础设施）
-- `asset.js`：统一资产管理
-- Metadata (Dexie) + Binary (IndexedDB) 分离
-- Avatar/Moment/Attachment 管理
-- Base64 导入/导出（备份用）
-- Orphaned asset cleanup 接口
+---
 
-## 3. 已知技术债
+## 10. 测试规则
 
-### 3.1 高优先级（Phase 7 前必须处理）
-1. **Message 读取仍从 localStorage**：UI 层直接访问 `chat.messages[]`，长聊天性能差
-   - 计划：Phase 3.3 切换读取到 Dexie，UI 改用分页
-2. **Conversation 未迁移到 Dexie**：Domain 层完成，存储后端未切换
-   - 计划：Phase 4 后续启用 ConversationRepository
+### 完成的定义
 
-### 3.2 中优先级（Phase 7-11 处理）
-3. **Character fallback 推导**：character.js 仍从 chats 推导，Dexie 数据可能不同步
-   - 计划：Phase 5 后续启用自动迁移，移除 fallback
-4. **Asset Domain 未接入 UI**：基础设施完成，UI 仍用 base64/URL
-   - 计划：Phase 6 后续 UI 接入
-5. **moments.js / relations.js / memory.js 直接访问 storage**：V1 Legacy 模块
-   - 计划：Phase 7/9/11 重构时通过 Repository 访问
+```
+Code（代码）
++ Test（自动化测试）
++ Manual Verification（手工验证）
++ Regression（回归测试）
+= 完成
+```
 
-### 3.3 低优先级（长期）
-6. **UI 层 600+ 行单文件**：views/index.js 待拆分
-7. **SVG sprite**：图标系统待优化
-8. **CSS bundling**：当前零构建，未来可考虑
-9. **TypeScript**：长期可考虑，当前不强制
+只有代码没有测试 = 没完成。
+只有测试没有手工验证 = 没完成。
 
-## 4. Deferred Work（明确推迟）
+### 现有测试
 
-| 工作项 | 推迟原因 | 计划 Phase |
-|--------|----------|-----------|
-| Memory Domain 重构 | 需要 Behavior Engine 配合 | Phase 7 |
-| Worldbook Domain | 依赖 Memory Context Builder | Phase 8 |
-| Relationship Domain | 需要 Event History 设计 | Phase 9 |
-| Moments / Social | 依赖 Relationship + Character | Phase 10-11 |
-| Behavior Engine | 依赖 Memory + Relationship | Phase 12-18 |
-| Character Reconstruction | 需要 Import Engine | Phase 15 |
-| Plugin System | 需要安全沙箱设计 | Phase 23 |
-| Cloud / Account | 商业模式未确定 | Phase 24-26 |
-| Community | 依赖 Cloud | Phase 25 |
-| Desktop (Tauri) | Web 稳定后再考虑 | Phase 30 |
-| Mobile Native | Web 稳定后再考虑 | Phase 31 |
-| TypeScript 全量迁移 | 渐进式，不强制 | 长期 |
+```bash
+# Migration 安全测试（90 assertions）
+node tests/migration_atomicity_test.mjs
 
-## 5. 禁止修改项（Cursor 接管后必须遵守）
+# Foundation 综合测试（24 tests）
+node tests/foundation_test.mjs
 
-### 5.1 绝对禁止
-1. **Full Rebuild**：不得删除现有项目重新创建
-2. **数据破坏**：不得通过 localStorage.clear() / indexedDB.deleteDatabase() 解决问题
-3. **Migration 降级**：不得移除 V1→V2 migration 安全机制
-4. **PWA 更新系统**：不得移除 APP_VERSION / SW 版本化机制
-5. **Storage Boundary**：Domain 层不得直接访问 localStorage/IndexedDB/Dexie（message-store 过渡例外）
-6. **用户数据**：不得在未授权情况下上传/修改/删除用户数据
+# 语法检查
+node --check src/your-file.js
+```
 
-### 5.2 需要审批
-1. **数据模型变更**：任何 schema 变化必须经过 Migration 设计
-2. **Repository 接口变更**：必须保持向后兼容
-3. **Dexie schema 变更**：必须经过 versioned migration
-4. **PWA 缓存策略变更**：必须验证更新流程
+### 新增代码必须有测试
 
-## 6. Repository Rules
+- 数据模型变更 → Migration 测试
+- Repository 新增 → Integration 测试
+- 核心业务逻辑 → Unit 测试
+- 不得用 mock 代替真实 production path
 
-### 6.1 Repository 职责
-- ✅ CRUD 操作
-- ✅ 查询 / 过滤 / 分页 / 搜索
-- ✅ 事务边界
-- ✅ 存储后端抽象（Dexie / Legacy / Future SQLite）
-- ❌ 业务逻辑（AI prompt / 关系计算 / 行为决策）
-- ❌ UI 状态管理
-- ❌ 直接操作 DOM
+---
 
-### 6.2 Repository 命名
-- 接口：`XxxRepository`（如 `CharacterRepository`）
-- 方法：`findById / findAll / create / update / delete / count`
-- 查询：`findByXxx / search / filter`
+## 11. UI/UX 原则
 
-### 6.3 新增 Repository
-1. 在 `repository/interfaces.js` 定义 JSDoc 接口
-2. 在 `repository/xxx.js` 实现（Dexie + Legacy fallback）
-3. 在 `repository/index.js` 导出
-4. Domain 层通过 Repository 访问，不直接访问 storage
+### 设计方向
+- **Morning Mint**（保留，不推翻）
+- Quiet / Personal / Warm / Clean
+- Character-centric / IM Familiarity
+- Low Cognitive Load
 
-## 7. Storage Rules
+### 避免
+- ❌ AI Dashboard / 复杂数据面板
+- ❌ 游戏属性栏 / 排行榜
+- ❌ 过度玻璃拟态 / 过度渐变
+- ❌ 社交媒体喧闹感
+- ❌ TikTok 化 / Instagram 化
 
-### 7.1 数据分类
-- **大型数据**（characters/messages/memories/etc.）→ IndexedDB / Dexie
-- **小型配置**（theme/settings/migration metadata）→ localStorage
-- **二进制**（avatars/images/attachments）→ IndexedDB blobs
-- **敏感数据**（API Key）→ 单独评估，未来平台安全存储
+### Character 页面必须回答
+1. "这个角色是谁？"
+2. "我和它现在是什么关系？"
+3. "最近发生了什么？"
+4. "我可以和它做什么？"
 
-### 7.2 双写过渡规则
+**不要堆：设置 / 按钮 / 统计 / 参数 / Debug 信息。**
+
+---
+
+## 12. Storage Rules
+
+### 数据分类
+- **大型数据**（messages/memories/etc.）→ Dexie / IndexedDB
+- **小型配置**（theme/settings）→ localStorage
+- **二进制**（avatars/images）→ IndexedDB blobs
+- **敏感数据**（API Key）→ 单独评估
+
+### 双写过渡规则
 1. 新数据同时写两个后端
 2. 读取优先从新后端，fallback 旧后端
 3. 启动时后台迁移旧数据
 4. 迁移幂等：已存在则跳过
 5. 旧后端删除前必须确认新后端数据完整
 
-### 7.3 Dexie 使用规则
-1. Dexie 只在 Infrastructure 层使用
-2. Repository 层通过 dexieAdapter 访问
-3. Domain 层不直接 import Dexie
-4. schema 变更必须 versioned migration
+### Architecture Boundary
+- Domain 层 → 只能通过 Repository 访问
+- Repository 层 → 可以访问 Infrastructure Adapter
+- Infrastructure 层 → 可以直接访问 localStorage/IndexedDB/Dexie
+- UI 层 → 只能通过 Domain 层访问
 
-## 8. Migration Rules
+**已知例外**：`message-store.js` 双写过渡，直接访问 dexieAdapter。STAGE 1 完成后移除。
 
-### 8.1 Migration 流程
+---
+
+## 13. Migration Rules
+
+### Migration 流程
 ```
 Detect → Validate Source → Transform → Validate Result → Stage → Commit → Verify → Mark
 ```
 
-### 8.2 失败处理
+### 失败处理
 - 失败不标记 schemaVersion 升级
 - 原始数据保留可恢复
 - 下次启动可重试
 - 不静默吞掉错误
 
-### 8.3 版本管理
+### 版本管理（三者独立，不混用）
 - `APP_VERSION`：应用版本（src/core/version.js）
-- `DATA_SCHEMA_VERSION`：数据 schema 版本（localStorage meta_v2）
-- `Dexie schema version`：数据库 schema 版本（dexie-db.js）
-- 三者独立，不混用
-
-## 9. Testing Rules
-
-### 9.1 测试分层
-- **Unit**：纯函数，无副作用
-- **Integration**：Repository + Storage
-- **Migration**：数据迁移安全
-- **E2E**：真实浏览器用户流程
-- **Performance**：性能基线
-- **Architecture**：边界检查（Domain 不直接访问 storage）
-
-### 9.2 现有测试
-- `tests/migration_atomicity_test.mjs`：90 assertions，15 scenarios
-- `tests/foundation_test.mjs`：24 tests，覆盖 Message/Character/Conversation/Asset/Migration/Integrity
-- `src/domain/message-perf-test.js`：浏览器端性能测试
-- `src/infrastructure/dexie-verify.js`：浏览器端 Dexie 验证
-
-### 9.3 新增测试要求
-- 数据模型变更必须添加 migration 测试
-- Repository 新增必须添加 integration 测试
-- 核心业务逻辑必须添加 unit 测试
-- 不得用 mock 代替真实 production path
-
-## 10. UI / Core Separation
-
-### 10.1 当前状态
-- UI 层：`src/ui/views/index.js`（600+ 行，V1 Legacy）
-- Core 层：`src/domain/` + `src/repository/` + `src/infrastructure/`
-- UI 直接访问 `store.getState()`，未完全通过 Domain 层
-
-### 10.2 目标状态
-```
-UI → Domain (Use Cases) → Repository → Storage
-```
-
-### 10.3 渐进式迁移
-1. 新功能必须通过 Domain 层
-2. 旧功能逐步重构，不强制一次性迁移
-3. UI 不直接访问 localStorage/IndexedDB/Dexie
-
-## 11. Cursor 接管后的第一阶段建议
-
-### 11.1 立即执行（Week 1-2）
-1. **Phase 3.3**：切换消息读取到 Dexie
-   - 修改 UI 层，通过 messageStore 分页加载消息
-   - 验证 1000/5000 消息性能
-   - 保留 localStorage fallback
-2. **Phase 4 后续**：启用 ConversationRepository
-   - 迁移 Conversation 数据到 Dexie
-   - UI 支持多对话列表
-
-### 11.2 短期执行（Week 3-4）
-3. **Phase 5 后续**：启用 Character 自动迁移
-   - 应用启动时迁移 Character 到 Dexie
-   - 移除 character.js fallback 推导
-4. **Phase 6 后续**：UI 接入 Asset Domain
-   - 头像上传使用 Asset.storeAvatar
-   - 实现 orphaned asset cleanup
-
-### 11.3 中期执行（Month 2）
-5. **Phase 7**：Memory Domain 重构
-6. **Phase 8**：Worldbook Domain
-7. **Phase 9**：Relationship Domain（Current State + Event History）
-
-## 12. 当前不能做的事情
-
-### 12.1 绝对不能
-1. ❌ Full Rebuild
-2. ❌ 破坏用户数据
-3. ❌ 移除 Migration 安全机制
-4. ❌ Domain 层直接访问 storage（除 message-store 过渡）
-5. ❌ 为了"代码漂亮"重构整个项目
-6. ❌ 提前实现 Cloud / Account / Community
-7. ❌ 提前实现 Plugin System
-8. ❌ 切换到 TypeScript（渐进式，不强制）
-9. ❌ 切换到 React/Vue（当前 Vanilla JS 足够）
-10. ❌ 切换到 Desktop/Mobile（Web 稳定后再考虑）
-
-### 12.2 需要审批后才能
-1. ⚠️ 数据模型变更（需要 Migration 设计）
-2. ⚠️ Repository 接口变更（需要向后兼容）
-3. ⚠️ Dexie schema 变更（需要 versioned migration）
-4. ⚠️ PWA 缓存策略变更（需要验证更新流程）
-5. ⚠️ 删除任何 V1 Legacy 代码（需要确认无依赖）
-
-## 13. 关键决策记录
-
-### 13.1 已确认的架构决策
-1. **Relationship = Current State + Event History**（非 Full Event Sourcing）
-2. **Web 数据库 = Dexie**（IndexedDB wrapper）
-3. **Desktop 数据库 = SQLite**（Tauri，未来）
-4. **Character = 一级实体**，Chat ≠ Character
-5. **Message = 独立存储**，支持分页/搜索/分支
-6. **渐进式迁移**：双写过渡，不破坏旧数据
-7. **Privacy by Architecture**：AI Provider 永远不直接读数据库
-
-### 13.2 待确认的决策
-1. Memory 检索策略（关键词 vs 向量 vs 混合）
-2. Cloud Sync 冲突解决策略（LWW vs CRDT）
-3. Plugin 沙箱实现方案（iframe vs Web Worker）
-4. Desktop 框架（Tauri vs Electron）
-
-## 14. 联系方式
-
-- 仓库：https://github.com/z180-arch/echochat-ui-lab
-- 架构文档：`docs/architecture/ECHOCHAT_LONG_TERM_ARCHITECTURE.md`
-- 基线文档：`docs/baseline/`
-- 问题反馈：GitHub Issues
+- `DATA_SCHEMA_VERSION`：数据 schema 版本
+- `Dexie schema version`：数据库 schema 版本
 
 ---
 
-**本文档是 Cursor 接管 EchoChat 的唯一权威基线。**
-**任何与本文档冲突的操作必须先更新本文档。**
+## 14. Git 规则
+
+### Commit Message 格式
+```
+feat(stage-1): switch message read path to dexie
+fix(stage-0): fix foundation test path resolution
+docs: update current state after stage 0
+```
+
+### 禁止使用
+- ❌ `update` / `final` / `fix` / `test` / `misc`（重大提交）
+- ❌ `feat: rebuild echochat`
+- ❌ `feat: v3 architecture`
+- ❌ 任何暗示 Full Rebuild 的 commit message
+
+### 每个 Stage 完成后
+1. 运行完整测试
+2. 检查 git diff（确认没有意外修改）
+3. 更新 CURRENT_STATE.md
+4. Commit
+5. Push
+6. STOP
+
+---
+
+## 15. 你可以自主执行的事情
+
+- ✅ 实现已经批准的功能（按 Master Roadmap）
+- ✅ 补测试
+- ✅ 修 Bug
+- ✅ 局部重构（< 200 行，有解释）
+- ✅ CSS/UI 微调
+- ✅ Repository 实现
+- ✅ Migration 实现
+- ✅ 文档更新
+- ✅ CI/CD 配置
+
+---
+
+## 16. 快速开始
+
+```bash
+# 1. 克隆仓库
+git clone git@github.com:z180-arch/echochat-ui-lab.git
+cd echat-ui-lab
+
+# 2. 读文档
+cat docs/baseline/CURSOR_HANDOFF_BASELINE.md  # 本文档
+cat docs/roadmap/ECHOCHAT_CURSOR_MASTER_ROADMAP.md  # 路线
+cat docs/baseline/CURRENT_STATE.md  # 当前状态
+
+# 3. 跑测试
+node tests/migration_atomicity_test.mjs
+node tests/foundation_test.mjs
+
+# 4. 启动本地服务器
+python3 -m http.server 8080
+# 浏览器打开 http://localhost:8080
+
+# 5. 开始 STAGE 0
+```
+
+---
+
+## 17. 最后提醒
+
+1. **一次只做一个 Stage**
+2. **不要"顺手重构"**
+3. **不要提前实现未来系统**
+4. **完成 = Code + Test + Manual Verification + Regression**
+5. **发现架构问题先报告，不要直接重构**
+6. **每个 Stage 完成后 STOP，等待审查**
+7. **Master Roadmap 是最高级路线，不要自己发明新路线**
+
+---
+
+**现在开始 STAGE 0。完成后 STOP，等待审查。**

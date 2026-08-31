@@ -88,47 +88,124 @@ export function needsMigration() {
 
 export function runMigrations() {
   const meta = readMeta();
-  let currentVersion = meta.schemaVersion;
+  const currentVersion = meta.schemaVersion;
 
-  if (currentVersion >= SCHEMA_VERSION) return { migrated: false, from: currentVersion, to: SCHEMA_VERSION };
+  if (currentVersion >= SCHEMA_VERSION) {
+    return { migrated: false, from: currentVersion, to: SCHEMA_VERSION, success: true };
+  }
 
-  // 读取所有数据
-  const data = {
-    state: safeParse(localStorage.getItem(KEYS.STATE)),
-    worldbook: safeParse(localStorage.getItem(KEYS.WORLDBOOK)),
-    moments: safeParse(localStorage.getItem(KEYS.MOMENTS)),
-    relations: safeParse(localStorage.getItem(KEYS.RELATIONS)),
+  console.log(`[Migration] starting v${currentVersion} → v${SCHEMA_VERSION}`);
+  const migrationLog = { startedAt: Date.now(), steps: [], errors: [] };
+
+  // ---- Step 1: Detect & Validate Source ----
+  const rawData = {
+    state: localStorage.getItem(KEYS.STATE),
+    worldbook: localStorage.getItem(KEYS.WORLDBOOK),
+    moments: localStorage.getItem(KEYS.MOMENTS),
+    relations: localStorage.getItem(KEYS.RELATIONS),
   };
 
-  let migratedData = data;
+  // 备份原始数据到内存（失败时可用于诊断，不写回以避免半迁移状态）
+  const backup = { ...rawData };
+
+  // 解析并验证源数据
+  const data = {
+    state: safeParse(rawData.state),
+    worldbook: safeParse(rawData.worldbook),
+    moments: safeParse(rawData.moments),
+    relations: safeParse(rawData.relations),
+  };
+
+  // 验证 state 基本结构（如果存在）
+  if (data.state && typeof data.state !== "object") {
+    migrationLog.errors.push("invalid state format");
+    return failMigration(currentVersion, migrationLog, "源数据 state 格式无效");
+  }
+
+  migrationLog.steps.push("source validated");
+
+  // ---- Step 2: Transform ----
+  let migratedData = { ...data };
   for (let v = currentVersion; v < SCHEMA_VERSION; v++) {
     if (migrations[v]) {
       try {
-        migratedData = migrations[v](migratedData) || migratedData;
+        const result = migrations[v](migratedData);
+        if (!result) throw new Error(`migration v${v} returned null`);
+        migratedData = result;
+        migrationLog.steps.push(`transform v${v}→v${v + 1} ok`);
       } catch (e) {
-        console.error(`[Storage] migration v${v}→v${v + 1} failed:`, e);
-        // 迁移失败不阻断，记录后继续
+        migrationLog.errors.push(`transform v${v} failed: ${e.message}`);
+        console.error(`[Migration] transform v${v}→v${v + 1} failed:`, e);
+        // 转换失败：不写入任何数据，保留原始数据
+        return failMigration(currentVersion, migrationLog, `数据转换失败: ${e.message}`);
       }
     }
   }
 
-  // 应用迁移后的数据
-  if (migratedData.state) safeSet(KEYS.STATE, migratedData.state);
-  if (migratedData.worldbook) safeSet(KEYS.WORLDBOOK, migratedData.worldbook);
-  if (migratedData.moments) safeSet(KEYS.MOMENTS, migratedData.moments);
-  if (migratedData.relations) safeSet(KEYS.RELATIONS, migratedData.relations);
+  // ---- Step 3: Validate Transformed Result ----
+  if (migratedData.state && typeof migratedData.state !== "object") {
+    return failMigration(currentVersion, migrationLog, "转换后 state 格式无效");
+  }
+  // 验证 chats 数组结构
+  if (migratedData.state?.chats && !Array.isArray(migratedData.state.chats)) {
+    return failMigration(currentVersion, migrationLog, "转换后 chats 不是数组");
+  }
+  migrationLog.steps.push("transformed result validated");
+
+  // ---- Step 4: Commit (写入所有数据) ----
+  const writeResults = [];
+  if (migratedData.state !== null) writeResults.push(safeSet(KEYS.STATE, migratedData.state));
+  if (migratedData.worldbook !== null) writeResults.push(safeSet(KEYS.WORLDBOOK, migratedData.worldbook));
+  if (migratedData.moments !== null) writeResults.push(safeSet(KEYS.MOMENTS, migratedData.moments));
+  if (migratedData.relations !== null) writeResults.push(safeSet(KEYS.RELATIONS, migratedData.relations));
 
   // 迁移世界书/动态/关系中的 roleKey → roleId
   if (migratedData._roleIdMap) {
-    migrateWorldbookRoleKeys(migratedData._roleIdMap);
-    migrateMomentsRoleKeys(migratedData._roleIdMap);
-    migrateRelationsRoleKeys(migratedData._roleIdMap);
+    try {
+      migrateWorldbookRoleKeys(migratedData._roleIdMap);
+      migrateMomentsRoleKeys(migratedData._roleIdMap);
+      migrateRelationsRoleKeys(migratedData._roleIdMap);
+      migrationLog.steps.push("roleKey migration ok");
+    } catch (e) {
+      migrationLog.errors.push(`roleKey migration failed: ${e.message}`);
+      // 注意：此时主数据已写入，但 roleKey 迁移失败
+      // 不标记 schema version，允许下次重试
+      return failMigration(currentVersion, migrationLog, `roleKey 迁移失败: ${e.message}`);
+    }
   }
 
-  writeMeta({ schemaVersion: SCHEMA_VERSION, migratedAt: Date.now() });
-  events.emit(EVT.DATA_MIGRATED, { from: currentVersion, to: SCHEMA_VERSION });
+  // 检查所有写入是否成功
+  if (writeResults.some((r) => r === false)) {
+    return failMigration(currentVersion, migrationLog, "部分数据写入失败（存储可能已满）");
+  }
+  migrationLog.steps.push("all data committed");
 
-  return { migrated: true, from: currentVersion, to: SCHEMA_VERSION };
+  // ---- Step 5: Mark Schema Version (只有完整成功后才升级) ----
+  writeMeta({
+    schemaVersion: SCHEMA_VERSION,
+    migratedAt: Date.now(),
+    migrationLog: { ...migrationLog, completedAt: Date.now() },
+  });
+  migrationLog.steps.push("schema version marked");
+
+  events.emit(EVT.DATA_MIGRATED, { from: currentVersion, to: SCHEMA_VERSION });
+  console.log(`[Migration] completed v${currentVersion} → v${SCHEMA_VERSION}`);
+
+  return { migrated: true, from: currentVersion, to: SCHEMA_VERSION, success: true };
+}
+
+// 迁移失败处理：不标记成功，保留原始数据，允许安全重试
+function failMigration(fromVersion, log, reason) {
+  console.error(`[Migration] FAILED v${fromVersion}: ${reason}`);
+  // 写入失败记录（但不升级 schema version，下次启动会重试）
+  writeMeta({
+    schemaVersion: fromVersion, // 保持原版本
+    lastFailedAt: Date.now(),
+    lastFailureReason: reason,
+    failureLog: log,
+  });
+  events.emit(EVT.ERROR, { type: "migration", reason, fromVersion });
+  return { migrated: false, from: fromVersion, to: SCHEMA_VERSION, success: false, reason };
 }
 
 function migrateWorldbookRoleKeys(roleIdMap) {

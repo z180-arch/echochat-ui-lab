@@ -34,6 +34,29 @@
   <link rel="stylesheet" href="src/styles/responsive.css" />
 </head>
 <body>
+  <!-- Logo 启动动画 (Morning Mint) -->
+  <div id="splash-screen" class="splash-screen">
+    <div class="splash-bg"></div>
+    <div class="splash-content">
+      <div class="splash-logo">
+        <svg viewBox="0 0 64 64" width="64" height="64" fill="none">
+          <circle cx="32" cy="32" r="30" fill="url(#mintGrad)" opacity="0.15"/>
+          <path d="M20 24c0-4 4-8 12-8s12 4 12 8v4c0 8-6 14-12 16-6-2-12-8-12-16v-4z" fill="url(#mintGrad)" opacity="0.9"/>
+          <circle cx="26" cy="28" r="2.5" fill="#fff"/>
+          <circle cx="38" cy="28" r="2.5" fill="#fff"/>
+          <path d="M27 36c2 2 8 2 10 0" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+          <defs>
+            <linearGradient id="mintGrad" x1="20" y1="16" x2="44" y2="48">
+              <stop offset="0%" stop-color="#5eead4"/>
+              <stop offset="100%" stop-color="#14b8a6"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div class="splash-wordmark">EchoChat</div>
+      <div class="splash-tagline">念念不忘，必有回响</div>
+    </div>
+  </div>
   <div id="app">
     <!-- 应用内容由 main.js 渲染 -->
     <div style="display:flex;align-items:center;justify-content:center;height:100vh;">
@@ -46,14 +69,5 @@
 
   <!-- 主应用入口（ES Module） -->
   <script type="module" src="src/main.js"></script>
-
-  <!-- Service Worker -->
-  <script>
-    if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js").catch(() => {});
-      });
-    }
-  </script>
 </body>
 </html>

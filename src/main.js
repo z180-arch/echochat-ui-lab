@@ -7,6 +7,7 @@ import { store } from "./core/store.js";
 import { events, EVT } from "./core/events.js";
 import { runMigrations, storage, KEYS } from "./core/storage.js";
 import { uid, esc, downloadFile, readFileAsText } from "./core/utils.js";
+import { APP_VERSION } from "./core/version.js";
 import { sendMessage, stopGeneration, regenerate, editMessage, deleteMessage, copyMessage, isSending } from "./domain/chat.js";
 import { createFromTemplate, getSystemTemplates, parseCharacterCard, buildCharacterCard } from "./domain/persona.js";
 import { rememberMessage } from "./domain/memory.js";
@@ -21,7 +22,7 @@ import {
   getOnboardSelection,
   resetOnboarding,
 } from "./ui/views/index.js";
-import { showToast, openModal, Icons } from "./ui/components/index.js";
+import { showToast, openModal, openConfirm, Icons, SettingRow, Segmented } from "./ui/components/index.js";
 
 // 应用状态
 const App = {
@@ -30,7 +31,10 @@ const App = {
 
   // 初始化
   async init() {
-    // 1. 运行数据迁移
+    // 0. 启动 Logo 动画（与数据加载并行，至少 800ms）
+    this.startSplashAnimation();
+
+    // 1. 运行数据迁移（安全迁移：失败不破坏原始数据）
     try {
       const result = runMigrations();
       if (result.migrated) {
@@ -38,27 +42,96 @@ const App = {
       }
     } catch (e) {
       console.error("[App] Migration failed:", e);
+      events.emit(EVT.TOAST, { message: "数据迁移遇到问题，已保留原始数据", type: "warning" });
     }
 
-    // 2. 应用主题
+    // 2. 注册 Service Worker + 监听更新
+    this.registerServiceWorker();
+
+    // 3. 应用主题
     this.applyTheme();
 
-    // 3. 判断初始视图
+    // 4. 判断初始视图
     const onboardDone = storage.getRaw(KEYS.ONBOARD_DONE);
     const hasChats = store.getState().chats?.length > 0;
     this.view = onboardDone || hasChats ? "app" : "landing";
 
-    // 4. 订阅状态变化，自动重渲染
+    // 5. 订阅状态变化，自动重渲染
     store.subscribe(() => this.render());
     events.on(EVT.STATE_CHANGE, () => this.render());
     events.on(EVT.TOAST, (payload) => showToast(payload));
     events.on("rerender", () => this.render());
 
-    // 5. 全局事件委托
+    // 6. 全局事件委托
     this.bindGlobalEvents();
-
     this.initialized = true;
-    this.render();
+
+    // 7. 等待 splash 动画完成后渲染
+    setTimeout(() => {
+      this.finishSplashAnimation();
+      this.render();
+    }, 800);
+  },
+
+  // Logo 启动动画
+  startSplashAnimation() {
+    const splash = document.getElementById("splash-screen");
+    if (!splash) return;
+    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReduced) splash.classList.add("splash-reduced");
+    splash.classList.add("splash-active");
+  },
+  finishSplashAnimation() {
+    const splash = document.getElementById("splash-screen");
+    if (!splash) return;
+    splash.classList.add("splash-exit");
+    setTimeout(() => splash.remove(), 400);
+  },
+
+  // Service Worker 注册 + 更新检测
+  registerServiceWorker() {
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker
+      .register("./sw.js")
+      .then((reg) => {
+        console.log(`[SW] registered, app version: ${APP_VERSION}`);
+        reg.addEventListener("updatefound", () => {
+          const newWorker = reg.installing;
+          newWorker.addEventListener("statechange", () => {
+            if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+              this.showUpdatePrompt();
+            }
+          });
+        });
+        setInterval(() => reg.update().catch(() => {}), 3600000);
+      })
+      .catch((err) => console.warn("[SW] registration failed:", err));
+
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      console.log("[SW] controller changed");
+    });
+    navigator.serviceWorker.addEventListener("message", (event) => {
+      if (event.data?.type === "SW_UPDATED") {
+        console.log(`[SW] updated to v${event.data.version}`);
+      }
+    });
+  },
+
+  // 显示更新提示
+  showUpdatePrompt() {
+    openConfirm({
+      title: "发现新版本",
+      message: "EchoChat 已更新到新版本，是否立即刷新？你的所有数据都会保留。",
+      confirmText: "立即更新",
+      cancelText: "稍后再说",
+      variant: "primary",
+      onConfirm: () => {
+        if (navigator.serviceWorker?.controller) {
+          navigator.serviceWorker.controller.postMessage("SKIP_WAITING");
+        }
+        setTimeout(() => location.reload(), 300);
+      },
+    });
   },
 
   // 渲染路由
@@ -88,15 +161,13 @@ const App = {
   },
 
   afterRenderApp() {
-    // 自动滚动到底部
+    // 智能滚动：仅当用户接近底部时自动滚动到底部
     const msgBox = document.getElementById("chat-messages");
     if (msgBox) {
-      msgBox.scrollTop = msgBox.scrollHeight;
-    }
-    // 聚焦输入框
-    const input = document.getElementById("chat-input");
-    if (input && !isSending()) {
-      // 不自动聚焦，避免移动端键盘弹出
+      const nearBottom = msgBox.scrollHeight - msgBox.scrollTop - msgBox.clientHeight < 120;
+      if (nearBottom || msgBox.scrollTop === 0) {
+        msgBox.scrollTop = msgBox.scrollHeight;
+      }
     }
   },
 
@@ -183,6 +254,13 @@ const App = {
       this.render();
     }
   },
+  resetOnboarding() {
+    resetOnboarding();
+    storage.remove(KEYS.ONBOARD_DONE);
+    this.view = "landing";
+    this.render();
+    showToast({ message: "已返回引导页", type: "info" });
+  },
 
   // App 导航
   switchTab(tab) {
@@ -200,10 +278,18 @@ const App = {
     store.setProfileOpen(false);
   },
   deleteChat(id) {
-    if (confirm("确定删除这个对话吗？此操作不可恢复。")) {
-      store.deleteChat(id);
-      showToast({ message: "对话已删除", type: "success" });
-    }
+    const chat = store.getState().chats.find((c) => c.id === id);
+    openConfirm({
+      title: "删除对话",
+      message: `确定删除与「${chat?.name || "此角色"}」的对话吗？所有聊天记录将被永久删除，此操作不可恢复。`,
+      confirmText: "删除",
+      cancelText: "取消",
+      variant: "danger",
+      onConfirm: () => {
+        store.deleteChat(id);
+        showToast({ message: "对话已删除", type: "success" });
+      },
+    });
   },
   backToList() {
     // 移动端返回列表
@@ -265,9 +351,47 @@ const App = {
     }
   },
   deleteMessage(index) {
-    if (confirm("确定删除这条消息吗？")) {
-      deleteMessage(index);
+    openConfirm({
+      title: "删除消息",
+      message: "确定删除这条消息吗？此操作不可恢复。",
+      confirmText: "删除",
+      cancelText: "取消",
+      variant: "danger",
+      onConfirm: () => {
+        deleteMessage(index);
+        showToast({ message: "消息已删除", type: "success" });
+      },
+    });
+  },
+  retryFromMessage(index) {
+    const chat = store.getCurrentChat();
+    if (!chat) return;
+    // 找到该消息之前的最后一条用户消息
+    let userText = null;
+    for (let i = index - 1; i >= 0; i--) {
+      if (chat.messages[i].role === "me") {
+        userText = chat.messages[i].text;
+        break;
+      }
     }
+    if (!userText) {
+      // 如果没有前面的用户消息，直接重试该条（如果是错误消息）
+      const msg = chat.messages[index];
+      if (msg && msg.role === "her") {
+        // 删除错误消息后重新生成（需要找到对应用户输入）
+        showToast({ message: "无法重试，请重新发送", type: "info" });
+        return;
+      }
+      return;
+    }
+    // 删除从该错误消息开始的所有消息
+    store.set((s) => ({
+      ...s,
+      chats: s.chats.map((c) =>
+        c.id === chat.id ? { ...c, messages: c.messages.slice(0, index) } : c
+      ),
+    }));
+    sendMessage(userText);
   },
   exportChat(id) {
     const chat = store.getState().chats.find((c) => c.id === id);
@@ -302,42 +426,73 @@ const App = {
     const s = store.getState();
     const presets = getApiPresets();
     const content = `
-      <div style="display:flex;flex-direction:column;gap:20px;">
-        <div>
-          <label style="font-size:13px;font-weight:600;margin-bottom:8px;display:block;">API 预设</label>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;">
-            ${presets.map((p) => `
-              <button class="chip ${s.settings.apiPresetId === p.id ? "chip-active" : ""}" onclick="window.EchoApp.applyPreset('${p.id}')">${esc(p.name)}</button>
-            `).join("")}
+      <div class="settings-modal">
+        <div class="settings-group">
+          <div class="settings-group-title">API 与模型</div>
+          <div class="settings-group-body">
+            <div class="setting-row" style="cursor:default;flex-direction:column;align-items:stretch;gap:8px;">
+              <div style="font-size:13px;font-weight:600;color:var(--color-text-secondary);">API 预设</div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                ${presets.map((p) => `
+                  <button class="chip ${s.settings.apiPresetId === p.id ? "chip-active" : ""}" onclick="window.EchoApp.applyPreset('${p.id}')">${esc(p.name)}</button>
+                `).join("")}
+              </div>
+            </div>
+            <div class="setting-row" style="cursor:default;flex-direction:column;align-items:stretch;gap:8px;">
+              <label style="font-size:13px;font-weight:600;color:var(--color-text-secondary);">接口地址</label>
+              <input class="input" id="set-baseurl" value="${esc(s.settings.baseUrl)}" placeholder="https://api.example.com/v1" />
+            </div>
+            <div class="setting-row" style="cursor:default;flex-direction:column;align-items:stretch;gap:8px;">
+              <label style="font-size:13px;font-weight:600;color:var(--color-text-secondary);">API Key</label>
+              <input class="input" id="set-apikey" type="password" value="${esc(s.settings.apiKey)}" placeholder="sk-..." autocomplete="off" />
+            </div>
+            <div class="setting-row" style="cursor:default;flex-direction:column;align-items:stretch;gap:8px;">
+              <label style="font-size:13px;font-weight:600;color:var(--color-text-secondary);">模型</label>
+              <input class="input" id="set-model" value="${esc(s.settings.model)}" placeholder="model-name" />
+            </div>
+            <div class="setting-row" style="cursor:default;flex-direction:column;align-items:stretch;gap:8px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <label style="font-size:13px;font-weight:600;color:var(--color-text-secondary);">温度</label>
+                <span id="temp-val" style="font-size:13px;font-weight:600;color:var(--color-primary);">${s.settings.temperature}</span>
+              </div>
+              <input type="range" class="slider" id="set-temp" min="0" max="2" step="0.1" value="${s.settings.temperature}" oninput="document.getElementById('temp-val').textContent=this.value" />
+            </div>
           </div>
         </div>
-        <div>
-          <label style="font-size:13px;font-weight:600;margin-bottom:8px;display:block;">接口地址</label>
-          <input class="input" id="set-baseurl" value="${esc(s.settings.baseUrl)}" />
-        </div>
-        <div>
-          <label style="font-size:13px;font-weight:600;margin-bottom:8px;display:block;">API Key</label>
-          <input class="input" id="set-apikey" type="password" value="${esc(s.settings.apiKey)}" placeholder="sk-..." />
-        </div>
-        <div>
-          <label style="font-size:13px;font-weight:600;margin-bottom:8px;display:block;">模型</label>
-          <input class="input" id="set-model" value="${esc(s.settings.model)}" />
-        </div>
-        <div>
-          <label style="font-size:13px;font-weight:600;margin-bottom:8px;display:block;">温度：${s.settings.temperature}</label>
-          <input type="range" class="slider" id="set-temp" min="0" max="2" step="0.1" value="${s.settings.temperature}" oninput="document.getElementById('temp-val').textContent=this.value" />
-          <span id="temp-val">${s.settings.temperature}</span>
-        </div>
-        <div>
-          <label style="font-size:13px;font-weight:600;margin-bottom:8px;display:block;">主题</label>
-          <div style="display:flex;gap:8px;">
-            <button class="chip ${s.settings.theme === "light" ? "chip-active" : ""}" onclick="window.EchoApp.setTheme('light')">亮色</button>
-            <button class="chip ${s.settings.theme === "dark" ? "chip-active" : ""}" onclick="window.EchoApp.setTheme('dark')">暗色</button>
+
+        <div class="settings-group">
+          <div class="settings-group-title">外观</div>
+          <div class="settings-group-body">
+            <div class="setting-row" style="cursor:default;">
+              <div class="setting-row-icon">${Icons.palette}</div>
+              <div class="setting-row-content">
+                <div class="setting-row-title">主题模式</div>
+                <div class="setting-row-desc">选择亮色或暗色界面</div>
+              </div>
+              <div class="setting-row-right">
+                <div style="display:flex;gap:6px;">
+                  <button class="chip ${s.settings.theme === "light" ? "chip-active" : ""}" onclick="window.EchoApp.setTheme('light')">亮色</button>
+                  <button class="chip ${s.settings.theme === "dark" ? "chip-active" : ""}" onclick="window.EchoApp.setTheme('dark')">暗色</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-        <div style="display:flex;gap:12px;margin-top:8px;">
-          <button class="btn btn-secondary" onclick="window.EchoApp.exportAll()">导出全部数据</button>
-          <button class="btn btn-secondary" onclick="window.EchoApp.importAll()">导入备份</button>
+
+        <div class="settings-group">
+          <div class="settings-group-title">数据管理</div>
+          <div class="settings-group-body">
+            ${SettingRow({ icon: Icons.download, title: "导出全部数据", desc: "JSON 格式全量备份，包含对话、记忆、设置", onClick: "window.EchoApp.exportAll()" })}
+            ${SettingRow({ icon: Icons.upload, title: "导入备份", desc: "从 JSON 备份文件恢复数据", onClick: "window.EchoApp.importAll()" })}
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title" style="color:var(--color-error);">危险操作</div>
+          <div class="settings-group-body">
+            ${SettingRow({ icon: Icons.trash, title: "清空所有对话", desc: "删除全部聊天记录，保留设置与记忆", onClick: "window.EchoApp.clearAllChats()" })}
+            ${SettingRow({ icon: Icons.warning, title: "重置应用", desc: "清除所有数据并恢复初始状态", onClick: "window.EchoApp.resetApp()" })}
+          </div>
         </div>
       </div>
     `;
@@ -345,7 +500,35 @@ const App = {
       <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">取消</button>
       <button class="btn btn-primary" onclick="window.EchoApp.saveSettings()">保存设置</button>
     `;
-    openModal({ title: "全局设置", content, footer });
+    openModal({ title: "设置", content, footer, width: "520px" });
+  },
+  clearAllChats() {
+    openConfirm({
+      title: "清空所有对话",
+      message: "确定要删除全部聊天记录吗？此操作不可恢复，角色记忆和设置将保留。",
+      confirmText: "清空对话",
+      cancelText: "取消",
+      variant: "danger",
+      onConfirm: () => {
+        store.set((s) => ({ ...s, chats: [], currentChatId: null }));
+        showToast({ message: "所有对话已清空", type: "success" });
+      },
+    });
+  },
+  resetApp() {
+    openConfirm({
+      title: "重置应用",
+      message: "确定要重置 EchoChat 吗？所有对话、记忆、设置和个人配置将被永久删除，此操作不可恢复。建议先导出备份。",
+      confirmText: "全部重置",
+      cancelText: "取消",
+      variant: "danger",
+      onConfirm: () => {
+        storage.clearAll();
+        store.reset();
+        showToast({ message: "应用已重置", type: "success" });
+        setTimeout(() => location.reload(), 800);
+      },
+    });
   },
   applyPreset(id) {
     const preset = findPreset(id);

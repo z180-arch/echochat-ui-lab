@@ -7,6 +7,8 @@
  * V1 模型：blob 直接存储在 IndexedDB，无 metadata
  * Phase 6 模型：Asset Metadata（Dexie assets 表）+ Binary（IndexedDB blobs store）
  *
+ * Domain 层通过 AssetRepository 访问，不直接访问 idb 或 Dexie。
+ *
  * 未来支持：
  * - IndexedDB（当前）
  * - OPFS
@@ -15,9 +17,7 @@
  * 通过 Adapter 解耦。
  */
 
-import { idb } from "../infrastructure/idb.js";
-import { dexieAssetAdapter } from "../infrastructure/dexie-adapter.js";
-import { isDbAvailable } from "../infrastructure/dexie-db.js";
+import { AssetRepository } from "../repository/asset.js";
 import { uid } from "../core/utils.js";
 
 // ============================================================
@@ -34,51 +34,25 @@ export const ASSET_TYPES = {
 };
 
 // ============================================================
-//  Asset CRUD
+//  Asset CRUD（通过 Repository）
 // ============================================================
 
 /**
  * 存储资产
  * @param {Blob} blob
  * @param {Object} [metadata]
- * @param {string} [metadata.type] - 资产类型
- * @param {string} [metadata.characterId] - 关联角色
- * @param {string} [metadata.momentId] - 关联动态
- * @param {string} [metadata.name] - 文件名
  * @returns {Promise<Object>} {id, metadata, url}
  */
 export async function storeAsset(blob, metadata = {}) {
-  const assetId = metadata.id || `asset_${uid()}`;
+  const result = await AssetRepository.storeBlob(blob, {
+    ...metadata,
+    id: metadata.id || `asset_${uid()}`,
+  });
 
-  // 1. 存储二进制到 IndexedDB
-  await idb.putBlob(blob, assetId);
+  // 生成 object URL（用于即时显示）
+  const url = await AssetRepository.getObjectUrl(result.id);
 
-  // 2. 存储 metadata 到 Dexie（如果可用）
-  const assetMeta = {
-    id: assetId,
-    type: metadata.type || ASSET_TYPES.ATTACHMENT,
-    characterId: metadata.characterId || null,
-    momentId: metadata.momentId || null,
-    name: metadata.name || "",
-    size: blob.size,
-    mimeType: blob.type,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  };
-
-  const available = await isDbAvailable();
-  if (available) {
-    try {
-      await dexieAssetAdapter.storeMetadata(assetId, assetMeta);
-    } catch (e) {
-      console.warn("[Asset] Dexie metadata store failed:", e.message);
-    }
-  }
-
-  // 3. 生成 object URL
-  const url = URL.createObjectURL(blob);
-
-  return { id: assetId, metadata: assetMeta, url };
+  return { id: result.id, metadata: result.metadata, url };
 }
 
 /**
@@ -87,7 +61,7 @@ export async function storeAsset(blob, metadata = {}) {
  * @returns {Promise<Blob|null>}
  */
 export async function getAssetBlob(id) {
-  return idb.getBlob(id);
+  return AssetRepository.getBlob(id);
 }
 
 /**
@@ -96,8 +70,7 @@ export async function getAssetBlob(id) {
  * @returns {Promise<string|null>}
  */
 export async function getAssetUrl(id) {
-  const blob = await idb.getBlob(id);
-  return blob ? URL.createObjectURL(blob) : null;
+  return AssetRepository.getObjectUrl(id);
 }
 
 /**
@@ -106,26 +79,7 @@ export async function getAssetUrl(id) {
  * @returns {Promise<Object|null>}
  */
 export async function getAssetMetadata(id) {
-  const available = await isDbAvailable();
-  if (available) {
-    try {
-      const meta = await dexieAssetAdapter.getMetadata(id);
-      if (meta) return meta;
-    } catch (e) {
-      // fallback
-    }
-  }
-
-  // Fallback: 从 blob 推断基本信息
-  const blob = await idb.getBlob(id);
-  if (!blob) return null;
-  return {
-    id,
-    type: ASSET_TYPES.ATTACHMENT,
-    size: blob.size,
-    mimeType: blob.type,
-    createdAt: null,
-  };
+  return AssetRepository.getMetadata(id);
 }
 
 /**
@@ -133,18 +87,7 @@ export async function getAssetMetadata(id) {
  * @param {string} id
  */
 export async function deleteAsset(id) {
-  // 1. 删除二进制
-  await idb.deleteBlob(id);
-
-  // 2. 删除 metadata
-  const available = await isDbAvailable();
-  if (available) {
-    try {
-      await dexieAssetAdapter.delete(id);
-    } catch (e) {
-      console.warn("[Asset] Dexie metadata delete failed:", e.message);
-    }
-  }
+  await AssetRepository.delete(id);
 }
 
 /**
@@ -153,8 +96,7 @@ export async function deleteAsset(id) {
  * @returns {Promise<number>}
  */
 export async function getAssetSize(id) {
-  const blob = await idb.getBlob(id);
-  return blob?.size || 0;
+  return AssetRepository.getSize(id);
 }
 
 // ============================================================
@@ -235,10 +177,6 @@ export async function storeAttachment(messageId, blob, name) {
 export async function cleanupOrphanedAssets() {
   // Phase 6: 基础实现，遍历所有 asset ID 并检查引用
   // 完整实现需要在 Phase 11 (Moments) 和 Phase 3 (Messages) 完成后
-  const available = await isDbAvailable();
-  if (!available) return { deleted: 0, freed: 0 };
-
-  // TODO: 完整实现需要查询所有 Character/Moment/Message 的 asset 引用
   // 当前只提供接口，实际清理在后续 Phase 实现
   return { deleted: 0, freed: 0 };
 }
@@ -263,7 +201,7 @@ export async function getAssetStats() {
  * @returns {Promise<string|null>}
  */
 export async function exportAssetAsBase64(id) {
-  const blob = await idb.getBlob(id);
+  const blob = await AssetRepository.getBlob(id);
   if (!blob) return null;
   return new Promise((resolve) => {
     const reader = new FileReader();

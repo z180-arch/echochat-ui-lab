@@ -18,8 +18,7 @@ import { store } from "../core/store.js";
 import { events, EVT } from "../core/events.js";
 import { uid } from "../core/utils.js";
 import { CharacterRepository } from "../repository/character.js";
-import { dexieCharacterAdapter } from "../infrastructure/dexie-adapter.js";
-import { isDbAvailable } from "../infrastructure/dexie-db.js";
+import { legacyAdapter } from "../repository/legacy-adapter.js";
 
 // ============================================================
 //  Character 实体定义
@@ -90,15 +89,12 @@ export function deriveCharacterFromChat(chat) {
  * @returns {Promise<Array>}
  */
 export async function getAllCharacters(options = {}) {
-  // 优先从 Dexie 读取（如果已迁移）
-  const available = await isDbAvailable();
-  if (available) {
-    try {
-      const chars = await dexieCharacterAdapter.findAll(options);
-      if (chars.length > 0) return chars;
-    } catch (e) {
-      console.warn("[Character] Dexie read failed, falling back to chats:", e.message);
-    }
+  // 通过 Repository 访问（内部处理 Dexie 优先 + Legacy fallback）
+  try {
+    const chars = await CharacterRepository.findAll(options);
+    if (chars.length > 0) return chars;
+  } catch (e) {
+    console.warn("[Character] Repository findAll failed:", e.message);
   }
 
   // Fallback: 从 chats 推导
@@ -121,14 +117,12 @@ export async function getAllCharacters(options = {}) {
  * @returns {Promise<Object|null>}
  */
 export async function getCharacterById(id) {
-  const available = await isDbAvailable();
-  if (available) {
-    try {
-      const char = await dexieCharacterAdapter.findById(id);
-      if (char) return char;
-    } catch (e) {
-      // fallback
-    }
+  // 通过 Repository 访问（内部处理 Dexie 优先 + Legacy fallback）
+  try {
+    const char = await CharacterRepository.findById(id);
+    if (char) return char;
+  } catch (e) {
+    // fallback
   }
 
   // Fallback: 从 chats 推导
@@ -161,14 +155,11 @@ export async function createCharacter(data) {
     updatedAt: Date.now(),
   };
 
-  // 写入 Dexie（如果可用）
-  const available = await isDbAvailable();
-  if (available) {
-    try {
-      await dexieCharacterAdapter.create(character);
-    } catch (e) {
-      console.warn("[Character] Dexie write failed:", e.message);
-    }
+  // 通过 Repository 写入（内部处理 Dexie + Legacy）
+  try {
+    await CharacterRepository.create(character);
+  } catch (e) {
+    console.warn("[Character] Repository create failed:", e.message);
   }
 
   events.emit("character_created", character);
@@ -182,17 +173,15 @@ export async function createCharacter(data) {
  * @returns {Promise<Object|null>}
  */
 export async function updateCharacter(id, updates) {
-  const available = await isDbAvailable();
-  if (available) {
-    try {
-      const updated = await dexieCharacterAdapter.update(id, updates);
-      if (updated) {
-        events.emit("character_updated", updated);
-        return updated;
-      }
-    } catch (e) {
-      console.warn("[Character] Dexie update failed:", e.message);
+  // 通过 Repository 更新（内部处理 Dexie + Legacy）
+  try {
+    const updated = await CharacterRepository.update(id, updates);
+    if (updated) {
+      events.emit("character_updated", updated);
+      return updated;
     }
+  } catch (e) {
+    console.warn("[Character] Repository update failed:", e.message);
   }
 
   // Fallback: 更新所有关联 chat 的 config
@@ -302,24 +291,20 @@ export async function permanentDeleteCharacter(id) {
   delete allMemory[id];
   store.set((s) => ({ ...s, longTermMemory: allMemory }));
 
-  // 3. 删除 Relationship
-  const relations = JSON.parse(localStorage.getItem("echodownload_relations_v1") || '{"version":1,"roles":{}}');
+  // 3. 删除 Relationship（通过 Legacy Adapter）
+  const relations = legacyAdapter.getAllRelations();
   delete relations.roles[id];
-  localStorage.setItem("echodownload_relations_v1", JSON.stringify(relations));
+  legacyAdapter.setAllRelations(relations);
 
-  // 4. 删除 Moments
-  const momentsData = JSON.parse(localStorage.getItem("echodownload_moments_v1") || '{"version":1,"moments":[]}');
-  momentsData.moments = momentsData.moments.filter((m) => m.roleId !== id);
-  localStorage.setItem("echodownload_moments_v1", JSON.stringify(momentsData));
+  // 4. 删除 Moments（通过 Legacy Adapter）
+  const moments = legacyAdapter.getAllMoments().filter((m) => m.roleId !== id);
+  legacyAdapter.setAllMoments(moments);
 
-  // 5. 从 Dexie 删除（如果可用）
-  const available = await isDbAvailable();
-  if (available) {
-    try {
-      await dexieCharacterAdapter.permanentDelete(id);
-    } catch (e) {
-      console.warn("[Character] Dexie delete failed:", e.message);
-    }
+  // 5. 从 Dexie 删除（通过 Repository，如果可用）
+  try {
+    await CharacterRepository.permanentDelete(id);
+  } catch (e) {
+    console.warn("[Character] Repository permanentDelete failed:", e.message);
   }
 
   events.emit("character_permanently_deleted", { characterId: id });
@@ -361,16 +346,14 @@ export async function getCharacterStats(id) {
  * 幂等：已存在的 Character 不会重复创建
  */
 export async function migrateCharactersToDexie() {
-  const available = await isDbAvailable();
-  if (!available) return { migrated: 0, skipped: true };
-
+  // 通过 Repository 迁移（内部处理 Dexie 可用性）
   const characters = await getAllCharacters({ includeGuides: true });
   let migrated = 0;
 
   for (const char of characters) {
-    const existing = await dexieCharacterAdapter.findById(char.id);
+    const existing = await CharacterRepository.findById(char.id);
     if (!existing) {
-      await dexieCharacterAdapter.create(char);
+      await CharacterRepository.create(char);
       migrated++;
     }
   }

@@ -15,6 +15,7 @@ export const KEYS = {
   MOMENTS: "echodownload_moments_v1",
   RELATIONS: "echodownload_relations_v1",
   META: "echodownload_meta_v2", // 新版本元数据（schema version, 迁移记录）
+  MIGRATION_STAGING: "echodownload_migration_staging_v2", // 两阶段提交 staging
   ONBOARD_DONE: "echodownload_onboard_done",
   IOS_HINT: "echodownload_ios_hint",
 };
@@ -91,11 +92,40 @@ export function runMigrations() {
   const currentVersion = meta.schemaVersion;
 
   if (currentVersion >= SCHEMA_VERSION) {
+    // 已是最新版本，清理可能残留的 staging
+    clearStaging();
     return { migrated: false, from: currentVersion, to: SCHEMA_VERSION, success: true };
   }
 
-  console.log(`[Migration] starting v${currentVersion} → v${SCHEMA_VERSION}`);
   const migrationLog = { startedAt: Date.now(), steps: [], errors: [] };
+
+  // ---- Step 0: Recovery Check（检测上次中断的 staging commit）----
+  const staging = readStaging();
+  if (staging && staging.targetVersion === SCHEMA_VERSION && staging.snapshot) {
+    console.log("[Migration] detected pending staging, attempting recovery commit");
+    migrationLog.steps.push("recovery: pending staging detected");
+    const recoverResult = commitSnapshot(staging.snapshot);
+    if (recoverResult.success) {
+      writeMeta({
+        schemaVersion: SCHEMA_VERSION,
+        migratedAt: Date.now(),
+        recoveredFromStaging: true,
+      });
+      clearStaging();
+      migrationLog.steps.push("recovery: commit succeeded");
+      events.emit(EVT.DATA_MIGRATED, { from: currentVersion, to: SCHEMA_VERSION, recovered: true });
+      console.log(`[Migration] recovered from staging v${currentVersion} → v${SCHEMA_VERSION}`);
+      return { migrated: true, from: currentVersion, to: SCHEMA_VERSION, success: true, recovered: true };
+    }
+    migrationLog.errors.push(`recovery commit failed: ${JSON.stringify(recoverResult.results)}`);
+    return failMigration(currentVersion, migrationLog, "staging recovery commit 失败，将在下次启动重试");
+  }
+  if (staging) {
+    console.warn("[Migration] staging data invalid, removing and restarting migration");
+    clearStaging();
+  }
+
+  console.log(`[Migration] starting v${currentVersion} → v${SCHEMA_VERSION}`);
 
   // ---- Step 1: Detect & Validate Source ----
   const rawData = {
@@ -182,26 +212,37 @@ export function runMigrations() {
   }
   migrationLog.steps.push("complete snapshot validated");
 
-  // ---- Step 4: Commit (原子写入所有数据，此阶段不做任何转换) ----
-  const writeResults = [];
-  if (migratedData.state !== null) writeResults.push(safeSet(KEYS.STATE, migratedData.state));
-  if (migratedData.worldbook !== null) writeResults.push(safeSet(KEYS.WORLDBOOK, migratedData.worldbook));
-  if (migratedData.moments !== null) writeResults.push(safeSet(KEYS.MOMENTS, migratedData.moments));
-  if (migratedData.relations !== null) writeResults.push(safeSet(KEYS.RELATIONS, migratedData.relations));
-
-  // 任一写入失败都不标记 schema version
-  if (writeResults.some((r) => r === false)) {
-    return failMigration(currentVersion, migrationLog, "部分数据写入失败（存储可能已满）");
+  // ---- Step 4: Two-Phase Commit ----
+  // Phase 1 (Prepare): 完整 snapshot 写入单个 staging key
+  // 此阶段失败时，正式 key 完全未动，旧数据完整
+  const snapshot = {
+    state: migratedData.state,
+    worldbook: migratedData.worldbook,
+    moments: migratedData.moments,
+    relations: migratedData.relations,
+  };
+  if (!writeStaging(snapshot)) {
+    return failMigration(currentVersion, migrationLog, "staging 写入失败（存储可能已满），旧数据未受影响");
   }
-  migrationLog.steps.push("all data committed atomically");
+  migrationLog.steps.push("staging prepared");
 
-  // ---- Step 5: Mark Schema Version (只有完整成功后才升级) ----
+  // Phase 2 (Commit): 从 staging 逐个写入正式 key
+  // 此阶段失败时，staging 保留完整 snapshot，下次启动可恢复
+  const commitResult = commitSnapshot(snapshot);
+  if (!commitResult.success) {
+    migrationLog.errors.push(`commit failed: ${JSON.stringify(commitResult.results)}`);
+    return failMigration(currentVersion, migrationLog, "正式数据写入失败，staging 已保留，下次启动自动恢复");
+  }
+  migrationLog.steps.push("all data committed from staging");
+
+  // ---- Step 5: Mark Schema Version + Cleanup Staging ----
   writeMeta({
     schemaVersion: SCHEMA_VERSION,
     migratedAt: Date.now(),
     migrationLog: { ...migrationLog, completedAt: Date.now() },
   });
-  migrationLog.steps.push("schema version marked");
+  clearStaging();
+  migrationLog.steps.push("schema version marked, staging cleared");
 
   events.emit(EVT.DATA_MIGRATED, { from: currentVersion, to: SCHEMA_VERSION });
   console.log(`[Migration] completed v${currentVersion} → v${SCHEMA_VERSION}`);
@@ -221,6 +262,54 @@ function failMigration(fromVersion, log, reason) {
   });
   events.emit(EVT.ERROR, { type: "migration", reason, fromVersion });
   return { migrated: false, from: fromVersion, to: SCHEMA_VERSION, success: false, reason };
+}
+
+// 从 snapshot 原子性地提交 4 个正式 key（返回每个 key 的写入结果）
+function commitSnapshot(snapshot) {
+  const results = {
+    state: null,
+    worldbook: null,
+    moments: null,
+    relations: null,
+  };
+  if (snapshot.state !== undefined && snapshot.state !== null) {
+    results.state = safeSet(KEYS.STATE, snapshot.state);
+  }
+  if (snapshot.worldbook !== undefined && snapshot.worldbook !== null) {
+    results.worldbook = safeSet(KEYS.WORLDBOOK, snapshot.worldbook);
+  }
+  if (snapshot.moments !== undefined && snapshot.moments !== null) {
+    results.moments = safeSet(KEYS.MOMENTS, snapshot.moments);
+  }
+  if (snapshot.relations !== undefined && snapshot.relations !== null) {
+    results.relations = safeSet(KEYS.RELATIONS, snapshot.relations);
+  }
+  const allOk = Object.values(results).every((r) => r === true || r === null);
+  return { success: allOk, results };
+}
+
+// 读取 staging 数据（上次中断的迁移）
+function readStaging() {
+  try {
+    const raw = localStorage.getItem(KEYS.MIGRATION_STAGING);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// 写入 staging（完整 transformed snapshot）
+function writeStaging(snapshot) {
+  return safeSet(KEYS.MIGRATION_STAGING, {
+    targetVersion: SCHEMA_VERSION,
+    createdAt: Date.now(),
+    snapshot,
+  });
+}
+
+// 删除 staging
+function clearStaging() {
+  safeRemove(KEYS.MIGRATION_STAGING);
 }
 
 // 纯内存转换：worldbook 中 roleKey → roleId（不读写 localStorage，不吞异常）

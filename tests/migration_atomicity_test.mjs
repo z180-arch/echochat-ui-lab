@@ -376,9 +376,68 @@ console.log("\n=== Test 11: staging 写入失败（旧数据完全未动）===")
 }
 
 // ============================================================
-//  Test 12: 损坏的 staging 被检测并清理，重新迁移
+//  Test 12: staging 包含 backup（旧数据原始值可恢复）
 // ============================================================
-console.log("\n=== Test 12: 损坏的 staging 被检测并清理，重新迁移 ===");
+console.log("\n=== Test 12: staging 包含 backup（旧数据原始值可恢复）===");
+{
+  const { v1State, v1Worldbook, v1Moments, v1Relations } = setupV1Data();
+  const originalState = JSON.stringify(v1State);
+  const originalWb = JSON.stringify(v1Worldbook);
+  const originalMo = JSON.stringify(v1Moments);
+  const originalRel = JSON.stringify(v1Relations);
+
+  // 模拟 STATE 写入失败，触发 staging 保留
+  const restore = mockSetItemFailure(KEYS.STATE);
+  runMigrations();
+  restore();
+
+  const staging = getStaging();
+  assert(staging !== null, "staging 存在");
+  assert(staging.backup !== undefined, "staging 包含 backup");
+  assert(staging.snapshot !== undefined, "staging 包含 snapshot");
+  assert(staging.backup.state === originalState, "backup.state 等于旧数据原始值");
+  assert(staging.backup.worldbook === originalWb, "backup.worldbook 等于旧数据原始值");
+  assert(staging.backup.moments === originalMo, "backup.moments 等于旧数据原始值");
+  assert(staging.backup.relations === originalRel, "backup.relations 等于旧数据原始值");
+}
+
+// ============================================================
+//  Test 13: commit 失败后从 backup 回滚恢复旧数据
+// ============================================================
+console.log("\n=== Test 13: commit 失败后从 backup 回滚恢复旧数据 ===");
+{
+  const { v1State } = setupV1Data();
+  const originalState = JSON.stringify(v1State);
+
+  // 模拟 WORLDBOOK 写入失败（STATE 已写入新数据）
+  const restore = mockSetItemFailure(KEYS.WORLDBOOK);
+  runMigrations();
+  restore();
+
+  // 此时 STATE 是新数据，WORLDBOOK 是旧数据
+  const stateBeforeRollback = getState();
+  assert(stateBeforeRollback.chats[0].roleId !== undefined, "中断后 STATE 是新数据");
+
+  // 从 staging.backup 回滚
+  const staging = getStaging();
+  assert(staging.backup !== null, "staging 有 backup");
+
+  // 手动回滚（模拟用户选择恢复旧数据）
+  const b = staging.backup;
+  localStorageMock.setItem(KEYS.STATE, b.state);
+  localStorageMock.setItem(KEYS.WORLDBOOK, b.worldbook);
+  localStorageMock.setItem(KEYS.MOMENTS, b.moments);
+  localStorageMock.setItem(KEYS.RELATIONS, b.relations);
+
+  // 验证回滚后旧数据恢复
+  assert(localStorageMock.getItem(KEYS.STATE) === originalState, "回滚后 STATE 恢复为旧数据");
+  assert(getState().chats[0].roleId === undefined, "回滚后 STATE 不含 roleId（v1 格式）");
+}
+
+// ============================================================
+//  Test 14: 损坏的 staging 被检测并清理，重新迁移
+// ============================================================
+console.log("\n=== Test 14: 损坏的 staging 被检测并清理，重新迁移 ===");
 {
   setupV1Data();
   // 注入损坏的 staging
@@ -388,6 +447,24 @@ console.log("\n=== Test 12: 损坏的 staging 被检测并清理，重新迁移 
   assert(result.success === true, "损坏的 staging 被清理，重新迁移成功");
   assert(getMeta().schemaVersion === 2, "schemaVersion = 2");
   assert(getStaging() === null, "损坏的 staging 已清理");
+}
+
+// ============================================================
+//  Test 15: recovery 后 backup 和 staging 都被清理
+// ============================================================
+console.log("\n=== Test 15: recovery 成功后 staging 被清理 ===");
+{
+  setupV1Data();
+  const restore = mockSetItemFailure(KEYS.MOMENTS);
+  runMigrations(); // 失败，staging 保留
+  restore();
+
+  assert(getStaging() !== null, "失败后 staging 存在");
+
+  runMigrations(); // recovery 成功
+
+  assert(getMeta().schemaVersion === 2, "recovery 后 schemaVersion = 2");
+  assert(getStaging() === null, "recovery 成功后 staging 被清理");
 }
 
 console.log(`\n=== 结果: ${passed} passed, ${failed} failed ===`);

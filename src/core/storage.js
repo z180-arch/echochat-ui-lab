@@ -221,7 +221,7 @@ export function runMigrations() {
     moments: migratedData.moments,
     relations: migratedData.relations,
   };
-  if (!writeStaging(snapshot)) {
+  if (!writeStaging(backup, snapshot)) {
     return failMigration(currentVersion, migrationLog, "staging 写入失败（存储可能已满），旧数据未受影响");
   }
   migrationLog.steps.push("staging prepared");
@@ -298,11 +298,14 @@ function readStaging() {
   }
 }
 
-// 写入 staging（完整 transformed snapshot）
-function writeStaging(snapshot) {
+// 写入 staging record（包含旧数据 backup + 新数据 snapshot，单个 key 原子写入）
+// backup: 旧数据原始字符串值，用于 rollback 恢复
+// snapshot: 完整新数据，用于 commit/recovery 重放
+function writeStaging(backup, snapshot) {
   return safeSet(KEYS.MIGRATION_STAGING, {
     targetVersion: SCHEMA_VERSION,
     createdAt: Date.now(),
+    backup,
     snapshot,
   });
 }
@@ -310,6 +313,31 @@ function writeStaging(snapshot) {
 // 删除 staging
 function clearStaging() {
   safeRemove(KEYS.MIGRATION_STAGING);
+}
+
+// 从 staging.backup 回滚旧数据（用于需要中止迁移时恢复）
+function rollbackFromStaging(staging) {
+  if (!staging || !staging.backup) return false;
+  const b = staging.backup;
+  let ok = true;
+  // 恢复旧数据原始字符串值（不经过 JSON 序列化，保持原样）
+  try {
+    if (b.state !== undefined && b.state !== null) localStorage.setItem(KEYS.STATE, b.state);
+    else localStorage.removeItem(KEYS.STATE);
+  } catch (e) { ok = false; }
+  try {
+    if (b.worldbook !== undefined && b.worldbook !== null) localStorage.setItem(KEYS.WORLDBOOK, b.worldbook);
+    else localStorage.removeItem(KEYS.WORLDBOOK);
+  } catch (e) { ok = false; }
+  try {
+    if (b.moments !== undefined && b.moments !== null) localStorage.setItem(KEYS.MOMENTS, b.moments);
+    else localStorage.removeItem(KEYS.MOMENTS);
+  } catch (e) { ok = false; }
+  try {
+    if (b.relations !== undefined && b.relations !== null) localStorage.setItem(KEYS.RELATIONS, b.relations);
+    else localStorage.removeItem(KEYS.RELATIONS);
+  } catch (e) { ok = false; }
+  return ok;
 }
 
 // 纯内存转换：worldbook 中 roleKey → roleId（不读写 localStorage，不吞异常）

@@ -1,21 +1,121 @@
-MIT License
+PolyForm Noncommercial License 1.0.0
 
-Copyright (c) 2026 z180-arch
+<https://polyformproject.org/licenses/noncommercial/1.0.0>
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Purpose
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+This license allows you to use and share this software for noncommercial
+purposes for free, but not to sell it or use it commercially for free.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+---
+
+Acceptance
+
+In order to get any license under these terms, you must agree to them as
+both strict obligations and conditions to all your licenses.
+
+Copyright License
+
+The licensor grants you a copyright license for the software to do
+everything you might do with the software that would otherwise infringe
+the contributor's copyright in it.
+
+You may do everything for noncommercial purposes and to make changes
+that you do not share.
+
+If you share changes, or use the software as part of a product or
+service that you make available to others, you may do so only for
+noncommercial purposes.
+
+Patent License
+
+The licensor grants you a patent license for the software that covers
+patent claims the licensor can license, or becomes able to license, that
+you would infringe by using the software.
+
+Free Trial
+
+You may use the software for a free trial period solely to evaluate
+whether the software is suitable for a commercial purpose.
+
+Fair Use
+
+You may have "fair use" rights for the software under the law. These
+terms do not limit them.
+
+Other Rights
+
+These terms do not attempt to limit rights apart from those specifically
+listed in the copyright license and patent license sections.
+
+Examples
+
+You may use the software for:
+
+- personal, noncommercial research and experimentation
+- teaching and education
+- making changes for your own internal, noncommercial use
+- sharing the software or changes for noncommercial purposes, including
+  in academic and open source contexts
+- evaluating the software for commercial use during a free trial period
+
+You may not use the software for:
+
+- selling the software or changes, either alone or as part of a larger
+  work
+- using the software as part of a product or service that you sell or
+  make available for a fee
+- using the software to provide a hosted service for a fee
+- using the software within a commercial product or service, except as
+  allowed by the free trial
+- removing or altering copyright or license notices
+
+No Other Rights
+
+These terms do not allow you to sublicense or transfer any of your
+licenses to anyone else, or prevent the licensor from granting licenses
+to anyone else.
+
+No Trademark License
+
+These terms do not grant you any right to use the licensor's trade
+names, trademarks, service marks, or product names. For EchoChat,
+brand usage is governed separately by TRADEMARKS.md.
+
+No Liability
+
+As far as the law allows, the software comes as is, without any
+warranty or condition, and the licensor will not be liable to you for
+any damages arising out of these terms or the use or nature of the
+software, under any kind of legal claim.
+
+Definitions
+
+The "licensor" is the individual or entity offering these terms, and
+the "software" is the software the licensor makes available under these
+terms, including any portions.
+
+"You" refers to the individual or entity agreeing to these terms.
+
+"Noncommercial" means not primarily intended for or directed towards
+commercial advantage or monetary compensation.
+
+"Your product" is any product or service that you make available to
+others, including for a fee or for free, that includes or is built
+using the software or any portion of it.
+
+---
+
+EchoChat Additional Notice
+
+EchoChat source code is licensed under the PolyForm Noncommercial
+License 1.0.0 above.
+
+EchoChat official brand assets (name, logo, wordmark, visual identity)
+are NOT licensed under this agreement. See TRADEMARKS.md for brand
+usage rules.
+
+Third-party dependencies used by EchoChat retain their own licenses.
+See THIRD_PARTY_NOTICES.md for details.
+
+Copyright (c) 2026 EchoChat Project Contributors

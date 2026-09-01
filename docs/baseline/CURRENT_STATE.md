@@ -1,8 +1,9 @@
 # EchoChat Current State
 
 > 最后更新：2026-09-01
-> 当前 Commit：`647b7df` → Stage 0 完成后见最新 commit
+> 当前 Commit：`87dfe84`
 > 状态：**STAGE 0 — Foundation Verification COMPLETE**
+> CI：✅ https://github.com/z180-arch/echochat-ui-lab/actions/runs/33482772101（success）
 
 ---
 
@@ -67,9 +68,9 @@
 
 | 测试套件 | 测试数 | 本地结果 | CI |
 |----------|--------|----------|-----|
-| Migration Atomicity | 90 assertions | ✅ 90/90 PASS | 随 push 运行 |
-| Foundation Test | 24 tests | ✅ 24/24 PASS | 随 push 运行 |
-| **总计** | **114** | **✅ 114/114 PASS** | 见 Actions |
+| Migration Atomicity | 90 assertions | ✅ 90/90 PASS | ✅ PASS（run 33482772101） |
+| Foundation Test | 24 tests | ✅ 24/24 PASS | ✅ PASS（run 33482772101） |
+| **总计** | **114** | **✅ 114/114 PASS** | **✅ CI success** |
 
 语法检查：`node --check` 覆盖 `src/**/*.js` — 本地 0 失败。
 

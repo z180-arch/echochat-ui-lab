@@ -712,3 +712,78 @@
   cursor: pointer;
   box-shadow: var(--shadow-sm);
 }
+
+/* ---- Character reconstruction (Morning Mint, local) ---- */
+.recon-lead {
+  margin: 0 0 var(--space-4);
+  font-size: var(--font-body);
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+}
+.recon-paste {
+  width: 100%;
+  min-height: 220px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.55;
+}
+.recon-hint {
+  margin-top: var(--space-3);
+  font-size: var(--font-caption);
+  color: var(--color-text-tertiary);
+  line-height: 1.5;
+}
+.recon-notice {
+  margin: var(--space-3) 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--font-caption);
+  line-height: 1.55;
+}
+.recon-notice-warn {
+  background: var(--color-primary-soft);
+  color: var(--color-text);
+}
+.recon-label {
+  display: block;
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--font-caption);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-secondary);
+}
+.recon-speakers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.recon-dim {
+  margin-top: var(--space-4);
+}
+.recon-dim-title {
+  font-size: var(--font-caption);
+  font-weight: var(--weight-semibold);
+  margin-bottom: var(--space-2);
+}
+.recon-finding {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.recon-finding-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-caption);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-2);
+}
+.recon-finding-text {
+  width: 100%;
+  resize: vertical;
+  line-height: 1.5;
+}
+.recon-evidence {
+  margin-top: var(--space-2);
+  font-size: var(--font-micro);
+  color: var(--color-text-tertiary);
+  line-height: 1.45;
+}

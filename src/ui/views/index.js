@@ -38,6 +38,7 @@ export function renderLanding() {
           <button class="btn btn-secondary" onclick="window.EchoApp.showMore()">了解更多</button>
         </div>
         <div style="font-size:13px;color:var(--color-text-tertiary);cursor:pointer;" onclick="window.EchoApp.importBackup()">导入完整备份</div>
+        <div style="font-size:13px;color:var(--color-text-tertiary);cursor:pointer;margin-top:8px;" onclick="window.EchoApp.openReconstruction()">从聊天记录重建角色</div>
         <div class="landing-features" style="margin-top:32px;">
           ${[
             { icon: Icons.sparkles, title: "角色", desc: "不是通用聊天机器人" },
@@ -125,6 +126,7 @@ export function renderOnboarding() {
       </div>
     </div>
     <div class="onboarding-footer">
+      <button class="btn btn-ghost" onclick="window.EchoApp.openReconstruction()">从记录重建</button>
       <button class="btn btn-ghost" onclick="window.EchoApp.skipOnboarding()">跳过·用默认</button>
       <button class="btn btn-primary" ${!selected ? "disabled" : ""} onclick="window.EchoApp.finishOnboarding()">下一步</button>
     </div>
@@ -276,7 +278,7 @@ function renderEmptyChat() {
 function renderEmptyCharacter() {
   return `
   <div class="chat-pane hidden-mobile">
-    ${EmptyState({ icon: Icons.users, title: "选择一个角色", desc: "角色是独立的人。点左边打开，看看她是谁，再继续聊。", actionText: "导入角色卡", actionOnClick: "window.EchoApp.importCharacterCard()" })}
+    ${EmptyState({ icon: Icons.users, title: "选择一个角色", desc: "角色是独立的人。点左边打开，看看她是谁，再继续聊。也可以从聊天记录重建。", actionText: "从记录重建", actionOnClick: "window.EchoApp.openReconstruction()" })}
   </div>`;
 }
 
@@ -290,6 +292,7 @@ function renderCharacterListPane(searchQuery, selectedCharacterId, hideListMobil
     <div class="list-header">
       <span class="list-title">角色</span>
       <div style="display:flex;gap:8px;">
+        ${IconButton({ icon: Icons.sparkles, title: "从聊天记录重建", onClick: "window.EchoApp.openReconstruction()" })}
         ${IconButton({ icon: Icons.upload, title: "导入角色卡", onClick: "window.EchoApp.importCharacterCard()" })}
         ${IconButton({ icon: Icons.plus, title: "新建角色", onClick: "window.EchoApp.newChat()" })}
       </div>
@@ -301,7 +304,7 @@ function renderCharacterListPane(searchQuery, selectedCharacterId, hideListMobil
       </div>
     </div>
     <div class="list-body">
-      ${hub.length === 0 ? EmptyState({ icon: Icons.users, title: "还没有角色", desc: "从模板创建，或导入一张角色卡", actionText: "开始", actionOnClick: "window.EchoApp.newChat()" }) :
+      ${hub.length === 0 ? EmptyState({ icon: Icons.users, title: "还没有角色", desc: "从模板创建、导入角色卡，或粘贴聊天记录重建", actionText: "从记录重建", actionOnClick: "window.EchoApp.openReconstruction()" }) :
         hub.map((h) => `
           <div class="list-item ${selectedCharacterId === h.id ? "list-item-active" : ""}" onclick="window.EchoApp.selectCharacter('${h.id}')">
             ${Avatar({ src: resolveAvatarSrc(h.avatar), size: "md" })}
@@ -393,6 +396,7 @@ function renderCharacterDetailPane(characterId) {
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn btn-primary" onclick="window.EchoApp.continueCharacter('${characterId}')">继续对话</button>
           <button class="btn btn-secondary" onclick="window.EchoApp.startNewConversation('${characterId}')">新对话</button>
+          ${convos.length ? `<button class="btn btn-ghost" onclick="window.EchoApp.openReconstructionFromChat('${convos[0].id}')">用对话重建新角色</button>` : ""}
         </div>
       </div>
     </div>

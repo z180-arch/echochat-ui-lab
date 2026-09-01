@@ -1,8 +1,8 @@
 # EchoChat Current State
 
 > 最后更新：2026-09-01
-> 当前 Commit：见 git log（Core Product Completion Wave）
-> 状态：**CORE PRODUCT COMPLETION WAVE — Character Hub + Memory/Relationship/Behavior loop COMPLETE**
+> 当前 Commit：见 git log（Character Reconstruction MVP）
+> 状态：**STAGE 5 — Character Reconstruction MVP COMPLETE**
 > CI：push 后由 GitHub Actions 验证
 
 ---
@@ -72,7 +72,8 @@
 | Foundation Test | 24 tests | ✅ 24/24 PASS | 随 push |
 | Storage Cutover | 28 tests | ✅ 28/28 PASS | 随 push |
 | Core Product | 19 tests | ✅ 19/19 PASS | 随 push |
-| **总计** | **161** | **✅ 161/161 PASS** | 随 push |
+| Reconstruction | 20 tests | ✅ 20/20 PASS | 随 push |
+| **总计** | **181** | **✅ 181/181 PASS** | 随 push |
 
 语法检查：`node --check` 覆盖 `src/**/*.js` — 本地 0 失败。
 新增套件：`node tests/storage_cutover_test.mjs`（Windows 使用 `pathToFileURL`）。Node 无 IndexedDB，测试注入内存 Dexie 形 Adapter。
@@ -102,8 +103,10 @@
 | 声明 | 状态 | 说明 |
 |------|------|------|
 | "142/142 PASS" | 被 161/161 取代 | Core Product 套件 +19 |
-| "161/161 PASS" | ✅ 本波次本地复验 | Windows Node |
+| "161/161 PASS" | 被 181/181 取代 | Reconstruction +20 |
+| "181/181 PASS" | ✅ 本波次本地复验 | Foundation 24 + Migration 90 + Cutover 28 + Core Product 19 + Reconstruction 20 |
 | "Browser core flow PASS" | ✅ Wave CDP | Hub + 记忆 + 角色 tab + 1280/390 |
+| "Reconstruction browser PASS" | ✅ Recon CDP | 解析/审查/创建/隔离/进对话/刷新/390 |
 | "Dexie 迁移完整" | ✅ Message/Conversation/Character 启动迁移已跑通 | Memory/Relationship/Moments 仍未迁 |
 | "PWA 更新正常" | ⚠️ 未在本次验证 | 之前 V1 Closing Pass 验证过 |
 
@@ -126,7 +129,7 @@
 | Desktop 1280×800 | PASS | CDP headless |
 | Mobile 390×844 | PASS | bottom nav 可见 |
 
-验证脚本：`scripts/batch1_browser_verify.mjs`。Stage 0 脚本仍保留：`scripts/stage0_browser_verify.mjs`。
+验证脚本：`scripts/batch1_browser_verify.mjs`、`scripts/wave_browser_verify.mjs`、`scripts/reconstruction_browser_verify.mjs`。Stage 0 脚本仍保留：`scripts/stage0_browser_verify.mjs`。
 
 ---
 
@@ -216,8 +219,9 @@
 | 永久删除 | ✅ 删除 chats/memory/relations/moments |
 | 自动迁移 | ✅ 启动时 `migrateFromLegacy`（幂等，不删 chats） |
 | fallback 推导 | ✅ 仅保留在 Repository 层；string persona 正确映射 identity |
+| Reconstruction | ✅ 纯文本 `名字: 内容` → 结构化审查（证据 + 数据不足）→ `createFromTemplate` / CharacterRepository；`source: reconstructed` |
 
-**下一步**：Character Reconstruction MVP（Stage 5）需独立审查；非本波次。
+**下一步**：Stage 6 记忆候选确认等产品深化；UI V3 仍非必须。
 
 ---
 
@@ -250,13 +254,14 @@
 | Moments | ✅ 按 characterId 筛选；头像取自角色 |
 | Memory | ✅ 角色隔离 + Hub 可见/可增删 + 注入 prompt |
 | Settings | ✅ V1 完整 |
-| Onboarding | ✅ V1 完整 |
+| Onboarding | ✅ V1 完整（含「从记录重建」） |
+| Reconstruction | ✅ 粘贴/文本文件 → 审查弹窗 → 创建角色 |
 | PWA | ✅ V1 完整（更新系统） |
 
 **UI 技术债**：
 - `src/ui/views/index.js` 仍为单文件（已增大）
 - UI 仍部分读取 store.getState() 双写副本
-- Character Reconstruction / 向量记忆 / 关系事件史未做
+- 向量记忆 / 关系事件史未做
 
 ---
 
@@ -308,6 +313,7 @@
 - PWA（安装 / 离线 / 更新）
 - 数据导入导出
 - Migration V1→V2
+- Character Reconstruction（纯文本聊天记录 → 结构化审查 → 现有 Character 合同）
 
 ⚠️ **基础设施完成，UI 未接入**：
 - Message 分页 / 搜索 / 分支
@@ -316,11 +322,8 @@
 - Asset 管理
 
 ❌ **未实现**：
-- Character Reconstruction
-- Memory 相关检索
+- Memory 相关检索的向量层（关键词检索已有）
 - Relationship Event History
-- Behavior Engine
-- Context Builder
 - Plugin System
 - Cloud / Account / Sync
 - Desktop / Mobile Native
@@ -331,7 +334,7 @@
 
 以下功能**仅在架构文档中设计，代码未实现**：
 
-- ❌ Character Reconstruction（从聊天记录重建角色）
+- ✅ Character Reconstruction MVP（纯文本导入 / 证据 / 数据不足 / 审查确认 / 可进入对话）
 - ❌ Memory 分层（Short-term / Long-term / Relationship / Social）
 - ❌ Relationship Current State + Event History
 - ❌ Behavior Engine
@@ -347,18 +350,18 @@
 
 ## 13. Next Action
 
-**Core Product Completion Wave 已完成。STOP。**
+**STAGE 5 Character Reconstruction MVP 已完成。** 现有 Morning Mint 足以承载粘贴 → 审查 → 创建角色，**不升级 UI V3**。
 
-有意推迟（需独立审查 / 后续波次）：
+有意推迟：
 
 ```
-STAGE 5 — Character Reconstruction MVP
 STAGE 6+ 完整 Memory 候选确认流水线 / 向量检索
 STAGE 7 Relationship Event History
-UI V3（当前 Morning Mint 已能表达核心角色体验，不强制升级）
+Plugin / Cloud
+UI V3（Reconstruction 未迫使信息架构重做）
 ```
 
-**不要自动开始 Reconstruction / Plugin / Cloud / UI V3。**
+**不要自动开始 Plugin / Cloud / UI V3。**
 
 ---
 
@@ -378,8 +381,11 @@ UI V3（当前 Morning Mint 已能表达核心角色体验，不强制升级）
 - 无向量检索；Memory 为关键词 + importance。
 - Relationship 无 Event History（V1 affinity 循环已接到 prompt）。
 
+### Reconstruction Wave Decision
+**PASS.** Character Reconstruction 走现有 CharacterRepository / createFromTemplate，无平行角色系统。UI 为 Hub/Landing 入口 + 审查弹窗，不构成 V3 升级理由。
+
 ### Core Product Wave Decision
-**PASS — STOP.** UI V3 不是必须：角色 Hub 用现有 Morning Mint 导航/列表/详情即可表达。Reconstruction 仍是下一差异化功能，不是本波次。
+**PASS — STOP.** UI V3 不是必须：角色 Hub 用现有 Morning Mint 导航/列表/详情即可表达。
 
 ---
 

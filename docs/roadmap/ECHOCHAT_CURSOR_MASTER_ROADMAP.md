@@ -41,7 +41,7 @@ Product Polish
 
 ## 1. 当前阶段定位
 
-**当前阶段：Storage Cutover COMPLETE → STOP before Character Experience**
+**当前阶段：Character Reconstruction MVP COMPLETE**
 
 已完成：
 - Phase 0-6 Foundation 施工（Repository / Dexie / Message / Character / Conversation / Asset）
@@ -50,12 +50,14 @@ Product Polish
 - Stage 1 Message Dexie Read Cutover
 - Stage 2 Conversation Storage Migration
 - Stage 3 Character Repository Cutover
-- 142/142 自动化测试通过（本地）
+- Stage 4 Character Hub / Detail（Core Product Completion Wave）
+- Stage 5 Character Reconstruction MVP（纯文本 → 审查 → CharacterRepository）
+- 181/181 自动化测试（含 Reconstruction 20）
 
 未完成：
 - Asset Domain 未接入 UI / orphan cleanup
-- Memory / Relationship / Moments / Behavior 均为 V1 Legacy
-- Character Hub / Character Detail（Stage 4）
+- Memory 候选确认流水线 / Relationship Event History
+- UI V3（当前不必须）
 
 ---
 
@@ -422,6 +424,8 @@ Evidence: Message #47, Message #52
 - ✅ Insufficient Data 处理
 - ✅ User Review / Edit / Confirm 流程
 - ✅ 生成的 Character 可进入 Chat
+
+**Status: COMPLETE（本波次）。** 本地启发式提取（无 API Key 可用）；不声称线上模型抽取已验证。
 
 ---
 
@@ -905,15 +909,17 @@ Agent 继续开发
 
 ## 21. 当前 NEXT ACTION
 
-**BATCH 1 与 Core Product Completion Wave 已完成。STOP。**
+**STAGE 5 Character Reconstruction MVP 已完成。**
 
 有意推迟：
 
 ```
-STAGE 5 — Character Reconstruction MVP
+STAGE 6+ Memory 候选确认流水线 / 向量检索
+STAGE 7 Relationship Event History
+Plugin / Cloud / UI V3
 ```
 
-**不要自动开始 Reconstruction / Plugin / Cloud / UI V3。**
+**不要自动开始 Plugin / Cloud / UI V3。**
 
 ---
 

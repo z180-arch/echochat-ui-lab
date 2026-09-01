@@ -76,6 +76,8 @@ export async function createFromTemplate(tpl) {
         firstMessage: tpl.firstMessage,
       },
       appearance: { avatar: tpl.avatar || null },
+      speakingStyle: tpl.speakingStyle || {},
+      preferences: tpl.preferences || {},
       source: tpl.source || "user_created",
     });
   } catch (e) {

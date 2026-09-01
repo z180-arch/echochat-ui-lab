@@ -24,7 +24,17 @@ import {
   getOnboardSelection,
   resetOnboarding,
 } from "./ui/views/index.js";
-import { showToast, openModal, openConfirm, Icons, SettingRow, Segmented } from "./ui/components/index.js";
+import { showToast, openModal, closeModal, openConfirm, Icons, SettingRow, Segmented } from "./ui/components/index.js";
+import { reconstructionModalMarkup } from "./ui/views/reconstruction.js";
+import {
+  buildReconstructionDraft,
+  buildDraftFromConversation,
+  setDraftCharacterSpeaker,
+  setDraftName,
+  setFindingAccepted,
+  editFindingText,
+  confirmReconstruction,
+} from "./domain/reconstruction/index.js";
 
 // 应用状态
 const App = {
@@ -772,6 +782,141 @@ const App = {
       }
     };
     input.click();
+  },
+
+  _recon: { overlay: null, step: "paste", pasteText: "", draft: null, error: "", sourceChatId: null },
+
+  openReconstruction() {
+    closeModal(this._recon?.overlay);
+    this._recon = { overlay: null, step: "paste", pasteText: "", draft: null, error: "", sourceChatId: null };
+    this._paintReconstruction();
+  },
+  openReconstructionFromChat(chatId) {
+    closeModal(this._recon?.overlay);
+    const built = buildDraftFromConversation(chatId);
+    if (!built.ok) {
+      showToast({
+        message: built.error === "no-messages" ? "这段对话还没有可解析的消息" : "无法从这段对话重建",
+        type: "info",
+      });
+      return;
+    }
+    this._recon = {
+      overlay: null,
+      step: "review",
+      pasteText: "",
+      draft: built.draft,
+      error: "",
+      sourceChatId: chatId,
+    };
+    this._paintReconstruction();
+  },
+  _paintReconstruction() {
+    const spec = reconstructionModalMarkup(this._recon);
+    if (this._recon.overlay?.isConnected) {
+      const title = this._recon.overlay.querySelector(".modal-title");
+      const body = this._recon.overlay.querySelector(".modal-body");
+      const footer = this._recon.overlay.querySelector(".modal-footer");
+      const modal = this._recon.overlay.querySelector(".modal");
+      if (title) title.textContent = spec.title;
+      if (body) body.innerHTML = spec.content;
+      if (footer) footer.innerHTML = spec.footer;
+      if (modal && spec.width) modal.style.maxWidth = spec.width;
+      return;
+    }
+    this._recon.overlay = openModal(spec);
+  },
+  _closeReconstruction() {
+    closeModal(this._recon.overlay);
+    this._recon = { overlay: null, step: "paste", pasteText: "", draft: null, error: "", sourceChatId: null };
+  },
+  _captureReconstructionEdits() {
+    if (!this._recon.draft) return;
+    const nameEl = document.getElementById("recon-name");
+    if (nameEl) this._recon.draft = setDraftName(this._recon.draft, nameEl.value);
+    for (const f of this._recon.draft.findings || []) {
+      const el = document.getElementById(`recon-text-${f.id}`);
+      if (el) this._recon.draft = editFindingText(this._recon.draft, f.id, el.value);
+    }
+  },
+  reconstructionParse() {
+    const el = document.getElementById("recon-paste");
+    const text = el ? el.value : this._recon.pasteText;
+    this._recon.pasteText = text;
+    const built = buildReconstructionDraft(text);
+    if (!built.ok) {
+      this._recon.error =
+        built.error === "empty" ? "请先粘贴聊天记录。" : "没有识别到「名字: 内容」格式的对话。角色卡 JSON 请走导入角色卡。";
+      this._recon.step = "paste";
+      this._paintReconstruction();
+      return;
+    }
+    this._recon.draft = built.draft;
+    this._recon.error = "";
+    this._recon.step = "review";
+    this._paintReconstruction();
+  },
+  reconstructionLoadFile() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".txt,text/plain";
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        this._recon.pasteText = await readFileAsText(file);
+        this._recon.step = "paste";
+        this._recon.error = "";
+        this._paintReconstruction();
+      } catch (err) {
+        showToast({ message: "无法读取文件", type: "error" });
+      }
+    };
+    input.click();
+  },
+  reconstructionSetSpeaker(name) {
+    this._captureReconstructionEdits();
+    this._recon.draft = setDraftCharacterSpeaker(this._recon.draft, name);
+    this._paintReconstruction();
+  },
+  reconstructionSetName(name) {
+    this._recon.draft = setDraftName(this._recon.draft, name);
+  },
+  reconstructionToggleFinding(id, accepted) {
+    this._recon.draft = setFindingAccepted(this._recon.draft, id, accepted);
+  },
+  reconstructionEditFinding(id, text) {
+    this._recon.draft = editFindingText(this._recon.draft, id, text);
+  },
+  reconstructionBack() {
+    this._captureReconstructionEdits();
+    this._recon.step = "paste";
+    this._recon.error = "";
+    this._paintReconstruction();
+  },
+  async reconstructionConfirm() {
+    this._captureReconstructionEdits();
+    if (!this._recon.draft) return;
+    try {
+      const result = await confirmReconstruction(this._recon.draft);
+      if (!result.ok) {
+        this._recon.error = "创建失败，请检查记录后再试。";
+        this._paintReconstruction();
+        return;
+      }
+      this._closeReconstruction();
+      storage.setRaw(KEYS.ONBOARD_DONE, "1");
+      this.view = "app";
+      store.setSelectedCharacter(result.characterId);
+      store.setActiveTab("characters");
+      this.render();
+      showToast({
+        message: result.insufficient ? "角色已创建。部分设定仍需你补充。" : "角色已从聊天记录重建",
+        type: "success",
+      });
+    } catch (err) {
+      showToast({ message: "创建失败", type: "error" });
+    }
   },
 };
 

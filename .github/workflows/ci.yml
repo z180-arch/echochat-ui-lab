@@ -31,6 +31,9 @@ jobs:
       - name: Core Product
         run: node tests/core_product_test.mjs
 
+      - name: Reconstruction
+        run: node tests/reconstruction_test.mjs
+
       - name: Syntax check (src)
         run: |
           set -euo pipefail

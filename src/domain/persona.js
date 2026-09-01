@@ -7,6 +7,9 @@
 import { store } from "../core/store.js";
 import { events, EVT } from "../core/events.js";
 import { uid, esc } from "../core/utils.js";
+import { Character } from "./character.js";
+import { ConversationRepository } from "../repository/conversation.js";
+import { messageStore } from "./message-store.js";
 
 const CFG = window.ECHOCHAT_CONFIG || {};
 
@@ -43,13 +46,34 @@ export function getRoleAvatar(chat) {
 
 // 从模板创建角色
 export function createFromTemplate(tpl) {
-  return store.createChat({
-    roleId: "role_" + uid(),
+  const roleId = "role_" + uid();
+  const chat = store.createChat({
+    roleId,
     name: tpl.name,
     avatar: tpl.avatar,
     persona: tpl.persona,
     firstMessage: tpl.firstMessage,
   });
+  Character.createCharacter({
+    id: roleId,
+    name: tpl.name,
+    avatar: tpl.avatar,
+    identity: tpl.persona,
+    personality: {
+      description: tpl.persona,
+      firstMessage: tpl.firstMessage,
+    },
+    appearance: { avatar: tpl.avatar || null },
+  }).catch((e) => console.warn("[Persona] character create failed:", e.message));
+  ConversationRepository.create({
+    id: chat.id,
+    characterId: roleId,
+    title: chat.name,
+    config: chat.config,
+    createdAt: chat.createdAt,
+  }).catch((e) => console.warn("[Persona] conversation create failed:", e.message));
+  messageStore.migrateChatMessages(chat.id).catch(() => {});
+  return chat;
 }
 
 // 系统模板列表（从 config 读取）
@@ -71,7 +95,7 @@ export function buildCharacterCard(chat) {
       description: persona,
       personality: "",
       scenario: "",
-      first_mes: chat.messages?.[0]?.text || "",
+      first_mes: messageStore.peekMessages(chat.id)?.[0]?.text || "",
       mes_example: "",
       creator_notes: "Exported from EchoChat",
       system_prompt: "",

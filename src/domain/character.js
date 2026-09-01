@@ -89,26 +89,12 @@ export function deriveCharacterFromChat(chat) {
  * @returns {Promise<Array>}
  */
 export async function getAllCharacters(options = {}) {
-  // 通过 Repository 访问（内部处理 Dexie 优先 + Legacy fallback）
   try {
-    const chars = await CharacterRepository.findAll(options);
-    if (chars.length > 0) return chars;
+    return await CharacterRepository.findAll(options);
   } catch (e) {
     console.warn("[Character] Repository findAll failed:", e.message);
+    return [];
   }
-
-  // Fallback: 从 chats 推导
-  const chats = store.getState().chats;
-  const seen = new Set();
-  const characters = [];
-  for (const chat of chats) {
-    if (seen.has(chat.roleId)) continue;
-    seen.add(chat.roleId);
-    const char = deriveCharacterFromChat(chat);
-    if (!options.includeGuides && char.isGuide) continue;
-    characters.push(char);
-  }
-  return characters;
 }
 
 /**
@@ -117,17 +103,12 @@ export async function getAllCharacters(options = {}) {
  * @returns {Promise<Object|null>}
  */
 export async function getCharacterById(id) {
-  // 通过 Repository 访问（内部处理 Dexie 优先 + Legacy fallback）
   try {
-    const char = await CharacterRepository.findById(id);
-    if (char) return char;
+    return await CharacterRepository.findById(id);
   } catch (e) {
-    // fallback
+    console.warn("[Character] Repository findById failed:", e.message);
+    return null;
   }
-
-  // Fallback: 从 chats 推导
-  const chat = store.getState().chats.find((c) => c.roleId === id);
-  return chat ? deriveCharacterFromChat(chat) : null;
 }
 
 /**
@@ -173,7 +154,6 @@ export async function createCharacter(data) {
  * @returns {Promise<Object|null>}
  */
 export async function updateCharacter(id, updates) {
-  // 通过 Repository 更新（内部处理 Dexie + Legacy）
   try {
     const updated = await CharacterRepository.update(id, updates);
     if (updated) {
@@ -183,21 +163,6 @@ export async function updateCharacter(id, updates) {
   } catch (e) {
     console.warn("[Character] Repository update failed:", e.message);
   }
-
-  // Fallback: 更新所有关联 chat 的 config
-  const chats = store.getState().chats.filter((c) => c.roleId === id);
-  for (const chat of chats) {
-    const patch = {};
-    if (updates.name) patch.name = updates.name;
-    if (updates.avatar) patch.avatar = updates.avatar;
-    if (updates.identity || updates.persona) {
-      patch.config = { ...chat.config, persona: updates.identity || updates.persona };
-    }
-    if (Object.keys(patch).length > 0) {
-      store.updateChat(chat.id, patch);
-    }
-  }
-
   return getCharacterById(id);
 }
 
@@ -346,20 +311,7 @@ export async function getCharacterStats(id) {
  * 幂等：已存在的 Character 不会重复创建
  */
 export async function migrateCharactersToDexie() {
-  // 通过 Repository 迁移（内部处理 Dexie 可用性）
-  const characters = await getAllCharacters({ includeGuides: true });
-  let migrated = 0;
-
-  for (const char of characters) {
-    const existing = await CharacterRepository.findById(char.id);
-    if (!existing) {
-      await CharacterRepository.create(char);
-      migrated++;
-    }
-  }
-
-  console.log(`[Character] Migrated ${migrated} characters to Dexie`);
-  return { migrated, total: characters.length };
+  return CharacterRepository.migrateFromLegacy();
 }
 
 // ============================================================

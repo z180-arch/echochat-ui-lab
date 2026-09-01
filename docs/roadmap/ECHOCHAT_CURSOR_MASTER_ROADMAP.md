@@ -41,21 +41,21 @@ Product Polish
 
 ## 1. 当前阶段定位
 
-**当前阶段：Foundation Closure → Independent Verification**
+**当前阶段：Storage Cutover COMPLETE → STOP before Character Experience**
 
 已完成：
 - Phase 0-6 Foundation 施工（Repository / Dexie / Message / Character / Conversation / Asset）
 - Foundation Gate Report：READY FOR CURSOR
-- 114/114 自动化测试通过
+- Stage 0 Foundation Verification
+- Stage 1 Message Dexie Read Cutover
+- Stage 2 Conversation Storage Migration
+- Stage 3 Character Repository Cutover
+- 142/142 自动化测试通过（本地）
 
 未完成：
-- Message 读取路径仍在 localStorage（UI 直接访问 chat.messages[]）
-- Conversation 未迁移到 Dexie
-- Character fallback 推导仍存在
-- Asset Domain 未接入 UI
+- Asset Domain 未接入 UI / orphan cleanup
 - Memory / Relationship / Moments / Behavior 均为 V1 Legacy
-
-**Cursor 的第一个任务不是开发新功能，而是验证 Foundation 真的可靠。**
+- Character Hub / Character Detail（Stage 4）
 
 ---
 
@@ -905,19 +905,15 @@ Agent 继续开发
 
 ## 21. 当前 NEXT ACTION
 
-**唯一的 NEXT ACTION**：
+**BATCH 1 已完成（Stage 1 Message Dexie Read + Stage 2 Conversation + Stage 3 Character Repository）。STOP。**
+
+唯一的 NEXT ACTION（需独立审查后）：
 
 ```
-STAGE 0 — Foundation Verification
-  ↓
-  1. 确认测试可跨环境运行（已修复硬编码路径）
-  2. 建立 GitHub Actions CI
-  3. 跑完整测试（114 tests）
-  4. 核心浏览器流程手工验证
-  5. STOP → 等待审查
+STAGE 4 — Character Experience / Hub
 ```
 
-**不要同时安排十几个下一步。只有这一个。**
+**不要自动开始 Stage 4。不要开始 Memory / Relationship / Reconstruction / Plugin / Cloud / Moments 扩张 / UI V3。**
 
 ---
 

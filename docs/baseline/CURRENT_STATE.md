@@ -1,9 +1,9 @@
 # EchoChat Current State
 
 > 最后更新：2026-09-01
-> 当前 Commit：`87dfe84`
-> 状态：**STAGE 0 — Foundation Verification COMPLETE**
-> CI：✅ https://github.com/z180-arch/echochat-ui-lab/actions/runs/33482772101（success）
+> 当前 Commit：见下方 Batch 1 commits（tests/docs 为本提交）
+> 状态：**BATCH 1 — Stages 1–3 Storage Cutover COMPLETE**
+> CI：push 后由 GitHub Actions 验证
 
 ---
 
@@ -55,33 +55,35 @@
 | Dexie 数据库 schema | ✅ 完成 | 100% |
 | Dexie Adapter | ✅ 完成 | 100% |
 | Dexie Migration | ✅ 完成 | 100% |
-| Message Store（双写） | ✅ 完成 | 75%（读取未切换） |
-| Character Domain | ✅ 完成 | 70%（fallback 待移除） |
-| Conversation Domain | ✅ 完成 | 60%（存储未切换） |
+| Message Store（双写 + Dexie 读） | ✅ 完成 | 100%（Stage 1 读取已切换；legacy 双写保留） |
+| Character Domain | ✅ 完成 | 90%（Repository 为运行时 SoT；Dexie 不可用时仍可从 chats 推导） |
+| Conversation Domain | ✅ 完成 | 90%（Repository 读写 + 启动迁移；UI 列表仍用 store.chats 双写副本） |
 | Asset Domain | ✅ 完成 | 65%（UI 未接入） |
 
 ---
 
 ## 3. Test Status
 
-### 3.1 自动化测试（Stage 0 本地复验）
+### 3.1 自动化测试（Batch 1 本地复验）
 
 | 测试套件 | 测试数 | 本地结果 | CI |
 |----------|--------|----------|-----|
-| Migration Atomicity | 90 assertions | ✅ 90/90 PASS | ✅ PASS（run 33482772101） |
-| Foundation Test | 24 tests | ✅ 24/24 PASS | ✅ PASS（run 33482772101） |
-| **总计** | **114** | **✅ 114/114 PASS** | **✅ CI success** |
+| Migration Atomicity | 90 assertions | ✅ 90/90 PASS | 待 push |
+| Foundation Test | 24 tests | ✅ 24/24 PASS | 待 push |
+| Storage Cutover | 28 tests | ✅ 28/28 PASS | 待 push |
+| **总计** | **142** | **✅ 142/142 PASS** | 待 push |
 
 语法检查：`node --check` 覆盖 `src/**/*.js` — 本地 0 失败。
+新增套件：`node tests/storage_cutover_test.mjs`（Windows 使用 `pathToFileURL`）。Node 无 IndexedDB，测试注入内存 Dexie 形 Adapter。
 
 ### 3.2 测试覆盖
 
 | 领域 | 覆盖 |
 |------|------|
 | Migration 安全 | ✅ 15 scenarios |
-| Message lifecycle | ✅ create/read/update/delete/100 messages |
-| Character CRUD | ✅ create/multi-conversation/soft-delete |
-| Conversation CRUD | ✅ create/rename/archive/delete |
+| Message lifecycle | ✅ create/read/update/delete/100 messages + Dexie 优先读 / 分页不全切 / 迁移幂等 |
+| Character CRUD | ✅ create/multi-conversation/soft-delete + Repository SoT + 启动迁移 |
+| Conversation CRUD | ✅ create/rename/archive/delete + Dexie 双写 / 非破坏迁移 |
 | Architecture Boundary | ✅ Domain 不直接访问 storage |
 | Data Integrity | ✅ 引用关系/孤儿检查 |
 
@@ -98,29 +100,31 @@
 
 | 声明 | 状态 | 说明 |
 |------|------|------|
-| "114/114 PASS" | ✅ Stage 0 本地复验 | Windows Node v24.15.0 |
-| "Browser core flow PASS" | ✅ Stage 0 手工/CDP 复验 | Create→Chat→Send→Refresh→Persist→Continue + Moments |
-| "Dexie 迁移完整" | ⚠️ 未单独深度验证 | 启动路径无阻塞错误；完整 Dexie 浏览器脚本未作为 Stage 0 阻断项 |
+| "142/142 PASS" | ✅ Batch 1 本地复验 | Windows Node v24.15.0 |
+| "Browser core flow PASS" | ✅ Batch 1 CDP 复验 | Create→Chat→Send→Dexie read→Refresh→Persist→Continue + 50+ msgs |
+| "Dexie 迁移完整" | ✅ Message/Conversation/Character 启动迁移已跑通 | Memory/Relationship/Moments 仍未迁 |
 | "PWA 更新正常" | ⚠️ 未在本次验证 | 之前 V1 Closing Pass 验证过 |
 
-### 3.5 Stage 0 Runtime / Manual Verification（2026-09-01）
+### 3.5 Batch 1 Runtime / Manual Verification（2026-09-01）
 
 | 检查项 | 结果 | 备注 |
 |--------|------|------|
 | 应用启动 | PASS | Landing 正常；无阻塞启动错误 |
 | 主 UI 加载 | PASS | EchoApp 就绪 |
 | Console 致命错误 | PASS | `window.__errors` 为空 |
-| Create Character | PASS | Onboarding → 橘小喵 |
+| Create Character | PASS | Onboarding → 橘小喵；Character 写入 Dexie |
 | Start Chat | PASS | 进入对话，开场白可见 |
-| Send Message | PASS | 用户消息写入；AI 回复在验证中使用本地 SSE stub（无真实 API Key） |
+| Send Message | PASS | 用户消息 + stub AI 回复 |
+| Dexie canonical read | PASS | `getMessages` 与 Dexie 表一致（3）；顺序正确 |
 | Refresh | PASS | 刷新后仍为 app 视图 |
-| Persistence | PASS | 刷新后消息仍在（含用户消息与 stub AI 回复） |
-| Continue Chat | PASS | 刷新后继续发送成功 |
-| Moments 基础流 | PASS | 添加动态 / 点赞 / 评论 / UI 可见 |
+| Persistence | PASS | 刷新后 Dexie 与 UI 均保留 ping + AI 回复 |
+| Continue Chat | PASS | 刷新后继续发送成功（5 条） |
+| Long conversation 50+ | PASS | 55 条；Dexie 全量读 1.6ms；插入含双写 1399.9ms |
+| New empty conversation | PASS | 同角色第二条对话为空；旧对话仍在 |
 | Desktop 1280×800 | PASS | CDP headless |
 | Mobile 390×844 | PASS | bottom nav 可见 |
 
-验证脚本：`scripts/stage0_browser_verify.mjs`（CDP，无额外 npm 依赖）。
+验证脚本：`scripts/batch1_browser_verify.mjs`。Stage 0 脚本仍保留：`scripts/stage0_browser_verify.mjs`。
 
 ---
 
@@ -130,9 +134,9 @@
 
 | 数据类型 | 存储位置 | 状态 |
 |----------|----------|------|
-| Chats / Conversations | localStorage (store) | Legacy |
-| Messages | localStorage + Dexie（双写） | Dual-write |
-| Characters | localStorage（推导）+ Dexie | Dual-read |
+| Chats / Conversations | localStorage (store) **+ Dexie conversations**（双写） | Dual-write |
+| Messages | localStorage + Dexie（双写）；**运行时读 Dexie** | Dexie read |
+| Characters | Dexie canonical + chats 推导 fallback（仅 Dexie 不可用或未迁移） | Dexie SoT |
 | Memories | localStorage (store.longTermMemory) | Legacy |
 | Relationships | localStorage (relations_v1) | Legacy |
 | Moments | localStorage (moments_v1) | Legacy |
@@ -147,62 +151,69 @@
 | Migration | 状态 |
 |-----------|------|
 | V1→V2（localStorage schema） | ✅ 完成，90/90 测试 |
-| localStorage→Dexie（Message） | ⚠️ 机制完成，启动时自动迁移 |
-| localStorage→Dexie（Character） | ⚠️ 机制完成，未自动启用 |
-| localStorage→Dexie（Conversation） | ❌ 未实现 |
+| localStorage→Dexie（Message） | ✅ 启动时自动迁移；读路径 Dexie 优先 |
+| localStorage→Dexie（Character） | ✅ 启动时自动迁移（幂等，不删 chats） |
+| localStorage→Dexie（Conversation） | ✅ 启动时自动迁移（幂等，不删 chats/messages） |
 | localStorage→Dexie（Memory/Relationship/Moments） | ❌ 未实现（Phase 7-11） |
 
 ---
 
 ## 5. Message Status
 
-**阶段：Dual-write，Legacy read**
+**阶段：Dual-write，Dexie canonical read（Stage 1）**
 
 | 路径 | 状态 |
 |------|------|
-| 写入 | ✅ messageStore → localStorage + Dexie（双写） |
-| 读取 | ❌ UI 直接访问 chat.messages[]（localStorage） |
-| 分页 | ✅ messageStore 支持，UI 未使用 |
+| 写入 | ✅ messageStore → localStorage + Dexie（双写；Dexie await） |
+| 读取 | ✅ Dexie 优先（`getMessages` / `peekMessages`）；未迁移时 fallback localStorage |
+| UI | ✅ 不再以 `chat.messages[]` dump 作为权威读路径；`peekMessages` + list preview |
+| 分页 | ✅ messageStore 支持；长会话默认全量 Dexie 读（pageSize=count），避免静默截断 50 条 |
 | 搜索 | ✅ messageStore 支持，UI 未使用 |
 | 分支 | ✅ messageStore 支持，UI 未使用 |
-| 自动迁移 | ✅ 应用启动时后台迁移 |
+| 自动迁移 | ✅ 应用启动 `bootstrapStorage` |
 
-**关键问题**：长聊天（1000+ 消息）性能差，因为 UI 全量加载 chat.messages[]。
+**性能（浏览器真实 Dexie，2026-09-01）**：
+- 100 msgs：bulk insert 15.9ms，全量读 5.7ms，page(50) 4.8ms
+- 500 msgs：bulk insert 108.2ms，全量读 9.3ms，page(50) 10.3ms
+- 1000 msgs：bulk insert 214.8ms，全量读 19.7ms，page(50) 19.6ms
+- 55 msgs 双写插入（含 localStorage）1399.9ms；随后 Dexie 全量读 1.6ms
 
-**下一步**：STAGE 1 — 切换读取到 Dexie。
+未对 page(50) 做索引级提前截断（全量 sort 再 slice）。1000 条读 <20ms，不提前优化。
+
+**下一步**：STAGE 4 — Character Experience / Hub（存储 cutover 已完成）。Legacy message 写入尚未移除（有意保留）。
 
 ---
 
 ## 6. Conversation Status
 
-**阶段：Legacy only**
+**阶段：Dexie + localStorage 双写（Stage 2）**
 
 | 路径 | 状态 |
 |------|------|
-| 写入 | ❌ store.createChat/updateChat/deleteChat（localStorage） |
-| 读取 | ❌ store.getState().chats（localStorage） |
-| Dexie | ❌ ConversationRepository 已定义但未被调用 |
-| 多对话 | ✅ Domain 层支持，UI 未支持 |
+| 写入 | ✅ ConversationRepository → Dexie + legacy chats |
+| 读取 | ✅ ConversationRepository Dexie 优先，fallback localStorage |
+| Dexie | ✅ 启动时从 chats 非破坏迁移 |
+| 多对话 | ✅ Domain + Repository 支持；UI 仍为会话列表（未做 Character Hub） |
 | Archive/Rename/Pin | ✅ Domain 层支持，UI 未使用 |
 
-**下一步**：STAGE 2 — Conversation Storage Cutover。
+**下一步**：STAGE 4 UI 不在本 batch。
 
 ---
 
 ## 7. Character Status
 
-**阶段：Dual-read，Dexie write + Legacy write**
+**阶段：Repository 为运行时 SoT（Stage 3）**
 
 | 路径 | 状态 |
 |------|------|
-| 写入 | ✅ CharacterRepository → Dexie + Legacy（双写） |
-| 读取 | ✅ CharacterRepository → Dexie 优先 + Legacy fallback |
+| 写入 | ✅ CharacterRepository → Dexie（+ 关联 chat 元数据双写于 update） |
+| 读取 | ✅ CharacterRepository → Dexie 优先；Dexie 不可用或未迁移时从 chats 推导 |
 | 级联删除 | ✅ soft delete → archive conversations |
 | 永久删除 | ✅ 删除 chats/memory/relations/moments |
-| 自动迁移 | ❌ 未在启动时启用 |
-| fallback 推导 | ⚠️ 仍存在，从 chats 推导 |
+| 自动迁移 | ✅ 启动时 `migrateFromLegacy`（幂等，不删 chats） |
+| fallback 推导 | ✅ 仅保留在 Repository 层；Domain 不再二次从 chats 推导 |
 
-**下一步**：STAGE 3 — Character Storage Cutover + 移除 fallback。
+**下一步**：STAGE 4 — Character Experience / Hub（产品 UX，非存储）。
 
 ---
 
@@ -247,19 +258,13 @@
 
 ## 10. Known Technical Debt
 
-### 高优先级（STAGE 1-3 必须处理）
+### 高优先级（STAGE 1-3 — 本 batch 已处理）
 
-1. **Message 读取未切换到 Dexie**
-   - 影响：长聊天性能差
-   - 计划：STAGE 1
-
-2. **Conversation 未迁移到 Dexie**
-   - 影响：数据量增长后性能下降
-   - 计划：STAGE 2
-
-3. **Character fallback 推导仍存在**
-   - 影响：数据可能不一致
-   - 计划：STAGE 3
+1. **Message 读取已切换到 Dexie** ✅ Stage 1
+2. **Conversation 已迁移到 Dexie（双写）** ✅ Stage 2
+3. **Character Repository 为运行时 SoT；启动自动迁移** ✅ Stage 3
+   - Domain 层二次 fallback 已移除
+   - Repository 层在 Dexie 不可用时仍可从 chats 推导（安全网）
 
 ### 中优先级（STAGE 4-10 处理）
 
@@ -290,7 +295,7 @@
 ✅ **已实现并可用**：
 - 创建角色（从模板）
 - 聊天（流式响应）
-- 消息持久化（localStorage）
+- 消息持久化（Dexie canonical read + localStorage 双写）
 - Memory（简单长期记忆）
 - Moments（基础朋友圈）
 - Relationship（基础好感度）
@@ -338,35 +343,36 @@
 
 ## 13. Next Action
 
-**STAGE 0 已完成。STOP。**
+**BATCH 1（Stages 1–3 Storage Cutover）已完成。STOP。**
 
 下一阶段（需独立审查批准后才开始）：
 
 ```
-STAGE 1 — Message Dexie Read Cutover
+STAGE 4 — Character Experience / Hub
 ```
 
-**不要自动开始 Stage 1。**
+**不要自动开始 Stage 4。不要开始 Memory / Relationship / Behavior / Reconstruction / Plugin / Cloud / Moments 扩张 / UI V3。**
 
 ---
 
-## 14. Stage 0 Issues Log
+## 14. Batch 1 Issues Log
 
 ### P0
 - （无未关闭 P0）
-- ✅ 已修复：`main.js` 导入 `SettingRow` / `openConfirm` / `Segmented`，但 `src/ui/components/index.js` 未导出 → **应用无法启动**。Stage 0 已补齐导出与基础 Settings CSS / icons。
-- ✅ 已修复：`tests/migration_atomicity_test.mjs` 在 Windows 上用绝对路径 `import()` 失败（`ERR_UNSUPPORTED_ESM_URL_SCHEME`）。改为 `pathToFileURL`。
 
 ### P1
 - 发送消息在未配置 API Key 时直接 return，**不会写入用户消息**（产品既有行为；手工验证需先配置 Key）。
 - 本机默认文档端口 8080 可能被 Steam `steamwebhelper` 占用，导致打开错误页面。
+- Dual-write 仍把完整 `chats[].messages` 写入 localStorage；长会话写入成本仍在（55 条双写插入 ~1.4s）。权威**读**已离开 dump。移除 legacy write 是后续 Stage，本 batch 有意保留。
 
 ### P2
 - Moments 自动生成仍依赖 AI summary；基础 CRUD/点赞/评论可用。
-- Message 仍为 dual-write + legacy read（已知，属 Stage 1）。
+- Dexie `findByConversationId` 分页仍是全量 `sortBy` 再 slice；1000 条 ~20ms，未提前优化。
+- Asset orphan cleanup / UI 接入未做（Roadmap Stage 3 的 Asset 部分，本 batch 范围为 Character Repository Cutover）。
+- UI 会话列表仍渲染 `store.chats`（双写副本），仅消息正文走 `peekMessages`。
 
-### Stage 0 Decision
-**STAGE 0 PASS**
+### Batch 1 Decision
+**STAGES 1–3 PASS — STOP for independent review before Stage 4.**
 
 ---
 

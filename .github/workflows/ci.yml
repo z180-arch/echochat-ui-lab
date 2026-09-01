@@ -25,6 +25,9 @@ jobs:
       - name: Foundation Test
         run: node tests/foundation_test.mjs
 
+      - name: Storage Cutover
+        run: node tests/storage_cutover_test.mjs
+
       - name: Syntax check (src)
         run: |
           set -euo pipefail

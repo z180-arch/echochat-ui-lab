@@ -45,15 +45,14 @@ const App = {
       events.emit(EVT.TOAST, { message: "数据迁移遇到问题，已保留原始数据", type: "warning" });
     }
 
-    // 1.5 Phase 3: 异步迁移消息到 Dexie（不阻塞启动，后台执行）
-    import("./domain/message-store.js")
-      .then(({ messageStore }) => messageStore.migrateAllMessages())
-      .then((result) => {
-        if (result.totalMigrated > 0) {
-          console.log(`[App] Messages migrated to Dexie: ${result.totalMigrated}`);
-        }
+    // 1.5 Stage 1-3: migrate Message/Conversation/Character into Dexie, then hydrate runtime cache
+    const storageReady = import("./domain/message-store.js")
+      .then(({ messageStore }) => messageStore.bootstrapStorage(store.getState().currentChatId))
+      .then(() => {
+        events.emit("rerender");
       })
-      .catch((e) => console.warn("[App] Dexie message migration skipped:", e.message));
+      .catch((e) => console.warn("[App] Dexie storage bootstrap skipped:", e.message));
+    this._storageReady = storageReady;
 
     // 2. 注册 Service Worker + 监听更新
     this.registerServiceWorker();
@@ -76,8 +75,13 @@ const App = {
     this.bindGlobalEvents();
     this.initialized = true;
 
-    // 7. 等待 splash 动画完成后渲染
-    setTimeout(() => {
+    // 7. 等待 splash 动画完成后渲染（若 Dexie hydrate 仍在进行则再等一会）
+    setTimeout(async () => {
+      try {
+        await this._storageReady;
+      } catch (e) {
+        console.warn("[App] storage ready failed:", e.message);
+      }
       this.finishSplashAnimation();
       this.render();
     }, 800);
@@ -221,6 +225,9 @@ const App = {
         const text = await readFileAsText(file);
         const data = JSON.parse(text);
         store.importAll(data, "merge");
+        import("./domain/message-store.js")
+          .then(({ messageStore }) => messageStore.bootstrapStorage(store.getState().currentChatId))
+          .catch(() => {});
         showToast({ message: "备份导入成功", type: "success" });
         this.view = "app";
         this.render();
@@ -286,6 +293,10 @@ const App = {
   selectChat(id) {
     store.selectChat(id);
     store.setProfileOpen(false);
+    import("./domain/message-store.js")
+      .then(({ messageStore }) => messageStore.hydrateChat(id))
+      .then(() => this.render())
+      .catch(() => {});
   },
   deleteChat(id) {
     const chat = store.getState().chats.find((c) => c.id === id);
@@ -296,8 +307,13 @@ const App = {
       cancelText: "取消",
       variant: "danger",
       onConfirm: () => {
-        store.deleteChat(id);
-        showToast({ message: "对话已删除", type: "success" });
+        import("./domain/conversation.js")
+          .then(({ deleteConversation }) => deleteConversation(id))
+          .then(() => showToast({ message: "对话已删除", type: "success" }))
+          .catch(() => {
+            store.deleteChat(id);
+            showToast({ message: "对话已删除", type: "success" });
+          });
       },
     });
   },
@@ -337,16 +353,20 @@ const App = {
   },
   copyMessage(index) {
     const chat = store.getCurrentChat();
-    if (chat?.messages[index]) {
-      copyMessage(chat.messages[index].text);
-    }
+    import("./domain/message-store.js").then(({ peekMessages }) => {
+      const msg = peekMessages(chat?.id)?.[index];
+      if (msg) copyMessage(msg.text);
+    });
   },
   rememberMessage(index) {
     const chat = store.getCurrentChat();
-    if (chat?.messages[index]) {
-      rememberMessage(chat, chat.messages[index]);
-      showToast({ message: "已加入记忆", type: "success" });
-    }
+    import("./domain/message-store.js").then(({ peekMessages }) => {
+      const msg = peekMessages(chat?.id)?.[index];
+      if (msg) {
+        rememberMessage(chat, msg);
+        showToast({ message: "已加入记忆", type: "success" });
+      }
+    });
   },
   regenerateMessage(index) {
     regenerate(index);
@@ -376,43 +396,36 @@ const App = {
   retryFromMessage(index) {
     const chat = store.getCurrentChat();
     if (!chat) return;
-    // 找到该消息之前的最后一条用户消息
-    let userText = null;
-    for (let i = index - 1; i >= 0; i--) {
-      if (chat.messages[i].role === "me") {
-        userText = chat.messages[i].text;
-        break;
+    import("./domain/message-store.js").then(async ({ peekMessages, truncateMessages }) => {
+      const msgs = peekMessages(chat.id);
+      let userText = null;
+      for (let i = index - 1; i >= 0; i--) {
+        if (msgs[i]?.role === "me") {
+          userText = msgs[i].text;
+          break;
+        }
       }
-    }
-    if (!userText) {
-      // 如果没有前面的用户消息，直接重试该条（如果是错误消息）
-      const msg = chat.messages[index];
-      if (msg && msg.role === "her") {
-        // 删除错误消息后重新生成（需要找到对应用户输入）
+      if (!userText) {
         showToast({ message: "无法重试，请重新发送", type: "info" });
         return;
       }
-      return;
-    }
-    // 删除从该错误消息开始的所有消息
-    store.set((s) => ({
-      ...s,
-      chats: s.chats.map((c) =>
-        c.id === chat.id ? { ...c, messages: c.messages.slice(0, index) } : c
-      ),
-    }));
-    sendMessage(userText);
+      await truncateMessages(chat.id, index);
+      sendMessage(userText);
+    });
   },
   exportChat(id) {
     const chat = store.getState().chats.find((c) => c.id === id);
     if (!chat) return;
-    let md = `# ${chat.name} · 聊天记录\n\n`;
-    chat.messages.forEach((m) => {
-      const who = m.role === "me" ? "我" : chat.name;
-      md += `**${who}**：${m.text}\n\n`;
+    import("./domain/message-store.js").then(({ peekMessages }) => {
+      const messages = peekMessages(id);
+      let md = `# ${chat.name} · 聊天记录\n\n`;
+      messages.forEach((m) => {
+        const who = m.role === "me" ? "我" : chat.name;
+        md += `**${who}**：${m.text}\n\n`;
+      });
+      downloadFile(`${chat.name || "chat"}.md`, md, "text/markdown");
+      showToast({ message: "已导出", type: "success" });
     });
-    downloadFile(`${chat.name || "chat"}.md`, md, "text/markdown");
-    showToast({ message: "已导出", type: "success" });
   },
 
   // 动态
@@ -520,8 +533,17 @@ const App = {
       cancelText: "取消",
       variant: "danger",
       onConfirm: () => {
-        store.set((s) => ({ ...s, chats: [], currentChatId: null }));
-        showToast({ message: "所有对话已清空", type: "success" });
+        const ids = (store.getState().chats || []).map((c) => c.id);
+        import("./domain/conversation.js")
+          .then(async ({ deleteConversation }) => {
+            for (const id of ids) {
+              await deleteConversation(id);
+            }
+          })
+          .finally(() => {
+            store.set((s) => ({ ...s, chats: [], currentChatId: null }));
+            showToast({ message: "所有对话已清空", type: "success" });
+          });
       },
     });
   },
@@ -625,6 +647,9 @@ const App = {
         const text = await readFileAsText(file);
         const data = JSON.parse(text);
         store.importAll(data, "merge");
+        import("./domain/message-store.js")
+          .then(({ messageStore }) => messageStore.bootstrapStorage(store.getState().currentChatId))
+          .catch(() => {});
         showToast({ message: "导入成功", type: "success" });
       } catch (err) {
         showToast({ message: "导入失败", type: "error" });

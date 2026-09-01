@@ -1,47 +1,69 @@
 /**
- * EchoChat Message Store (Phase 3 — Message Independence)
+ * EchoChat Message Store (Stage 1 — Dexie Read Cutover)
  *
- * 消息存储抽象层：优先使用 Dexie/IndexedDB，过渡期间双写 localStorage。
+ * Dual-write: localStorage (store.addMessage) + Dexie.
+ * Canonical READ: Dexie via Message Repository / Dexie adapter.
+ * Runtime cache: sync UI/chat reads after hydrate; not a localStorage dump.
  *
- * 渐进式迁移策略：
- * - Phase 3.1: 双写（Dexie + localStorage），读取仍从 localStorage
- * - Phase 3.2: 自动迁移旧消息到 Dexie
- * - Phase 3.3: 读取优先 Dexie，fallback localStorage
- * - Phase 3.4: 移除 localStorage 消息存储
- *
- * 接口与 store.addMessage/updateMessage/deleteMessage 保持一致，
- * chat.js 和 UI 层可无缝切换。
+ * localStorage messages are kept (never discarded) until a later stage
+ * removes legacy write.
  */
 
 import { store } from "../core/store.js";
-import { uid } from "../core/utils.js";
-import { dexieAdapter } from "../infrastructure/dexie-adapter.js";
-import { isDbAvailable } from "../infrastructure/dexie-db.js";
+import { getStorageHooks } from "../repository/test-hooks.js";
 
-// ============================================================
-//  迁移状态
-// ============================================================
+const runtimeCache = new Map();
+const previews = new Map();
 
-let dexieAvailable = null;
-let migrationInProgress = false;
-
-/**
- * 检查 Dexie 是否可用（缓存结果）
- */
-async function ensureDexie() {
-  if (dexieAvailable === null) {
-    dexieAvailable = await isDbAvailable();
-  }
-  return dexieAvailable;
+export function resetRuntime() {
+  runtimeCache.clear();
+  previews.clear();
 }
 
-// ============================================================
-//  消息格式转换
-// ============================================================
+function setCache(chatId, messages) {
+  runtimeCache.set(chatId, messages);
+  const last = messages[messages.length - 1];
+  if (last) previews.set(chatId, { text: last.text, time: last.time });
+  else previews.delete(chatId);
+}
+
+function patchCache(chatId, updater) {
+  const current = runtimeCache.has(chatId)
+    ? runtimeCache.get(chatId)
+    : store.getState().chats.find((c) => c.id === chatId)?.messages || [];
+  setCache(chatId, updater(current));
+}
 
 /**
- * V1 消息格式 → Dexie 消息格式
+ * Sync UI read. After hydrate, this is the Dexie snapshot.
+ * Before hydrate, falls back to the in-memory store copy so first paint
+ * is not blank; hydrate then replaces cache from Dexie.
  */
+export function peekMessages(chatId) {
+  if (runtimeCache.has(chatId)) return runtimeCache.get(chatId);
+  const chat = store.getState().chats.find((c) => c.id === chatId);
+  return chat?.messages || [];
+}
+
+export function getCachedMessages(chatId) {
+  return runtimeCache.get(chatId) || [];
+}
+
+export function getLastMessagePreview(chatId) {
+  if (previews.has(chatId)) return previews.get(chatId);
+  const msgs = peekMessages(chatId);
+  const last = msgs[msgs.length - 1];
+  return last ? { text: last.text, time: last.time } : null;
+}
+
+async function dexieReady() {
+  try {
+    return await getStorageHooks().isAvailable();
+  } catch {
+    return false;
+  }
+}
+
 function toDexieMessage(msg, chatId) {
   return {
     id: msg.id,
@@ -56,219 +78,262 @@ function toDexieMessage(msg, chatId) {
   };
 }
 
-/**
- * Dexie 消息格式 → V1 消息格式
- */
 function toV1Message(msg) {
   return {
     id: msg.id,
     role: msg.role === "user" ? "me" : msg.role === "assistant" ? "her" : msg.role,
-    text: msg.content,
-    time: msg.createdAt,
+    text: msg.content ?? msg.text ?? "",
+    time: msg.createdAt ?? msg.time,
     status: msg.status,
     parentMessageId: msg.parentMessageId,
     metadata: msg.metadata,
   };
 }
 
-// ============================================================
-//  迁移
-// ============================================================
+async function bumpConversationMeta(chatId, msg, deltaCount) {
+  const hooks = getStorageHooks();
+  try {
+    const existing = await hooks.conversation.findById(chatId);
+    if (!existing) return;
+    const patch = { lastMessageAt: msg?.time || msg?.createdAt || Date.now() };
+    if (typeof existing.messageCount === "number" && deltaCount) {
+      patch.messageCount = Math.max(0, existing.messageCount + deltaCount);
+    }
+    await hooks.conversation.update(chatId, patch);
+  } catch {
+    // metadata is best-effort
+  }
+}
 
-/**
- * 迁移单个 chat 的消息到 Dexie
- * 幂等：已迁移的消息不会重复
- */
 export async function migrateChatMessages(chatId) {
-  const available = await ensureDexie();
+  const available = await dexieReady();
   if (!available) return { migrated: 0, skipped: true };
 
   const chat = store.getState().chats.find((c) => c.id === chatId);
-  if (!chat || !chat.messages?.length) return { migrated: 0 };
+  if (!chat) return { migrated: 0 };
 
-  // 检查 Dexie 中是否已有该 chat 的消息
-  const existingCount = await dexieAdapter.message.countByConversationId(chatId);
+  const hooks = getStorageHooks();
+  const existingCount = await hooks.message.countByConversationId(chatId);
   if (existingCount > 0) {
     return { migrated: 0, alreadyMigrated: true, existingCount };
   }
 
-  // 批量写入 Dexie
-  const dexieMessages = chat.messages.map((m) => toDexieMessage(m, chatId));
-  await dexieAdapter.message.bulkCreate(dexieMessages);
-
-  return { migrated: dexieMessages.length };
-}
-
-/**
- * 迁移所有 chat 的消息到 Dexie
- */
-export async function migrateAllMessages() {
-  if (migrationInProgress) return { skipped: true };
-  migrationInProgress = true;
+  const list = chat.messages || [];
+  if (list.length) {
+    let lastTs = 0;
+    const records = list.map((m) => {
+      let t = m.time || Date.now();
+      if (t <= lastTs) t = lastTs + 1;
+      lastTs = t;
+      return toDexieMessage({ ...m, time: t }, chatId);
+    });
+    await hooks.message.bulkCreate(records);
+  }
 
   try {
-    const chats = store.getState().chats;
-    const results = [];
-    let totalMigrated = 0;
-
-    for (const chat of chats) {
-      try {
-        const result = await migrateChatMessages(chat.id);
-        results.push({ chatId: chat.id, ...result });
-        totalMigrated += result.migrated || 0;
-      } catch (e) {
-        console.error(`[MessageStore] migrate ${chat.id} failed:`, e);
-        results.push({ chatId: chat.id, error: String(e) });
-      }
-    }
-
-    console.log(`[MessageStore] Migration complete: ${totalMigrated} messages`);
-    return { totalMigrated, results };
-  } finally {
-    migrationInProgress = false;
-  }
-}
-
-// ============================================================
-//  消息操作（双写）
-// ============================================================
-
-/**
- * 添加消息
- * 双写：localStorage (store.addMessage) + Dexie
- */
-export async function addMessage(chatId, message) {
-  // 1. 写入 localStorage（保持 UI 立即响应）
-  const msg = store.addMessage(chatId, message);
-
-  // 2. 异步写入 Dexie（不阻塞 UI）
-  ensureDexie().then((available) => {
-    if (available) {
-      dexieAdapter.message.create(toDexieMessage(msg, chatId)).catch((e) => {
-        console.error("[MessageStore] Dexie addMessage failed:", e);
+    const existing = await hooks.conversation.findById(chatId);
+    if (!existing) {
+      await hooks.conversation.create({
+        id: chatId,
+        characterId: chat.roleId,
+        title: chat.name || "",
+        config: chat.config || {},
+        messageCount: list.length,
+        lastMessageAt: list.length ? list[list.length - 1].time : chat.createdAt,
+        createdAt: chat.createdAt,
+        archivedAt: chat.archivedAt || null,
+        status: chat.archivedAt ? "archived" : "active",
       });
     }
-  });
+  } catch (e) {
+    console.warn("[MessageStore] conversation upsert during migrate failed:", e.message);
+  }
 
+  return { migrated: list.length };
+}
+
+export async function migrateAllMessages() {
+  const chats = store.getState().chats || [];
+  const results = [];
+  let totalMigrated = 0;
+  for (const chat of chats) {
+    try {
+      const result = await migrateChatMessages(chat.id);
+      results.push({ chatId: chat.id, ...result });
+      totalMigrated += result.migrated || 0;
+    } catch (e) {
+      console.error(`[MessageStore] migrate ${chat.id} failed:`, e);
+      results.push({ chatId: chat.id, error: String(e) });
+    }
+  }
+  console.log(`[MessageStore] Migration complete: ${totalMigrated} messages`);
+  return { totalMigrated, results };
+}
+
+function nextCreatedAt(chatId, requested) {
+  const last = peekMessages(chatId)[peekMessages(chatId).length - 1];
+  const t = requested || Date.now();
+  if (last && t <= last.time) return last.time + 1;
+  return t;
+}
+
+export async function addMessage(chatId, message) {
+  const time = nextCreatedAt(chatId, message.time);
+  const msg = store.addMessage(chatId, { ...message, time });
+  if (runtimeCache.has(chatId)) {
+    patchCache(chatId, (list) => [...list, msg]);
+  } else {
+    setCache(chatId, store.getState().chats.find((c) => c.id === chatId)?.messages || [msg]);
+  }
+
+  try {
+    if (await dexieReady()) {
+      await getStorageHooks().message.create(toDexieMessage(msg, chatId));
+      await bumpConversationMeta(chatId, msg, 1);
+    }
+  } catch (e) {
+    console.error("[MessageStore] Dexie addMessage failed:", e);
+  }
   return msg;
 }
 
-/**
- * 更新消息
- * 双写：localStorage + Dexie
- */
 export async function updateMessage(chatId, messageId, patch) {
-  // 1. 更新 localStorage
   store.updateMessage(chatId, messageId, patch);
+  if (runtimeCache.has(chatId)) {
+    patchCache(chatId, (list) =>
+      list.map((m) => (m.id === messageId ? { ...m, ...patch } : m))
+    );
+  }
 
-  // 2. 异步更新 Dexie
-  ensureDexie().then((available) => {
-    if (available) {
+  try {
+    if (await dexieReady()) {
       const dexiePatch = {};
       if (patch.text !== undefined) dexiePatch.content = patch.text;
       if (patch.status !== undefined) dexiePatch.status = patch.status;
       if (patch.role !== undefined) {
-        dexiePatch.role = patch.role === "me" ? "user" : patch.role === "her" ? "assistant" : patch.role;
+        dexiePatch.role =
+          patch.role === "me" ? "user" : patch.role === "her" ? "assistant" : patch.role;
       }
       if (Object.keys(dexiePatch).length > 0) {
         dexiePatch.updatedAt = Date.now();
-        dexieAdapter.message.update(messageId, dexiePatch).catch((e) => {
-          console.error("[MessageStore] Dexie updateMessage failed:", e);
-        });
+        await getStorageHooks().message.update(messageId, dexiePatch);
       }
     }
-  });
+  } catch (e) {
+    console.error("[MessageStore] Dexie updateMessage failed:", e);
+  }
 }
 
-/**
- * 删除消息
- * 双写：localStorage + Dexie
- */
 export async function deleteMessage(chatId, messageId) {
-  // 1. 从 localStorage 删除
   store.deleteMessage(chatId, messageId);
-
-  // 2. 异步从 Dexie 删除
-  ensureDexie().then((available) => {
-    if (available) {
-      dexieAdapter.message.delete(messageId).catch((e) => {
-        console.error("[MessageStore] Dexie deleteMessage failed:", e);
-      });
+  if (runtimeCache.has(chatId)) {
+    patchCache(chatId, (list) => list.filter((m) => m.id !== messageId));
+  }
+  try {
+    if (await dexieReady()) {
+      await getStorageHooks().message.delete(messageId);
+      const last = peekMessages(chatId)[peekMessages(chatId).length - 1];
+      await bumpConversationMeta(chatId, last, -1);
     }
-  });
+  } catch (e) {
+    console.error("[MessageStore] Dexie deleteMessage failed:", e);
+  }
 }
 
 /**
- * 获取消息（优先 Dexie，fallback localStorage）
- * 当前 Phase 3.1: 仍从 localStorage 读取
- * Phase 3.3: 切换到 Dexie 读取
+ * Canonical read: Dexie first. Does not use a full localStorage dump when Dexie has data.
+ * Default (no pageSize) returns the full conversation so UI/chat never silently truncate.
  */
 export async function getMessages(chatId, options = {}) {
-  const available = await ensureDexie();
+  const hooks = getStorageHooks();
+  const available = await dexieReady();
 
   if (available) {
-    // 检查 Dexie 中是否有数据
-    const count = await dexieAdapter.message.countByConversationId(chatId);
-    if (count > 0) {
-      const result = await dexieAdapter.message.findByConversationId(chatId, options);
-      return result.items.map(toV1Message);
+    try {
+      const count = await hooks.message.countByConversationId(chatId);
+      if (count > 0) {
+        const page = options.page || 1;
+        const pageSize = options.pageSize || count;
+        const result = await hooks.message.findByConversationId(chatId, {
+          ...options,
+          page,
+          pageSize,
+        });
+        const v1 = result.items.map(toV1Message);
+        if (!options.pageSize) setCache(chatId, v1);
+        return v1;
+      }
+      const dexieConv = await hooks.conversation.findById(chatId);
+      if (dexieConv) {
+        setCache(chatId, []);
+        return [];
+      }
+    } catch (e) {
+      console.error("[MessageStore] Dexie getMessages failed:", e);
     }
   }
 
-  // Fallback: 从 localStorage 读取
   const chat = store.getState().chats.find((c) => c.id === chatId);
-  return chat?.messages || [];
+  const msgs = chat?.messages || [];
+  setCache(chatId, msgs);
+  return msgs;
 }
 
-/**
- * 获取消息数量
- */
 export async function getMessageCount(chatId) {
-  const available = await ensureDexie();
-  if (available) {
-    const count = await dexieAdapter.message.countByConversationId(chatId);
-    if (count > 0) return count;
+  const hooks = getStorageHooks();
+  if (await dexieReady()) {
+    try {
+      const count = await hooks.message.countByConversationId(chatId);
+      if (count > 0) return count;
+      const conv = await hooks.conversation.findById(chatId);
+      if (conv) return 0;
+    } catch (e) {
+      // fallback
+    }
   }
   const chat = store.getState().chats.find((c) => c.id === chatId);
   return chat?.messages?.length || 0;
 }
 
-/**
- * 搜索消息
- */
 export async function searchMessages(chatId, query) {
-  const available = await ensureDexie();
-  if (available) {
-    const results = await dexieAdapter.message.search(chatId, query);
-    if (results.length > 0) return results.map(toV1Message);
+  const hooks = getStorageHooks();
+  if (await dexieReady()) {
+    try {
+      const results = await hooks.message.search(chatId, query);
+      if (results.length > 0) return results.map(toV1Message);
+    } catch (e) {
+      // fallback
+    }
   }
   const chat = store.getState().chats.find((c) => c.id === chatId);
   const lower = query.toLowerCase();
-  return (chat?.messages || []).filter((m) =>
-    (m.text || "").toLowerCase().includes(lower)
-  );
+  return (chat?.messages || []).filter((m) => (m.text || "").toLowerCase().includes(lower));
 }
 
-/**
- * 分页获取消息（用于长聊天加载更多）
- */
 export async function getMessagesPaginated(chatId, page = 1, pageSize = 50) {
-  const available = await ensureDexie();
-  if (available) {
-    const count = await dexieAdapter.message.countByConversationId(chatId);
-    if (count > 0) {
-      const result = await dexieAdapter.message.findByConversationId(chatId, { page, pageSize });
-      return {
-        items: result.items.map(toV1Message),
-        total: result.total,
-        hasMore: result.hasMore,
-        page,
-        pageSize,
-      };
+  const hooks = getStorageHooks();
+  if (await dexieReady()) {
+    try {
+      const count = await hooks.message.countByConversationId(chatId);
+      if (count > 0) {
+        const result = await hooks.message.findByConversationId(chatId, { page, pageSize });
+        return {
+          items: result.items.map(toV1Message),
+          total: result.total,
+          hasMore: result.hasMore,
+          page,
+          pageSize,
+        };
+      }
+      const conv = await hooks.conversation.findById(chatId);
+      if (conv) {
+        return { items: [], total: 0, hasMore: false, page, pageSize };
+      }
+    } catch (e) {
+      // fallback
     }
   }
 
-  // Fallback: 内存分页
   const chat = store.getState().chats.find((c) => c.id === chatId);
   const all = chat?.messages || [];
   const total = all.length;
@@ -283,62 +348,114 @@ export async function getMessagesPaginated(chatId, page = 1, pageSize = 50) {
   };
 }
 
-// ============================================================
-//  批量操作（用于 retry/regenerate 等场景）
-// ============================================================
-
-/**
- * 截断消息到指定索引
- * 用于 retryLastMessage / regenerate / editMessage
- */
 export async function truncateMessages(chatId, keepCount) {
-  const chat = store.getState().chats.find((c) => c.id === chatId);
-  if (!chat) return;
+  const msgs = peekMessages(chatId);
+  const toDelete = msgs.slice(keepCount).map((m) => m.id);
 
-  const toDelete = chat.messages.slice(keepCount).map((m) => m.id);
-
-  // 1. localStorage 截断
   store.set((s) => ({
     ...s,
     chats: s.chats.map((c) =>
-      c.id === chatId ? { ...c, messages: c.messages.slice(0, keepCount) } : c
+      c.id === chatId ? { ...c, messages: (c.messages || []).slice(0, keepCount) } : c
     ),
   }));
+  setCache(chatId, msgs.slice(0, keepCount));
 
-  // 2. Dexie 删除
-  const available = await ensureDexie();
-  if (available) {
+  if (await dexieReady()) {
+    const hooks = getStorageHooks();
     for (const id of toDelete) {
-      dexieAdapter.message.delete(id).catch(() => {});
+      try {
+        await hooks.message.delete(id);
+      } catch {
+        // continue
+      }
     }
   }
 }
 
-/**
- * 删除整个 chat 的所有消息
- */
 export async function deleteAllMessages(chatId) {
-  // 1. localStorage
   store.set((s) => ({
     ...s,
     chats: s.chats.map((c) => (c.id === chatId ? { ...c, messages: [] } : c)),
   }));
+  setCache(chatId, []);
 
-  // 2. Dexie
-  const available = await ensureDexie();
-  if (available) {
-    // Dexie adapter 没有批量删除，逐条删除
-    // 注意：实际应用中应该用 db.transaction 批量删除
-    const messages = await dexieAdapter.message.findByConversationId(chatId, { pageSize: 10000 });
-    for (const msg of messages.items) {
-      await dexieAdapter.message.delete(msg.id);
+  if (await dexieReady()) {
+    const hooks = getStorageHooks();
+    try {
+      if (typeof hooks.message.deleteByConversationId === "function") {
+        await hooks.message.deleteByConversationId(chatId);
+      } else {
+        const messages = await hooks.message.findByConversationId(chatId, { pageSize: 10000 });
+        for (const msg of messages.items) {
+          await hooks.message.delete(msg.id);
+        }
+      }
+    } catch (e) {
+      console.error("[MessageStore] Dexie deleteAllMessages failed:", e);
     }
   }
 }
 
-// ============================================================
-//  导出
-// ============================================================
+export async function hydrateChat(chatId) {
+  if (!chatId) return [];
+  return getMessages(chatId);
+}
+
+export async function hydrateList() {
+  const chats = store.getState().chats || [];
+  if (!(await dexieReady())) {
+    for (const c of chats) {
+      const last = c.messages?.[c.messages.length - 1];
+      if (last) previews.set(c.id, { text: last.text, time: last.time });
+    }
+    return;
+  }
+  const hooks = getStorageHooks();
+  for (const c of chats) {
+    try {
+      const latest = await hooks.message.findLatest(c.id);
+      if (latest) {
+        previews.set(c.id, {
+          text: latest.content || latest.text,
+          time: latest.createdAt || latest.time,
+        });
+      }
+    } catch {
+      const last = c.messages?.[c.messages.length - 1];
+      if (last) previews.set(c.id, { text: last.text, time: last.time });
+    }
+  }
+}
+
+export async function bootstrapStorage(currentChatId) {
+  try {
+    await migrateAllMessages();
+  } catch (e) {
+    console.warn("[MessageStore] message migrate skipped:", e.message);
+  }
+  try {
+    const { Conversation } = await import("./conversation.js");
+    if (typeof Conversation.migrateAllConversations === "function") {
+      await Conversation.migrateAllConversations();
+    }
+  } catch (e) {
+    console.warn("[MessageStore] conversation migrate skipped:", e.message);
+  }
+  try {
+    const { Character } = await import("./character.js");
+    if (typeof Character.migrateCharactersToDexie === "function") {
+      await Character.migrateCharactersToDexie();
+    }
+  } catch (e) {
+    console.warn("[MessageStore] character migrate skipped:", e.message);
+  }
+  try {
+    await hydrateList();
+    if (currentChatId) await hydrateChat(currentChatId);
+  } catch (e) {
+    console.warn("[MessageStore] hydrate skipped:", e.message);
+  }
+}
 
 export const messageStore = {
   addMessage,
@@ -352,5 +469,12 @@ export const messageStore = {
   deleteAllMessages,
   migrateChatMessages,
   migrateAllMessages,
-  isDexieAvailable: () => dexieAvailable,
+  peekMessages,
+  getCachedMessages,
+  getLastMessagePreview,
+  hydrateChat,
+  hydrateList,
+  bootstrapStorage,
+  resetRuntime,
+  isDexieAvailable: async () => dexieReady(),
 };

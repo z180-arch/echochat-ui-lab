@@ -37,7 +37,8 @@ function buildSystemPrompt(chat) {
   const memoryBlock = roleId ? buildMemoryBlock(roleId) : null;
   if (memoryBlock) parts.push(memoryBlock);
 
-  const wbBlock = buildWorldbookBlock(chat, chat.messages, roleId, persona);
+  const history = messageStore.peekMessages(chat.id);
+  const wbBlock = buildWorldbookBlock(chat, history, roleId, persona);
   if (wbBlock) parts.push(wbBlock);
 
   return parts.join("\n\n");
@@ -77,7 +78,7 @@ export async function sendMessage(text) {
 
     // 4. 构建请求
     const systemPrompt = buildSystemPrompt(chat);
-    const messages = buildMessages(chat, systemPrompt);
+    const messages = buildMessages(chat, systemPrompt, messageStore.peekMessages(chat.id));
 
     // 5. 创建临时 AI 消息（流式中）
     const tempMsg = await messageStore.addMessage(chat.id, {
@@ -127,7 +128,8 @@ export async function sendMessage(text) {
     // 清理临时消息
     const current = store.getCurrentChat();
     if (current) {
-      const lastMsg = current.messages[current.messages.length - 1];
+      const msgs = messageStore.peekMessages(current.id);
+      const lastMsg = msgs[msgs.length - 1];
       if (lastMsg?.status === "streaming") {
         messageStore.updateMessage(current.id, lastMsg.id, {
           status: e.name === "AbortError" ? "stopped" : "error",
@@ -154,17 +156,17 @@ export async function retryLastMessage() {
   const chat = store.getCurrentChat();
   if (!chat || sending) return;
 
-  // 找到最后一条用户消息
+  const msgs = messageStore.peekMessages(chat.id);
   let lastUserIdx = -1;
-  for (let i = chat.messages.length - 1; i >= 0; i--) {
-    if (chat.messages[i].role === "me") {
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    if (msgs[i].role === "me") {
       lastUserIdx = i;
       break;
     }
   }
   if (lastUserIdx < 0) return;
 
-  const userText = chat.messages[lastUserIdx].text;
+  const userText = msgs[lastUserIdx].text;
 
   // 删除最后一条用户消息之后的所有消息（双写：localStorage + Dexie）
   await messageStore.truncateMessages(chat.id, lastUserIdx);
@@ -178,11 +180,11 @@ export async function regenerate(messageIndex) {
   const chat = store.getCurrentChat();
   if (!chat || sending) return;
 
-  // 找到该消息之前的用户消息
+  const msgs = messageStore.peekMessages(chat.id);
   let userText = null;
   for (let i = messageIndex - 1; i >= 0; i--) {
-    if (chat.messages[i].role === "me") {
-      userText = chat.messages[i].text;
+    if (msgs[i]?.role === "me") {
+      userText = msgs[i].text;
       break;
     }
   }
@@ -198,7 +200,8 @@ export async function regenerate(messageIndex) {
 export async function editMessage(messageIndex) {
   const chat = store.getCurrentChat();
   if (!chat) return;
-  const msg = chat.messages[messageIndex];
+  const msgs = messageStore.peekMessages(chat.id);
+  const msg = msgs[messageIndex];
   if (!msg || msg.role !== "me") return;
 
   // 删除从该条开始的所有消息（双写）
@@ -211,7 +214,8 @@ export async function editMessage(messageIndex) {
 export function deleteMessage(messageIndex) {
   const chat = store.getCurrentChat();
   if (!chat) return;
-  const msgId = chat.messages[messageIndex]?.id;
+  const msgs = messageStore.peekMessages(chat.id);
+  const msgId = msgs[messageIndex]?.id;
   if (msgId) messageStore.deleteMessage(chat.id, msgId);
 }
 

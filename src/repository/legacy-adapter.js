@@ -12,7 +12,7 @@
  */
 
 import { store } from "../core/store.js";
-import { KEYS, safeGet, safeSet } from "../core/storage.js";
+import { KEYS, storage } from "../core/storage.js";
 import { idb } from "../infrastructure/idb.js";
 
 // ============================================================
@@ -33,7 +33,7 @@ export function getState() {
  * @returns {any}
  */
 export function getStateKey(key) {
-  return store.get(key);
+  return store.getState()?.[key];
 }
 
 /**
@@ -42,7 +42,7 @@ export function getStateKey(key) {
  * @param {any} value
  */
 export function setStateKey(key, value) {
-  store.set(key, value);
+  store.set((s) => ({ ...s, [key]: value }));
 }
 
 /**
@@ -64,7 +64,7 @@ export function subscribeState(listener) {
  * @returns {any}
  */
 export function readKey(keyName) {
-  return safeGet(KEYS[keyName]);
+  return storage.get(KEYS[keyName]);
 }
 
 /**
@@ -73,7 +73,7 @@ export function readKey(keyName) {
  * @param {any} value
  */
 export function writeKey(keyName, value) {
-  safeSet(KEYS[keyName], value);
+  storage.set(KEYS[keyName], value);
 }
 
 // ============================================================

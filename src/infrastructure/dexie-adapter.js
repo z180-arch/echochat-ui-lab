@@ -79,13 +79,20 @@ export const dexieMessageAdapter = {
       coll = coll.and((m) => m.createdAt > after);
     }
 
-    // 按 createdAt 倒序，取分页，再正序返回
     const total = await coll.count();
-    const sorted = await coll
-      .reverse()
-      .sortBy("createdAt");
+    const chronological = await coll.sortBy("createdAt");
+    if (page === 1 && pageSize >= total) {
+      return {
+        items: chronological,
+        total,
+        page,
+        pageSize,
+        hasMore: false,
+      };
+    }
+    const newestFirst = chronological.slice().reverse();
     const start = (page - 1) * pageSize;
-    const items = sorted.slice(start, start + pageSize).reverse();
+    const items = newestFirst.slice(start, start + pageSize).reverse();
 
     return {
       items,
@@ -166,6 +173,11 @@ export const dexieMessageAdapter = {
     await bulkPut(TABLES.MESSAGES, records);
     return records;
   },
+
+  async deleteByConversationId(conversationId) {
+    const t = await table(TABLES.MESSAGES);
+    return t.where("conversationId").equals(conversationId).delete();
+  },
 };
 
 // ============================================================
@@ -175,6 +187,15 @@ export const dexieMessageAdapter = {
 export const dexieConversationAdapter = {
   async findById(id) {
     return getById(TABLES.CONVERSATIONS, id);
+  },
+
+  async findAll(options = {}) {
+    const t = await table(TABLES.CONVERSATIONS);
+    let coll = t.toCollection();
+    if (options.includeArchived === false) {
+      coll = coll.and((c) => c.status !== "archived" && !c.archivedAt);
+    }
+    return coll.sortBy("updatedAt");
   },
 
   async findByCharacterId(characterId, options = {}) {
@@ -191,12 +212,13 @@ export const dexieConversationAdapter = {
       id: conversation.id || `conv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       characterId: conversation.characterId,
       title: conversation.title || "",
-      status: conversation.status || "active",
+      status: conversation.status || (conversation.archivedAt ? "archived" : "active"),
       config: conversation.config || {},
-      messageCount: 0,
-      lastMessageAt: conversation.createdAt || Date.now(),
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      messageCount: conversation.messageCount ?? 0,
+      lastMessageAt: conversation.lastMessageAt || conversation.createdAt || Date.now(),
+      createdAt: conversation.createdAt || Date.now(),
+      updatedAt: conversation.updatedAt || Date.now(),
+      archivedAt: conversation.archivedAt || null,
     };
     await put(TABLES.CONVERSATIONS, record);
     return record;
@@ -262,8 +284,8 @@ export const dexieCharacterAdapter = {
       source: character.source || "user_created",
       isGuide: character.isGuide || false,
       status: character.status || "active",
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      createdAt: character.createdAt || Date.now(),
+      updatedAt: character.updatedAt || Date.now(),
     };
     await put(TABLES.CHARACTERS, record);
     return record;

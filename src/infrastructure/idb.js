@@ -225,3 +225,6 @@ export const EchoIDB = {
   isPersistent,
   ingestImage,
 };
+
+/** Alias used by Legacy Adapter / Asset Repository */
+export const idb = EchoIDB;

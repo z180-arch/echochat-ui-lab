@@ -35,13 +35,13 @@ export function findPreset(id) {
 }
 
 // 构建 OpenAI 格式请求消息
-export function buildMessages(chat, systemPrompt) {
+export function buildMessages(chat, systemPrompt, historyMessages) {
   const messages = [];
   if (systemPrompt) {
     messages.push({ role: "system", content: systemPrompt });
   }
   const maxMsgs = CFG.contextMaxMessages || 40;
-  const history = (chat.messages || []).slice(-maxMsgs);
+  const history = (historyMessages || chat.messages || []).slice(-maxMsgs);
   history.forEach((m) => {
     if (m.role === "me") {
       messages.push({ role: "user", content: m.text });

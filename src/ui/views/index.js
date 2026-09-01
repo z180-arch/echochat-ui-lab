@@ -12,6 +12,7 @@ import { getMemoryList, buildMemoryBlock } from "../../domain/memory.js";
 import { listMoments, toggleLike, addComment } from "../../domain/moments.js";
 import { getAffinity } from "../../domain/relations.js";
 import { isSending, getStreamingChatId } from "../../domain/chat.js";
+import { peekMessages, getLastMessagePreview } from "../../domain/message-store.js";
 
 const CFG = window.ECHOCHAT_CONFIG || {};
 
@@ -224,22 +225,25 @@ function renderListPane(chats, currentChat, searchQuery) {
     </div>
     <div class="list-body">
       ${chats.length === 0 ? EmptyState({ icon: Icons.message, title: "还没有对话", desc: "点击右上角 + 创建新对话", actionText: "新建对话", actionOnClick: "window.EchoApp.newChat()" }) :
-        chats.map(c => `
+        chats.map(c => {
+          const preview = getLastMessagePreview(c.id);
+          return `
           <div class="list-item ${currentChat?.id === c.id ? "list-item-active" : ""}" onclick="window.EchoApp.selectChat('${c.id}')">
             ${Avatar({ src: getRoleAvatar(c), size: "md" })}
             <div class="list-item-content">
               <div class="list-item-title">${esc(c.name || "未命名")}</div>
-              <div class="list-item-subtitle">${esc(c.messages?.[c.messages.length - 1]?.text?.slice(0, 30) || "开始对话吧")}</div>
+              <div class="list-item-subtitle">${esc(preview?.text?.slice(0, 30) || "开始对话吧")}</div>
             </div>
             <div style="text-align:right;">
-              <div style="font-size:11px;color:var(--color-text-tertiary);">${c.messages?.length ? formatDateTime(c.messages[c.messages.length - 1].time) : ""}</div>
+              <div style="font-size:11px;color:var(--color-text-tertiary);">${preview?.time ? formatDateTime(preview.time) : ""}</div>
               <div style="margin-top:4px;display:flex;gap:4px;justify-content:flex-end;">
                 <button class="icon-btn" style="width:28px;height:28px;" title="导出" onclick="event.stopPropagation();window.EchoApp.exportChat('${c.id}')">${Icons.download}</button>
                 <button class="icon-btn" style="width:28px;height:28px;" title="删除" onclick="event.stopPropagation();window.EchoApp.deleteChat('${c.id}')">${Icons.trash}</button>
               </div>
             </div>
           </div>
-        `).join("")}
+        `;
+        }).join("")}
     </div>
   </div>`;
 }
@@ -252,7 +256,7 @@ function renderEmptyChat() {
 }
 
 function renderChatPane(chat) {
-  const messages = chat.messages || [];
+  const messages = peekMessages(chat.id);
   const sending = isSending() && getStreamingChatId() === chat.id;
   const roleId = getRoleId(chat);
   const affinity = roleId ? getAffinity(roleId, { moments: listMoments(roleId) }) : null;

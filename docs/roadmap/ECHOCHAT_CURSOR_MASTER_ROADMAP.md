@@ -905,15 +905,15 @@ Agent 继续开发
 
 ## 21. 当前 NEXT ACTION
 
-**BATCH 1 已完成（Stage 1 Message Dexie Read + Stage 2 Conversation + Stage 3 Character Repository）。STOP。**
+**BATCH 1 与 Core Product Completion Wave 已完成。STOP。**
 
-唯一的 NEXT ACTION（需独立审查后）：
+有意推迟：
 
 ```
-STAGE 4 — Character Experience / Hub
+STAGE 5 — Character Reconstruction MVP
 ```
 
-**不要自动开始 Stage 4。不要开始 Memory / Relationship / Reconstruction / Plugin / Cloud / Moments 扩张 / UI V3。**
+**不要自动开始 Reconstruction / Plugin / Cloud / UI V3。**
 
 ---
 

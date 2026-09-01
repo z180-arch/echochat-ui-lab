@@ -66,6 +66,12 @@
   font-size: 10px;
   font-weight: var(--weight-medium);
 }
+.chat-back-btn {
+  display: none;
+}
+.character-detail-body {
+  padding: var(--space-5);
+}
 .nav-spacer {
   flex: 1;
 }

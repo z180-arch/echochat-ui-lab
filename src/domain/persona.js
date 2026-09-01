@@ -19,10 +19,19 @@ export function getRoleId(chat) {
   return chat.roleId || chat.config?.memRoleKey || null;
 }
 
+function personaText(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "object") return value.persona || value.description || "";
+  return "";
+}
+
 // 获取角色人设（chat 级优先，全局兜底）
 export function getPersona(chat) {
   if (!chat) return "";
-  return (chat.config && chat.config.persona) || store.getState().global.persona || "";
+  const fromChat = personaText(chat.config && chat.config.persona);
+  if (fromChat) return fromChat;
+  return personaText(store.getState().global.persona);
 }
 
 // 设置角色人设（不改变 roleId）
@@ -41,11 +50,13 @@ export function getRoleName(chat) {
 // 获取角色头像
 export function getRoleAvatar(chat) {
   if (!chat) return "assets/avatars/default.svg";
-  return chat.avatar || "assets/avatars/default.svg";
+  const avatar = chat.avatar || "";
+  if (!avatar || String(avatar).startsWith("blob:")) return "assets/avatars/default.svg";
+  return avatar;
 }
 
 // 从模板创建角色
-export function createFromTemplate(tpl) {
+export async function createFromTemplate(tpl) {
   const roleId = "role_" + uid();
   const chat = store.createChat({
     roleId,
@@ -54,17 +65,22 @@ export function createFromTemplate(tpl) {
     persona: tpl.persona,
     firstMessage: tpl.firstMessage,
   });
-  Character.createCharacter({
-    id: roleId,
-    name: tpl.name,
-    avatar: tpl.avatar,
-    identity: tpl.persona,
-    personality: {
-      description: tpl.persona,
-      firstMessage: tpl.firstMessage,
-    },
-    appearance: { avatar: tpl.avatar || null },
-  }).catch((e) => console.warn("[Persona] character create failed:", e.message));
+  try {
+    await Character.createCharacter({
+      id: roleId,
+      name: tpl.name,
+      avatar: tpl.avatar,
+      identity: tpl.persona,
+      personality: {
+        description: tpl.persona,
+        firstMessage: tpl.firstMessage,
+      },
+      appearance: { avatar: tpl.avatar || null },
+      source: tpl.source || "user_created",
+    });
+  } catch (e) {
+    console.warn("[Persona] character create failed:", e.message);
+  }
   ConversationRepository.create({
     id: chat.id,
     characterId: roleId,
@@ -115,31 +131,57 @@ export function buildCharacterCard(chat) {
   };
 }
 
-// 解析角色卡 JSON
+// 解析角色卡 JSON（非破坏、缺字段给默认值；无法解析则 null）
 export function parseCharacterCard(json) {
+  if (json == null || json === "") return null;
   try {
     const obj = typeof json === "string" ? JSON.parse(json) : json;
-    // v2 格式
-    if (obj.data) {
+    if (!obj || typeof obj !== "object") return null;
+    if (obj.data && typeof obj.data === "object") {
+      const d = obj.data;
       return {
-        name: obj.data.name || "导入角色",
-        persona: obj.data.description || "",
-        firstMessage: obj.data.first_mes || "",
-        avatar: obj.data.extensions?.echochat?.avatar || "",
-        worldbook: obj.data.character_book || null,
+        name: String(d.name || "导入角色").trim() || "导入角色",
+        persona: String(d.description || d.personality || "").trim(),
+        firstMessage: String(d.first_mes || "").trim(),
+        avatar: String(d.extensions?.echochat?.avatar || d.avatar || "").trim(),
+        worldbook: d.character_book || null,
+        sourceRoleId: d.extensions?.echochat?.roleId || null,
       };
     }
-    // v1 格式
     return {
-      name: obj.name || "导入角色",
-      persona: obj.description || obj.persona || "",
-      firstMessage: obj.first_mes || "",
-      avatar: obj.avatar || "",
+      name: String(obj.name || "导入角色").trim() || "导入角色",
+      persona: String(obj.description || obj.persona || "").trim(),
+      firstMessage: String(obj.first_mes || obj.firstMessage || "").trim(),
+      avatar: String(obj.avatar || "").trim(),
       worldbook: obj.character_book || null,
+      sourceRoleId: obj.roleId || null,
     };
   } catch (e) {
     return null;
   }
+}
+
+/**
+ * Import a character card into Character + Conversation.
+ * Always creates a new roleId (never overwrites existing characters).
+ */
+export async function importCharacter(input) {
+  const parsed = parseCharacterCard(input);
+  if (!parsed) return { ok: false, error: "parse" };
+  const chat = await createFromTemplate({
+    name: parsed.name,
+    persona: parsed.persona,
+    firstMessage: parsed.firstMessage,
+    avatar: parsed.avatar || "assets/avatars/default.svg",
+    source: "imported",
+  });
+  const characterId = getRoleId(chat);
+  try {
+    await Character.updateCharacter(characterId, { source: "imported" });
+  } catch (e) {
+    /* character create is already best-effort */
+  }
+  return { ok: true, chat, characterId };
 }
 
 // 用户人设预设库
@@ -173,6 +215,7 @@ export const Persona = {
   getSystemTemplates,
   buildCharacterCard,
   parseCharacterCard,
+  importCharacter,
   getUserPersonaPresets,
   addUserPersonaPreset,
   deleteUserPersonaPreset,

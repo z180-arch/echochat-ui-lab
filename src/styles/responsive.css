@@ -59,6 +59,9 @@
   .bottom-nav {
     display: flex;
   }
+  .chat-back-btn {
+    display: flex;
+  }
 
   /* 会话列表：全屏覆盖 */
   .list-pane {

@@ -9,11 +9,13 @@ import { events, EVT } from "../core/events.js";
 import { uid, sleep, rand } from "../core/utils.js";
 import { getRoleId, getPersona, getRoleName } from "./persona.js";
 import { buildMessages, streamChat, needsApiSetup } from "./provider.js";
-import { buildMemoryBlock } from "./memory.js";
+import { getMemoryList } from "./memory.js";
 import { buildWorldbookBlock } from "./worldbook.js";
-import { recordChatTurn } from "./relations.js";
+import { recordChatTurn, getAffinity } from "./relations.js";
 import { maybeAutoSummary } from "./memory.js";
 import { messageStore } from "./message-store.js";
+import { listMoments } from "./moments.js";
+import { buildBehaviorContext } from "./behavior.js";
 
 let abortCtrl = null;
 let sending = false;
@@ -27,15 +29,16 @@ export function getStreamingChatId() {
   return streamingChatId;
 }
 
-// 构建系统提示词（人设 + 记忆 + 世界书）
-function buildSystemPrompt(chat) {
-  const parts = [];
-  const persona = getPersona(chat);
-  if (persona) parts.push(persona);
-
+// 构建系统提示词（人设 + 记忆 + 关系语气 + 世界书）
+export function buildSystemPrompt(chat) {
   const roleId = getRoleId(chat);
-  const memoryBlock = roleId ? buildMemoryBlock(roleId) : null;
-  if (memoryBlock) parts.push(memoryBlock);
+  const persona = getPersona(chat);
+  const memories = roleId ? getMemoryList(roleId, store.getState().memoryCfg?.injectMax || 10) : [];
+  const affinity = roleId ? getAffinity(roleId, { moments: listMoments(roleId) }) : null;
+  const behavior = buildBehaviorContext({ persona, memories, affinity });
+
+  const parts = [];
+  if (behavior) parts.push(behavior);
 
   const history = messageStore.peekMessages(chat.id);
   const wbBlock = buildWorldbookBlock(chat, history, roleId, persona);
@@ -49,7 +52,16 @@ export async function sendMessage(text) {
   const chat = store.getCurrentChat();
   if (!chat || sending || !text?.trim()) return;
 
+  // Persist the user message first so a missing API key never drops it.
+  const userMsg = await messageStore.addMessage(chat.id, { role: "me", text: text.trim(), status: "sent" });
+  events.emit(EVT.MESSAGE_SENT, { chatId: chat.id, message: userMsg });
+
   if (needsApiSetup(chat)) {
+    await messageStore.addMessage(chat.id, {
+      role: "her",
+      text: "发送失败：请先配置 API 接口地址与 Key。你的消息已保存。",
+      status: "error",
+    });
     events.emit(EVT.TOAST, {
       message: "请先配置 API 接口地址与 Key",
       type: "error",
@@ -57,10 +69,6 @@ export async function sendMessage(text) {
     });
     return;
   }
-
-  // 1. 添加用户消息
-  const userMsg = await messageStore.addMessage(chat.id, { role: "me", text: text.trim(), status: "sent" });
-  events.emit(EVT.MESSAGE_SENT, { chatId: chat.id, message: userMsg });
 
   // 2. 设置发送状态
   sending = true;

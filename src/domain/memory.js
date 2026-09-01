@@ -9,6 +9,7 @@ import { uid } from "../core/utils.js";
 import { getRoleId, getPersona, getRoleName } from "./persona.js";
 import { chatCompletion } from "./provider.js";
 import { parseSummaryAndMoment, addMoment } from "./moments.js";
+import { peekMessages } from "./message-store.js";
 
 let summaryRunning = false;
 
@@ -63,6 +64,13 @@ export function clearMemory(roleId) {
   });
 }
 
+export function searchMemories(roleId, query) {
+  const list = getMemoryList(roleId);
+  const q = String(query || "").trim().toLowerCase();
+  if (!q) return list;
+  return list.filter((m) => String(m.content || "").toLowerCase().includes(q));
+}
+
 export function updateMemoryImportance(roleId, memoryId, importance) {
   store.set((s) => {
     const existing = s.longTermMemory[roleId];
@@ -107,14 +115,15 @@ export async function maybeAutoSummary(chat) {
   const s = store.getState();
   const cfg = s.memoryCfg.autoSummary;
   if (!cfg?.enabled || summaryRunning) return;
-  const msgCount = chat.messages?.length || 0;
+  const history = peekMessages(chat.id);
+  const msgCount = history.length;
   if (msgCount < cfg.everyTurns || msgCount % cfg.everyTurns !== 0) return;
 
   summaryRunning = true;
   try {
     const roleId = getRoleId(chat);
     const persona = getPersona(chat);
-    const recent = chat.messages.slice(-cfg.everyTurns * 2);
+    const recent = history.slice(-cfg.everyTurns * 2);
     const conversation = recent
       .map((m) => `${m.role === "me" ? "用户" : getRoleName(chat)}: ${m.text}`)
       .join("\n");
@@ -173,6 +182,7 @@ export const Memory = {
   addMemory,
   deleteMemory,
   clearMemory,
+  searchMemories,
   updateMemoryImportance,
   buildMemoryBlock,
   rememberMessage,

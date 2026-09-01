@@ -60,11 +60,12 @@ function defaultState() {
     chats: [], // [{id, roleId, name, avatar, createdAt, config:{persona,myAvatar,model,temperature}, messages:[{id,role,text,time,status}]}]
     currentChatId: null,
     ui: {
-      activeTab: "messages", // messages | moments | me
+      activeTab: "messages", // messages | characters | moments | me
       sidebarOpen: true,
       profileOpen: false,
       searchQuery: "",
       momentsFilter: "all",
+      selectedCharacterId: null,
     },
   };
 }
@@ -275,6 +276,14 @@ class Store {
 
   setSearchQuery(q) {
     this.set((s) => ({ ...s, ui: { ...s.ui, searchQuery: q } }));
+  }
+
+  setSelectedCharacter(id) {
+    this.set((s) => ({ ...s, ui: { ...s.ui, selectedCharacterId: id || null } }));
+  }
+
+  setMomentsFilter(filter) {
+    this.set((s) => ({ ...s, ui: { ...s.ui, momentsFilter: filter || "all" } }));
   }
 
   // 导出全量数据（备份）

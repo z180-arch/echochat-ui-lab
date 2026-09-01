@@ -28,6 +28,9 @@ jobs:
       - name: Storage Cutover
         run: node tests/storage_cutover_test.mjs
 
+      - name: Core Product
+        run: node tests/core_product_test.mjs
+
       - name: Syntax check (src)
         run: |
           set -euo pipefail

@@ -52,17 +52,18 @@ import { legacyAdapter } from "../repository/legacy-adapter.js";
  * @returns {Object}
  */
 export function deriveCharacterFromChat(chat) {
-  const persona = chat.config?.persona || {};
+  const raw = chat.config?.persona;
+  const identity = typeof raw === "string" ? raw : (raw?.persona || raw?.description || "");
   return {
     id: chat.roleId,
-    name: chat.name || persona.name || "Unknown",
+    name: chat.name || raw?.name || "Unknown",
     avatar: chat.avatar || null,
-    identity: persona.persona || "",
+    identity,
     personality: {
-      description: persona.persona || "",
-      firstMessage: persona.first_mes || "",
-      mesExample: persona.mes_example || "",
-      scenario: persona.scenario || "",
+      description: identity,
+      firstMessage: raw?.first_mes || "",
+      mesExample: raw?.mes_example || "",
+      scenario: raw?.scenario || "",
     },
     appearance: {
       avatar: chat.avatar || null,

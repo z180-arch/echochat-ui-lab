@@ -8,11 +8,13 @@ import { events, EVT } from "./core/events.js";
 import { runMigrations, storage, KEYS } from "./core/storage.js";
 import { uid, esc, downloadFile, readFileAsText } from "./core/utils.js";
 import { APP_VERSION } from "./core/version.js";
-import { sendMessage, stopGeneration, regenerate, editMessage, deleteMessage, copyMessage, isSending } from "./domain/chat.js";
-import { createFromTemplate, getSystemTemplates, parseCharacterCard, buildCharacterCard } from "./domain/persona.js";
-import { rememberMessage } from "./domain/memory.js";
+import { sendMessage, stopGeneration, regenerate, editMessage, deleteMessage, copyMessage, isSending, buildSystemPrompt } from "./domain/chat.js";
+import { createFromTemplate, getSystemTemplates, buildCharacterCard, importCharacter } from "./domain/persona.js";
+import { rememberMessage, addMemory, deleteMemory } from "./domain/memory.js";
 import { listMoments, toggleLike, addComment } from "./domain/moments.js";
-import { getApiPresets, findPreset, needsApiSetup } from "./domain/provider.js";
+import { getApiPresets, findPreset } from "./domain/provider.js";
+import { continueCharacter as continueCharacterHub, startConversationForCharacter } from "./domain/character-hub.js";
+import { Character } from "./domain/character.js";
 import {
   renderLanding,
   renderOnboarding,
@@ -282,10 +284,125 @@ const App = {
   // App 导航
   switchTab(tab) {
     store.setActiveTab(tab);
-    // 移动端：切换 tab 时隐藏聊天详情
     if (window.innerWidth < 768) {
       store.setProfileOpen(false);
     }
+  },
+  selectCharacter(id) {
+    store.setSelectedCharacter(id);
+    store.setActiveTab("characters");
+  },
+  backToCharacterList() {
+    store.setSelectedCharacter(null);
+  },
+  continueCharacter(id) {
+    const chat = continueCharacterHub(id);
+    if (chat?.id) {
+      import("./domain/message-store.js")
+        .then(({ messageStore }) => messageStore.hydrateChat(chat.id))
+        .then(() => this.render())
+        .catch(() => this.render());
+    }
+  },
+  startNewConversation(id) {
+    startConversationForCharacter(id).then((chat) => {
+      if (chat?.id) {
+        import("./domain/message-store.js")
+          .then(({ messageStore }) => messageStore.hydrateChat(chat.id))
+          .then(() => this.render())
+          .catch(() => this.render());
+      }
+    });
+  },
+  openConversation(id) {
+    this.selectChat(id);
+    store.setActiveTab("messages");
+  },
+  importCharacterCard() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json,application/json";
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const text = await readFileAsText(file);
+        const result = await importCharacter(text);
+        if (!result.ok) {
+          showToast({ message: "无法解析角色卡", type: "error" });
+          return;
+        }
+        store.setSelectedCharacter(result.characterId);
+        store.setActiveTab("characters");
+        this.view = "app";
+        this.render();
+        showToast({ message: "角色已导入", type: "success" });
+      } catch (err) {
+        showToast({ message: "导入失败", type: "error" });
+      }
+    };
+    input.click();
+  },
+  exportCharacterCard(characterId) {
+    const chat = store.getState().chats.find((c) => c.roleId === characterId) || store.getCurrentChat();
+    if (!chat) {
+      showToast({ message: "没有可导出的角色", type: "info" });
+      return;
+    }
+    const card = buildCharacterCard(chat);
+    downloadFile(`${chat.name || "character"}.json`, JSON.stringify(card, null, 2));
+    showToast({ message: "角色卡已导出", type: "success" });
+  },
+  editCharacter(characterId) {
+    const chat = store.getState().chats.find((c) => c.roleId === characterId);
+    const name = chat?.name || "";
+    const persona = chat?.config?.persona || "";
+    const personaStr = typeof persona === "string" ? persona : (persona.persona || "");
+    openModal({
+      title: "编辑角色",
+      content: `
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <label style="font-size:13px;font-weight:600;">名字</label>
+          <input class="input" id="edit-char-name" value="${esc(name)}" />
+          <label style="font-size:13px;font-weight:600;">她是谁</label>
+          <textarea class="input" id="edit-char-identity" rows="6" style="min-height:120px;">${esc(personaStr)}</textarea>
+        </div>
+      `,
+      footer: `
+        <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">取消</button>
+        <button class="btn btn-primary" onclick="window.EchoApp.saveCharacterEdit('${characterId}')">保存</button>
+      `,
+    });
+  },
+  saveCharacterEdit(characterId) {
+    const name = document.getElementById("edit-char-name")?.value?.trim();
+    const identity = document.getElementById("edit-char-identity")?.value || "";
+    Character.updateCharacter(characterId, {
+      name: name || undefined,
+      identity,
+      personality: { description: identity },
+    }).then(() => {
+      const chats = store.getState().chats.filter((c) => c.roleId === characterId);
+      chats.forEach((c) => {
+        store.updateChat(c.id, {
+          name: name || c.name,
+          config: { ...c.config, persona: identity },
+        });
+      });
+      document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+      showToast({ message: "角色已更新", type: "success" });
+    });
+  },
+  addCharacterMemory(characterId) {
+    const input = document.getElementById("hub-memory-input");
+    const text = input?.value?.trim();
+    if (!text) return;
+    addMemory(characterId, text, 6, "manual");
+    if (input) input.value = "";
+    showToast({ message: "已记下", type: "success" });
+  },
+  deleteCharacterMemory(characterId, memoryId) {
+    deleteMemory(characterId, memoryId);
   },
   newChat() {
     this.startOnboarding();
@@ -429,9 +546,8 @@ const App = {
   },
 
   // 动态
-  setMomentsFilter(name) {
-    // 简单实现：前端过滤
-    showToast({ message: `筛选：${name}`, type: "info" });
+  setMomentsFilter(value) {
+    store.setMomentsFilter(value);
   },
   toggleMomentLike(id) {
     toggleLike(id, "我");
@@ -600,10 +716,10 @@ const App = {
       showToast({ message: "请先选择一个对话", type: "info" });
       return;
     }
-    const persona = (chat.config?.persona || store.getState().global.persona || "").slice(0, 500);
+    const persona = buildSystemPrompt(chat) || "";
     openModal({
       title: "Prompt 结构预览",
-      content: `<div style="font-family:monospace;font-size:13px;white-space:pre-wrap;word-break:break-all;">${esc(persona)}</div>`,
+      content: `<div style="font-family:monospace;font-size:13px;white-space:pre-wrap;word-break:break-all;">${esc(persona.slice(0, 4000) || "（空）")}</div>`,
     });
   },
   uploadMyAvatar() {

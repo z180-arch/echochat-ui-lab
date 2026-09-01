@@ -8,11 +8,12 @@ import { events, EVT } from "../../core/events.js";
 import { esc, formatDateTime, relativeTime, renderMarkdown } from "../../core/utils.js";
 import { Icons, Avatar, EmptyState, Button, IconButton, TypingIndicator, showToast, openModal } from "../components/index.js";
 import { getSystemTemplates, getRoleId, getRoleName, getRoleAvatar, getPersona } from "../../domain/persona.js";
-import { getMemoryList, buildMemoryBlock } from "../../domain/memory.js";
+import { getMemoryList } from "../../domain/memory.js";
 import { listMoments, toggleLike, addComment } from "../../domain/moments.js";
 import { getAffinity } from "../../domain/relations.js";
 import { isSending, getStreamingChatId } from "../../domain/chat.js";
 import { peekMessages, getLastMessagePreview } from "../../domain/message-store.js";
+import { listCharactersForHub, listActiveConversations, resolveAvatarSrc } from "../../domain/character-hub.js";
 
 const CFG = window.ECHOCHAT_CONFIG || {};
 
@@ -157,19 +158,30 @@ export function renderAppShell() {
   const state = store.getState();
   const activeTab = state.ui.activeTab;
   const currentChat = store.getCurrentChat();
-  const chats = state.chats || [];
+  const chats = (state.chats || []).filter((c) => !c.archivedAt);
   const searchQuery = state.ui.searchQuery || "";
+  const selectedCharacterId = state.ui.selectedCharacterId || null;
   const filteredChats = searchQuery
-    ? chats.filter(c => c.name?.toLowerCase().includes(searchQuery.toLowerCase()))
+    ? chats.filter((c) => c.name?.toLowerCase().includes(searchQuery.toLowerCase()))
     : chats;
+  const sortedChats = filteredChats
+    .map((c) => ({ c, preview: getLastMessagePreview(c.id) }))
+    .sort((a, b) => (b.preview?.time || b.c.createdAt || 0) - (a.preview?.time || a.c.createdAt || 0))
+    .map((x) => x.c);
+
+  const hideListMobile =
+    (activeTab === "messages" && !!currentChat) || (activeTab === "characters" && !!selectedCharacterId);
+  const hideChatMobile = activeTab === "messages" && !currentChat;
 
   return `
   <div class="app-shell">
     ${renderNavRail(activeTab)}
-    ${activeTab === "messages" ? renderListPane(filteredChats, currentChat, searchQuery) : ""}
+    ${activeTab === "messages" ? renderListPane(sortedChats, currentChat, searchQuery, hideListMobile) : ""}
+    ${activeTab === "characters" ? renderCharacterListPane(searchQuery, selectedCharacterId, hideListMobile) : ""}
     ${activeTab === "moments" ? renderMomentsPane() : ""}
     ${activeTab === "me" ? renderMePane() : ""}
-    ${activeTab === "messages" && currentChat ? renderChatPane(currentChat) : (activeTab === "messages" ? renderEmptyChat() : "")}
+    ${activeTab === "messages" && currentChat ? renderChatPane(currentChat, hideChatMobile) : (activeTab === "messages" ? renderEmptyChat() : "")}
+    ${activeTab === "characters" && selectedCharacterId ? renderCharacterDetailPane(selectedCharacterId) : (activeTab === "characters" ? renderEmptyCharacter() : "")}
     ${activeTab === "messages" && currentChat && state.ui.profileOpen ? renderProfilePane(currentChat) : ""}
     ${renderBottomNav(activeTab)}
   </div>`;
@@ -181,6 +193,9 @@ function renderNavRail(activeTab) {
     <div class="nav-logo">E</div>
     <button class="nav-item ${activeTab === "messages" ? "nav-item-active" : ""}" onclick="window.EchoApp.switchTab('messages')" title="消息">
       ${Icons.message}<span class="nav-item-label">消息</span>
+    </button>
+    <button class="nav-item ${activeTab === "characters" ? "nav-item-active" : ""}" onclick="window.EchoApp.switchTab('characters')" title="角色">
+      ${Icons.users}<span class="nav-item-label">角色</span>
     </button>
     <button class="nav-item ${activeTab === "moments" ? "nav-item-active" : ""}" onclick="window.EchoApp.switchTab('moments')" title="动态">
       ${Icons.moments}<span class="nav-item-label">动态</span>
@@ -198,6 +213,9 @@ function renderBottomNav(activeTab) {
     <button class="bottom-nav-item ${activeTab === "messages" ? "bottom-nav-item-active" : ""}" onclick="window.EchoApp.switchTab('messages')">
       ${Icons.message}<span>消息</span>
     </button>
+    <button class="bottom-nav-item ${activeTab === "characters" ? "bottom-nav-item-active" : ""}" onclick="window.EchoApp.switchTab('characters')">
+      ${Icons.users}<span>角色</span>
+    </button>
     <button class="bottom-nav-item ${activeTab === "moments" ? "bottom-nav-item-active" : ""}" onclick="window.EchoApp.switchTab('moments')">
       ${Icons.moments}<span>动态</span>
     </button>
@@ -207,9 +225,9 @@ function renderBottomNav(activeTab) {
   </nav>`;
 }
 
-function renderListPane(chats, currentChat, searchQuery) {
+function renderListPane(chats, currentChat, searchQuery, hideListMobile) {
   return `
-  <div class="list-pane">
+  <div class="list-pane ${hideListMobile ? "hidden-mobile" : ""}">
     <div class="list-header">
       <span class="list-title">消息</span>
       <div style="display:flex;gap:8px;">
@@ -250,21 +268,147 @@ function renderListPane(chats, currentChat, searchQuery) {
 
 function renderEmptyChat() {
   return `
-  <div class="chat-pane" style="align-items:center;justify-content:center;">
+  <div class="chat-pane hidden-mobile">
     ${EmptyState({ icon: Icons.message, title: "选择一个对话", desc: "从左侧列表打开角色，继续聊天", actionText: "+ 新建对话", actionOnClick: "window.EchoApp.newChat()" })}
   </div>`;
 }
 
-function renderChatPane(chat) {
+function renderEmptyCharacter() {
+  return `
+  <div class="chat-pane hidden-mobile">
+    ${EmptyState({ icon: Icons.users, title: "选择一个角色", desc: "角色是独立的人。点左边打开，看看她是谁，再继续聊。", actionText: "导入角色卡", actionOnClick: "window.EchoApp.importCharacterCard()" })}
+  </div>`;
+}
+
+function renderCharacterListPane(searchQuery, selectedCharacterId, hideListMobile) {
+  const hub = listCharactersForHub().filter((h) => {
+    if (!searchQuery) return true;
+    return (h.name || "").toLowerCase().includes(searchQuery.toLowerCase());
+  });
+  return `
+  <div class="list-pane ${hideListMobile ? "hidden-mobile" : ""}">
+    <div class="list-header">
+      <span class="list-title">角色</span>
+      <div style="display:flex;gap:8px;">
+        ${IconButton({ icon: Icons.upload, title: "导入角色卡", onClick: "window.EchoApp.importCharacterCard()" })}
+        ${IconButton({ icon: Icons.plus, title: "新建角色", onClick: "window.EchoApp.newChat()" })}
+      </div>
+    </div>
+    <div class="list-search">
+      <div style="position:relative;">
+        <input class="input" type="text" placeholder="搜索角色…" value="${esc(searchQuery)}" oninput="window.EchoApp.setSearch(this.value)" style="padding-left:36px;" />
+        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--color-text-tertiary);">${Icons.search}</span>
+      </div>
+    </div>
+    <div class="list-body">
+      ${hub.length === 0 ? EmptyState({ icon: Icons.users, title: "还没有角色", desc: "从模板创建，或导入一张角色卡", actionText: "开始", actionOnClick: "window.EchoApp.newChat()" }) :
+        hub.map((h) => `
+          <div class="list-item ${selectedCharacterId === h.id ? "list-item-active" : ""}" onclick="window.EchoApp.selectCharacter('${h.id}')">
+            ${Avatar({ src: resolveAvatarSrc(h.avatar), size: "md" })}
+            <div class="list-item-content">
+              <div class="list-item-title">${esc(h.name)}</div>
+              <div class="list-item-subtitle">${esc(h.lastPreview || `${h.conversationCount} 个对话`)}</div>
+            </div>
+            <div style="text-align:right;font-size:11px;color:var(--color-text-tertiary);">${h.conversationCount} 对话</div>
+          </div>
+        `).join("")}
+    </div>
+  </div>`;
+}
+
+function renderCharacterDetailPane(characterId) {
+  const hub = listCharactersForHub().find((h) => h.id === characterId);
+  const chats = store.getState().chats.filter((c) => c.roleId === characterId && !c.archivedAt);
+  const sample = chats[0] || null;
+  const identity = sample ? getPersona(sample) : "";
+  const name = hub?.name || sample?.name || "角色";
+  const avatar = resolveAvatarSrc(hub?.avatar || sample?.avatar);
+  const memories = getMemoryList(characterId, 8);
+  const moments = listMoments(characterId).slice(0, 3);
+  const affinity = getAffinity(characterId, { moments: listMoments(characterId) });
+  const convos = listActiveConversations(characterId);
+
+  return `
+  <div class="chat-pane character-detail">
+    <div class="chat-header">
+      <button class="icon-btn chat-back-btn" onclick="window.EchoApp.backToCharacterList()">${Icons.back}</button>
+      <div class="chat-header-center">
+        ${Avatar({ src: avatar, size: "sm" })}
+        <div>
+          <div class="chat-header-name">${esc(name)}</div>
+          <div class="chat-header-status"><span class="status-dot"></span>${affinity ? `认识${affinity.knownDays}天 · ${affinity.toneHint}` : "刚刚认识"}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        ${IconButton({ icon: Icons.download, title: "导出角色卡", onClick: `window.EchoApp.exportCharacterCard('${characterId}')` })}
+        ${IconButton({ icon: Icons.edit, title: "编辑", onClick: `window.EchoApp.editCharacter('${characterId}')` })}
+      </div>
+    </div>
+    <div class="chat-messages character-detail-body">
+      <div class="profile-section" style="padding:0 4px;">
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">
+          ${Avatar({ src: avatar, size: "lg" })}
+          <div>
+            <div style="font-size:20px;font-weight:700;">${esc(name)}</div>
+            <div style="font-size:13px;color:var(--color-text-secondary);">${affinity ? `亲密度 ${affinity.score} · ${affinity.turns} 轮对话` : "还没有聊过"}</div>
+          </div>
+        </div>
+        <div class="profile-section-title">她是谁</div>
+        <div class="profile-section-content" style="font-size:14px;line-height:1.7;margin-bottom:16px;">${esc(identity?.slice(0, 280) || "暂无设定")}${identity?.length > 280 ? "…" : ""}</div>
+        <div class="profile-section-title">关系</div>
+        <div class="profile-section-content" style="margin-bottom:16px;">
+          ${affinity ? `认识 ${affinity.knownDays} 天 · 连续 ${affinity.streakDays} 天 · ${esc(affinity.toneHint)}` : "还在刚刚认识"}
+        </div>
+        <div class="profile-section-title">对话</div>
+        <div class="profile-section-content" style="margin-bottom:16px;">
+          ${convos.length === 0 ? `<div style="color:var(--color-text-tertiary);font-size:13px;">还没有对话</div>` :
+            convos.map((c) => `
+              <div class="list-item" style="padding:8px 0;border-bottom:1px solid var(--color-border);cursor:pointer;" onclick="window.EchoApp.openConversation('${c.id}')">
+                <div class="list-item-content">
+                  <div class="list-item-title">${esc(c.name || "对话")}</div>
+                  <div class="list-item-subtitle">${esc((c.lastPreview || "开始对话吧").slice(0, 36))}</div>
+                </div>
+              </div>
+            `).join("")}
+        </div>
+        <div class="profile-section-title">记忆</div>
+        <div class="profile-section-content" style="margin-bottom:16px;">
+          ${memories.length === 0 ? `<div style="color:var(--color-text-tertiary);font-size:13px;">还没有记忆。聊天里点「记住」，或在下面添加。</div>` :
+            memories.map((m) => `
+              <div style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--color-border);">
+                <div style="flex:1;font-size:13px;">${esc(m.content)}</div>
+                <button class="icon-btn" style="width:28px;height:28px;" title="删除" onclick="window.EchoApp.deleteCharacterMemory('${characterId}','${m.id}')">${Icons.close}</button>
+              </div>
+            `).join("")}
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <input class="input" id="hub-memory-input" placeholder="记下一件关于你的事…" />
+            <button class="btn btn-secondary btn-sm" onclick="window.EchoApp.addCharacterMemory('${characterId}')">添加</button>
+          </div>
+        </div>
+        <div class="profile-section-title">动态</div>
+        <div class="profile-section-content" style="margin-bottom:20px;">
+          ${moments.length === 0 ? `<div style="color:var(--color-text-tertiary);font-size:13px;">还没有动态</div>` :
+            moments.map((m) => `<div style="padding:8px 0;border-bottom:1px solid var(--color-border);font-size:13px;">${esc(m.content)}</div>`).join("")}
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="window.EchoApp.continueCharacter('${characterId}')">继续对话</button>
+          <button class="btn btn-secondary" onclick="window.EchoApp.startNewConversation('${characterId}')">新对话</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderChatPane(chat, hideChatMobile) {
   const messages = peekMessages(chat.id);
   const sending = isSending() && getStreamingChatId() === chat.id;
   const roleId = getRoleId(chat);
   const affinity = roleId ? getAffinity(roleId, { moments: listMoments(roleId) }) : null;
 
   return `
-  <div class="chat-pane">
+  <div class="chat-pane ${hideChatMobile ? "hidden-mobile" : ""}">
     <div class="chat-header">
-      <button class="icon-btn" style="display:none;" id="back-btn" onclick="window.EchoApp.backToList()">${Icons.back}</button>
+      <button class="icon-btn chat-back-btn" onclick="window.EchoApp.backToList()">${Icons.back}</button>
       <div class="chat-header-center" onclick="window.EchoApp.toggleProfile()">
         ${Avatar({ src: getRoleAvatar(chat), size: "sm" })}
         <div>
@@ -376,24 +520,28 @@ function renderProfilePane(chat) {
 // 动态页
 // ============================================================
 function renderMomentsPane() {
-  const moments = listMoments("all");
+  const filter = store.getState().ui.momentsFilter || "all";
+  const all = listMoments("all");
+  const moments = filter === "all" ? all : all.filter((m) => m.roleId === filter || m.roleName === filter);
+  const hub = listCharactersForHub();
+  const avatarByRole = Object.fromEntries(hub.map((h) => [h.id, h.avatar]));
   return `
   <div class="moments-pane">
     <div class="list-header">
       <span class="list-title">动态</span>
       <select class="select" style="width:auto;padding:8px 12px;" onchange="window.EchoApp.setMomentsFilter(this.value)">
-        <option value="all">全部</option>
-        ${[...new Set(moments.map(m => m.roleName))].map(name => `<option value="${esc(name)}">${esc(name)}</option>`).join("")}
+        <option value="all" ${filter === "all" ? "selected" : ""}>全部</option>
+        ${hub.map((h) => `<option value="${esc(h.id)}" ${filter === h.id ? "selected" : ""}>${esc(h.name)}</option>`).join("")}
       </select>
     </div>
     <div class="moments-feed">
       ${moments.length === 0 ? EmptyState({ icon: Icons.moments, title: "还没有动态", desc: "和角色多聊一会儿，这里会留下生活痕迹", actionText: "去消息里聊聊", actionOnClick: "window.EchoApp.switchTab('messages')" }) :
-        moments.map(m => `
+        moments.map((m) => `
           <div class="moment-card">
             <div class="moment-header">
-              ${Avatar({ src: "assets/avatars/default.svg", size: "sm", circle: true })}
+              ${Avatar({ src: resolveAvatarSrc(avatarByRole[m.roleId] || m.avatar), size: "sm", circle: true })}
               <div>
-                <div style="font-weight:600;font-size:14px;">${esc(m.roleName)}</div>
+                <div style="font-weight:600;font-size:14px;cursor:pointer;" onclick="window.EchoApp.selectCharacter('${m.roleId || ""}')">${esc(m.roleName)}</div>
                 <div style="font-size:12px;color:var(--color-text-tertiary);">${relativeTime(m.createdAt)}</div>
               </div>
             </div>
@@ -417,6 +565,7 @@ function renderMomentsPane() {
 // ============================================================
 function renderMePane() {
   const state = store.getState();
+  const characterCount = listCharactersForHub().length;
   return `
   <div class="me-pane">
     <div class="list-header">
@@ -428,7 +577,7 @@ function renderMePane() {
         ${Avatar({ src: state.settings.myAvatar || "assets/avatars/user-default.svg", size: "lg", circle: true })}
         <div style="flex:1;">
           <div style="font-size:18px;font-weight:700;">我</div>
-          <div style="font-size:13px;color:var(--color-text-secondary);">本地保存 · ${state.chats?.length || 0} 个对话</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);">本地保存 · ${characterCount} 个角色 · ${state.chats?.length || 0} 个对话</div>
         </div>
         <button class="icon-btn" onclick="window.EchoApp.uploadMyAvatar()" title="更换头像">${Icons.edit}</button>
       </div>

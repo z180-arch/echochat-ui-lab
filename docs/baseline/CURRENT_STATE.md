@@ -1,8 +1,8 @@
 # EchoChat Current State
 
 > 最后更新：2026-09-01
-> 当前 Commit：见下方 Batch 1 commits（tests/docs 为本提交）
-> 状态：**BATCH 1 — Stages 1–3 Storage Cutover COMPLETE**
+> 当前 Commit：见 git log（Core Product Completion Wave）
+> 状态：**CORE PRODUCT COMPLETION WAVE — Character Hub + Memory/Relationship/Behavior loop COMPLETE**
 > CI：push 后由 GitHub Actions 验证
 
 ---
@@ -56,9 +56,9 @@
 | Dexie Adapter | ✅ 完成 | 100% |
 | Dexie Migration | ✅ 完成 | 100% |
 | Message Store（双写 + Dexie 读） | ✅ 完成 | 100%（Stage 1 读取已切换；legacy 双写保留） |
-| Character Domain | ✅ 完成 | 90%（Repository 为运行时 SoT；Dexie 不可用时仍可从 chats 推导） |
-| Conversation Domain | ✅ 完成 | 90%（Repository 读写 + 启动迁移；UI 列表仍用 store.chats 双写副本） |
-| Asset Domain | ✅ 完成 | 65%（UI 未接入） |
+| Character Domain | ✅ 完成 | 95%（Hub + Detail + 导入导出；Dexie 不可用时仍可从 chats 推导） |
+| Conversation Domain | ✅ 完成 | 92%（Repository 读写 + 启动迁移；列表按 last message 排序，仍用 store.chats 双写副本） |
+| Asset Domain | ✅ 完成 | 75%（头像路径解析 + blob: 回退；导入图仍多为 URL/dataURL，未强制迁 blob 表） |
 
 ---
 
@@ -68,10 +68,11 @@
 
 | 测试套件 | 测试数 | 本地结果 | CI |
 |----------|--------|----------|-----|
-| Migration Atomicity | 90 assertions | ✅ 90/90 PASS | 待 push |
-| Foundation Test | 24 tests | ✅ 24/24 PASS | 待 push |
-| Storage Cutover | 28 tests | ✅ 28/28 PASS | 待 push |
-| **总计** | **142** | **✅ 142/142 PASS** | 待 push |
+| Migration Atomicity | 90 assertions | ✅ 90/90 PASS | 随 push |
+| Foundation Test | 24 tests | ✅ 24/24 PASS | 随 push |
+| Storage Cutover | 28 tests | ✅ 28/28 PASS | 随 push |
+| Core Product | 19 tests | ✅ 19/19 PASS | 随 push |
+| **总计** | **161** | **✅ 161/161 PASS** | 随 push |
 
 语法检查：`node --check` 覆盖 `src/**/*.js` — 本地 0 失败。
 新增套件：`node tests/storage_cutover_test.mjs`（Windows 使用 `pathToFileURL`）。Node 无 IndexedDB，测试注入内存 Dexie 形 Adapter。
@@ -100,8 +101,9 @@
 
 | 声明 | 状态 | 说明 |
 |------|------|------|
-| "142/142 PASS" | ✅ Batch 1 本地复验 | Windows Node v24.15.0 |
-| "Browser core flow PASS" | ✅ Batch 1 CDP 复验 | Create→Chat→Send→Dexie read→Refresh→Persist→Continue + 50+ msgs |
+| "142/142 PASS" | 被 161/161 取代 | Core Product 套件 +19 |
+| "161/161 PASS" | ✅ 本波次本地复验 | Windows Node |
+| "Browser core flow PASS" | ✅ Wave CDP | Hub + 记忆 + 角色 tab + 1280/390 |
 | "Dexie 迁移完整" | ✅ Message/Conversation/Character 启动迁移已跑通 | Memory/Relationship/Moments 仍未迁 |
 | "PWA 更新正常" | ⚠️ 未在本次验证 | 之前 V1 Closing Pass 验证过 |
 
@@ -193,7 +195,7 @@
 | 写入 | ✅ ConversationRepository → Dexie + legacy chats |
 | 读取 | ✅ ConversationRepository Dexie 优先，fallback localStorage |
 | Dexie | ✅ 启动时从 chats 非破坏迁移 |
-| 多对话 | ✅ Domain + Repository 支持；UI 仍为会话列表（未做 Character Hub） |
+| 多对话 | ✅ Domain + Repository；Hub 可开新对话 / 继续最近对话；消息列表按 last message 排序 |
 | Archive/Rename/Pin | ✅ Domain 层支持，UI 未使用 |
 
 **下一步**：STAGE 4 UI 不在本 batch。
@@ -202,18 +204,20 @@
 
 ## 7. Character Status
 
-**阶段：Repository 为运行时 SoT（Stage 3）**
+**阶段：Repository 为运行时 SoT + Character Hub（本波次）**
 
 | 路径 | 状态 |
 |------|------|
 | 写入 | ✅ CharacterRepository → Dexie（+ 关联 chat 元数据双写于 update） |
 | 读取 | ✅ CharacterRepository → Dexie 优先；Dexie 不可用或未迁移时从 chats 推导 |
+| Hub | ✅ 独立「角色」tab：列表 / 详情 / 继续对话 / 新对话 / 编辑 |
+| 导入导出 | ✅ SillyTavern v1/v2 JSON；缺字段默认值；损坏输入不写数据 |
 | 级联删除 | ✅ soft delete → archive conversations |
 | 永久删除 | ✅ 删除 chats/memory/relations/moments |
 | 自动迁移 | ✅ 启动时 `migrateFromLegacy`（幂等，不删 chats） |
-| fallback 推导 | ✅ 仅保留在 Repository 层；Domain 不再二次从 chats 推导 |
+| fallback 推导 | ✅ 仅保留在 Repository 层；string persona 正确映射 identity |
 
-**下一步**：STAGE 4 — Character Experience / Hub（产品 UX，非存储）。
+**下一步**：Character Reconstruction MVP（Stage 5）需独立审查；非本波次。
 
 ---
 
@@ -225,7 +229,7 @@
 |------|------|
 | 写入 | ✅ AssetRepository → IndexedDB (blob) + Dexie (metadata) |
 | 读取 | ✅ AssetRepository → IndexedDB + Dexie |
-| UI 接入 | ❌ V1 仍使用 base64 / URL |
+| UI 接入 | ⚠️ 头像使用路径 / dataURL；`blob:` 视为失效并回退 default.svg |
 | orphan cleanup | ⚠️ 接口已定义，未实现 |
 | Avatar 管理 | ✅ Domain 层支持，UI 未使用 |
 | Moment 图片 | ✅ Domain 层支持，UI 未使用 |
@@ -240,19 +244,19 @@
 
 | 模块 | 状态 |
 |------|------|
-| Character List | ❌ 与 Conversation List 混合 |
-| Character Detail | ❌ 不存在 |
+| Character List | ✅ 独立「角色」tab（Morning Mint，未改视觉系统） |
+| Character Detail | ✅ 身份 / 关系 / 对话 / 记忆 / 动态 |
 | Chat | ✅ V1 功能完整 |
-| Moments | ✅ V1 基础功能 |
-| Memory | ⚠️ V1 简单实现 |
+| Moments | ✅ 按 characterId 筛选；头像取自角色 |
+| Memory | ✅ 角色隔离 + Hub 可见/可增删 + 注入 prompt |
 | Settings | ✅ V1 完整 |
 | Onboarding | ✅ V1 完整 |
 | PWA | ✅ V1 完整（更新系统） |
 
 **UI 技术债**：
-- `src/ui/views/index.js` 600+ 行单文件
-- UI 直接访问 store.getState()，未完全通过 Domain 层
-- 无 Character Hub / Character Detail 页面
+- `src/ui/views/index.js` 仍为单文件（已增大）
+- UI 仍部分读取 store.getState() 双写副本
+- Character Reconstruction / 向量记忆 / 关系事件史未做
 
 ---
 
@@ -343,15 +347,18 @@
 
 ## 13. Next Action
 
-**BATCH 1（Stages 1–3 Storage Cutover）已完成。STOP。**
+**Core Product Completion Wave 已完成。STOP。**
 
-下一阶段（需独立审查批准后才开始）：
+有意推迟（需独立审查 / 后续波次）：
 
 ```
-STAGE 4 — Character Experience / Hub
+STAGE 5 — Character Reconstruction MVP
+STAGE 6+ 完整 Memory 候选确认流水线 / 向量检索
+STAGE 7 Relationship Event History
+UI V3（当前 Morning Mint 已能表达核心角色体验，不强制升级）
 ```
 
-**不要自动开始 Stage 4。不要开始 Memory / Relationship / Behavior / Reconstruction / Plugin / Cloud / Moments 扩张 / UI V3。**
+**不要自动开始 Reconstruction / Plugin / Cloud / UI V3。**
 
 ---
 
@@ -361,18 +368,18 @@ STAGE 4 — Character Experience / Hub
 - （无未关闭 P0）
 
 ### P1
-- 发送消息在未配置 API Key 时直接 return，**不会写入用户消息**（产品既有行为；手工验证需先配置 Key）。
-- 本机默认文档端口 8080 可能被 Steam `steamwebhelper` 占用，导致打开错误页面。
-- Dual-write 仍把完整 `chats[].messages` 写入 localStorage；长会话写入成本仍在（55 条双写插入 ~1.4s）。权威**读**已离开 dump。移除 legacy write 是后续 Stage，本 batch 有意保留。
+- ~~发送消息在未配置 API Key 时直接 return，不会写入用户消息~~ **已修**：先持久化用户消息，再写入 status=error 的失败气泡。
+- 本机默认文档端口 8080 可能被 Steam `steamwebhelper` 占用。
+- Dual-write 仍把完整 `chats[].messages` 写入 localStorage。
 
 ### P2
-- Moments 自动生成仍依赖 AI summary；基础 CRUD/点赞/评论可用。
-- Dexie `findByConversationId` 分页仍是全量 `sortBy` 再 slice；1000 条 ~20ms，未提前优化。
-- Asset orphan cleanup / UI 接入未做（Roadmap Stage 3 的 Asset 部分，本 batch 范围为 Character Repository Cutover）。
-- UI 会话列表仍渲染 `store.chats`（双写副本），仅消息正文走 `peekMessages`。
+- Moments 自动生成仍依赖 AI summary。
+- Asset blob 表仍未作为头像主存储（路径 / dataURL 为主）。
+- 无向量检索；Memory 为关键词 + importance。
+- Relationship 无 Event History（V1 affinity 循环已接到 prompt）。
 
-### Batch 1 Decision
-**STAGES 1–3 PASS — STOP for independent review before Stage 4.**
+### Core Product Wave Decision
+**PASS — STOP.** UI V3 不是必须：角色 Hub 用现有 Morning Mint 导航/列表/详情即可表达。Reconstruction 仍是下一差异化功能，不是本波次。
 
 ---
 

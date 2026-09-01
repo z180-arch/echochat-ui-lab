@@ -34,6 +34,8 @@ export const Icons = {
   palette: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>`,
   database: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>`,
   sparkles: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"/></svg>`,
+  upload: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>`,
+  warning: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
 };
 
 // 按钮组件
@@ -117,4 +119,66 @@ export function openModal({ title, content, footer = "", width = "560px" }) {
 
 export function closeModal(overlay) {
   overlay?.remove();
+}
+
+// 设置行
+export function SettingRow({ icon = "", title = "", desc = "", onClick = "", right = "" }) {
+  return `<div class="setting-row" ${onClick ? `onclick="${onClick}" style="cursor:pointer;"` : ""}>
+    ${icon ? `<div class="setting-row-icon">${icon}</div>` : ""}
+    <div class="setting-row-content">
+      ${title ? `<div class="setting-row-title">${esc(title)}</div>` : ""}
+      ${desc ? `<div class="setting-row-desc">${esc(desc)}</div>` : ""}
+    </div>
+    ${right ? `<div class="setting-row-right">${right}</div>` : `<div class="setting-row-right">${Icons.chevronRight}</div>`}
+  </div>`;
+}
+
+// 分段选择（轻量；onboarding 等处也可直接用 segmented-btn 类）
+export function Segmented({ options = [], value = "", onChange = "" }) {
+  return `<div class="segmented">
+    ${options
+      .map(
+        (opt) => {
+          const v = typeof opt === "string" ? opt : opt.value;
+          const label = typeof opt === "string" ? opt : opt.label;
+          const active = v === value ? "segmented-btn-active" : "";
+          const handler = onChange ? `onclick="${onChange}('${esc(v)}')"` : "";
+          return `<button type="button" class="segmented-btn ${active}" ${handler}>${esc(label)}</button>`;
+        }
+      )
+      .join("")}
+  </div>`;
+}
+
+// 确认弹窗
+export function openConfirm({
+  title = "确认",
+  message = "",
+  confirmText = "确定",
+  cancelText = "取消",
+  variant = "primary",
+  onConfirm = null,
+  onCancel = null,
+} = {}) {
+  const btnClass = variant === "danger" ? "btn-danger" : "btn-primary";
+  const overlay = openModal({
+    title,
+    content: `<p style="margin:0;line-height:1.6;color:var(--color-text-secondary);">${esc(message)}</p>`,
+    footer: `
+      <button type="button" class="btn btn-ghost" data-confirm="cancel">${esc(cancelText)}</button>
+      <button type="button" class="btn ${btnClass}" data-confirm="ok">${esc(confirmText)}</button>
+    `,
+    width: "420px",
+  });
+  const cancelBtn = overlay.querySelector('[data-confirm="cancel"]');
+  const okBtn = overlay.querySelector('[data-confirm="ok"]');
+  cancelBtn?.addEventListener("click", () => {
+    overlay.remove();
+    onCancel?.();
+  });
+  okBtn?.addEventListener("click", () => {
+    overlay.remove();
+    onConfirm?.();
+  });
+  return overlay;
 }

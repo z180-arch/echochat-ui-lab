@@ -1,8 +1,8 @@
 # EchoChat Current State
 
-> 最后更新：2026-08-31
-> 当前 Commit：`1d0bb16`（待更新为最新）
-> 状态：**Foundation Closure Complete → Ready for Cursor**
+> 最后更新：2026-09-01
+> 当前 Commit：`647b7df` → Stage 0 完成后见最新 commit
+> 状态：**STAGE 0 — Foundation Verification COMPLETE**
 
 ---
 
@@ -12,11 +12,22 @@
 |------|------|
 | 仓库 | https://github.com/z180-arch/echochat-ui-lab |
 | 分支 | main |
-| 最新 Commit | `1d0bb16` |
+| Baseline Commit（Stage 0 起点） | `647b7df` |
 | 构建系统 | 无（零构建，原生 ES Modules） |
-| package.json | 不存在 |
-| CI | 未建立（STAGE 0 任务） |
+| package.json | 不存在（有意为之；测试用 Node 直接运行 `.mjs`） |
+| CI | ✅ GitHub Actions `.github/workflows/ci.yml`（push / pull_request） |
 | 许可证 | PolyForm Noncommercial 1.0.0 |
+
+### 1.1 Stage 0 开发环境（已验证）
+
+| 项目 | 值 |
+|------|------|
+| OS | Windows 10 (10.0.19045) |
+| Node.js | v24.15.0 |
+| npm | 11.12.1（未用于安装依赖；仓库无 lockfile/依赖） |
+| 包管理 | 无（零依赖） |
+| 开发服务器 | `python -m http.server <port>`（本机 8080 被 Steam CEF 占用，验证使用 **8765**） |
+| 浏览器验证 | Chromium/Chrome headless via CDP（1280×800 + 390×844） |
 
 ---
 
@@ -52,13 +63,15 @@
 
 ## 3. Test Status
 
-### 3.1 自动化测试
+### 3.1 自动化测试（Stage 0 本地复验）
 
-| 测试套件 | 测试数 | 状态 | 可跨环境 |
-|----------|--------|------|----------|
-| Migration Atomicity | 90 assertions | ✅ PASS | ✅ 是 |
-| Foundation Test | 24 tests | ✅ PASS | ✅ 是（已修复硬编码路径） |
-| **总计** | **114** | **✅ PASS** | **✅ 是** |
+| 测试套件 | 测试数 | 本地结果 | CI |
+|----------|--------|----------|-----|
+| Migration Atomicity | 90 assertions | ✅ 90/90 PASS | 随 push 运行 |
+| Foundation Test | 24 tests | ✅ 24/24 PASS | 随 push 运行 |
+| **总计** | **114** | **✅ 114/114 PASS** | 见 Actions |
+
+语法检查：`node --check` 覆盖 `src/**/*.js` — 本地 0 失败。
 
 ### 3.2 测试覆盖
 
@@ -84,10 +97,29 @@
 
 | 声明 | 状态 | 说明 |
 |------|------|------|
-| "114/114 PASS" | ✅ 已验证 | Node 环境可复现 |
-| "Browser Regression PASS" | ⚠️ 部分验证 | 基于之前的浏览器测试，未在本次重新验证 |
-| "Dexie 迁移完整" | ⚠️ 未在真实浏览器验证 | 代码逻辑完整，需浏览器端验证 |
+| "114/114 PASS" | ✅ Stage 0 本地复验 | Windows Node v24.15.0 |
+| "Browser core flow PASS" | ✅ Stage 0 手工/CDP 复验 | Create→Chat→Send→Refresh→Persist→Continue + Moments |
+| "Dexie 迁移完整" | ⚠️ 未单独深度验证 | 启动路径无阻塞错误；完整 Dexie 浏览器脚本未作为 Stage 0 阻断项 |
 | "PWA 更新正常" | ⚠️ 未在本次验证 | 之前 V1 Closing Pass 验证过 |
+
+### 3.5 Stage 0 Runtime / Manual Verification（2026-09-01）
+
+| 检查项 | 结果 | 备注 |
+|--------|------|------|
+| 应用启动 | PASS | Landing 正常；无阻塞启动错误 |
+| 主 UI 加载 | PASS | EchoApp 就绪 |
+| Console 致命错误 | PASS | `window.__errors` 为空 |
+| Create Character | PASS | Onboarding → 橘小喵 |
+| Start Chat | PASS | 进入对话，开场白可见 |
+| Send Message | PASS | 用户消息写入；AI 回复在验证中使用本地 SSE stub（无真实 API Key） |
+| Refresh | PASS | 刷新后仍为 app 视图 |
+| Persistence | PASS | 刷新后消息仍在（含用户消息与 stub AI 回复） |
+| Continue Chat | PASS | 刷新后继续发送成功 |
+| Moments 基础流 | PASS | 添加动态 / 点赞 / 评论 / UI 可见 |
+| Desktop 1280×800 | PASS | CDP headless |
+| Mobile 390×844 | PASS | bottom nav 可见 |
+
+验证脚本：`scripts/stage0_browser_verify.mjs`（CDP，无额外 npm 依赖）。
 
 ---
 
@@ -241,14 +273,14 @@
 
 ### 低优先级（长期）
 
-7. **无 CI/CD**
-   - 计划：STAGE 0
+7. **无 E2E / Visual Regression 测试**
+   - Stage 0 提供了 CDP 手工验证脚本，正式 E2E 仍未建立
 
-8. **无 E2E / Visual Regression 测试**
-   - 计划：STAGE 0-1
-
-9. **SVG sprite / CSS bundling**
+8. **SVG sprite / CSS bundling**
    - 不影响功能，暂不处理
+
+9. **本机 8080 端口可能被 Steam CEF 占用**
+   - 开发时改用其他端口（如 8765）
 
 ---
 
@@ -299,29 +331,45 @@
 - ❌ Cloud / Account / Sync / Community
 - ❌ Desktop (Tauri) / Mobile Native
 - ❌ TypeScript
-- ❌ CI/CD
+- ❌ 正式 E2E / Visual Regression（Stage 0 仅有 CDP 验证脚本）
 
 ---
 
 ## 13. Next Action
 
-**唯一的 NEXT ACTION**：
+**STAGE 0 已完成。STOP。**
+
+下一阶段（需独立审查批准后才开始）：
 
 ```
-STAGE 0 — Foundation Verification
-  ↓
-  1. 确认测试可跨环境运行（已修复硬编码路径）
-  2. 建立 GitHub Actions CI
-  3. 跑完整测试（114 tests）
-  4. 核心浏览器流程手工验证
-  5. STOP → 等待审查
+STAGE 1 — Message Dexie Read Cutover
 ```
 
-**不要同时安排多个下一步。只有这一个。**
+**不要自动开始 Stage 1。**
 
 ---
 
-## 14. 权威文档索引
+## 14. Stage 0 Issues Log
+
+### P0
+- （无未关闭 P0）
+- ✅ 已修复：`main.js` 导入 `SettingRow` / `openConfirm` / `Segmented`，但 `src/ui/components/index.js` 未导出 → **应用无法启动**。Stage 0 已补齐导出与基础 Settings CSS / icons。
+- ✅ 已修复：`tests/migration_atomicity_test.mjs` 在 Windows 上用绝对路径 `import()` 失败（`ERR_UNSUPPORTED_ESM_URL_SCHEME`）。改为 `pathToFileURL`。
+
+### P1
+- 发送消息在未配置 API Key 时直接 return，**不会写入用户消息**（产品既有行为；手工验证需先配置 Key）。
+- 本机默认文档端口 8080 可能被 Steam `steamwebhelper` 占用，导致打开错误页面。
+
+### P2
+- Moments 自动生成仍依赖 AI summary；基础 CRUD/点赞/评论可用。
+- Message 仍为 dual-write + legacy read（已知，属 Stage 1）。
+
+### Stage 0 Decision
+**STAGE 0 PASS**
+
+---
+
+## 15. 权威文档索引
 
 | 文档 | 路径 | 用途 |
 |------|------|------|

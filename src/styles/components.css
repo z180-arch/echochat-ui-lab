@@ -336,6 +336,73 @@
   justify-content: flex-end;
 }
 
+/* ---- 设置面板（Settings modal） ---- */
+.settings-modal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+.settings-group-title {
+  font-size: var(--font-caption);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: var(--space-2);
+}
+.settings-group-body {
+  background: var(--color-surface-2, var(--color-surface));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+.setting-row:last-child {
+  border-bottom: none;
+}
+.setting-row-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+.setting-row-icon svg {
+  width: 20px;
+  height: 20px;
+}
+.setting-row-content {
+  flex: 1;
+  min-width: 0;
+}
+.setting-row-title {
+  font-size: var(--font-body);
+  font-weight: var(--weight-medium);
+}
+.setting-row-desc {
+  font-size: var(--font-caption);
+  color: var(--color-text-tertiary);
+  margin-top: 2px;
+}
+.setting-row-right {
+  display: flex;
+  align-items: center;
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+.setting-row-right svg {
+  width: 16px;
+  height: 16px;
+}
+
 /* ---- 抽屉 Drawer ---- */
 .drawer-overlay {
   position: fixed;

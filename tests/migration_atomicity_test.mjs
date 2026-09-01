@@ -2,7 +2,7 @@
 // 直接 import 并执行 production src/core/storage.js 的真实 runMigrations()
 // 不复制核心实现
 
-import { fileURLToPath } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
 import { dirname, join } from "path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -20,7 +20,8 @@ const localStorageMock = {
 global.localStorage = localStorageMock;
 
 // ---- Import production storage.js ----
-const storage = await import(join(__dirname, "../src/core/storage.js"));
+// Use pathToFileURL so absolute Windows paths (D:\...) import correctly under Node ESM
+const storage = await import(pathToFileURL(join(__dirname, "../src/core/storage.js")).href);
 const { runMigrations, KEYS, SCHEMA_VERSION } = storage;
 
 // ---- Test helpers ----

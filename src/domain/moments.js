@@ -57,7 +57,9 @@ function normalizeMoment(partial) {
           }))
           .filter((c) => c.text)
       : [],
-    source: p.source === "manual" ? "manual" : "auto_summary",
+    source: ["manual", "auto_summary", "memory", "candidate", "reconstruction"].includes(p.source)
+      ? p.source
+      : "auto_summary",
     relatedMemoryId: p.relatedMemoryId != null ? String(p.relatedMemoryId) : null,
   };
 }

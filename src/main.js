@@ -26,6 +26,13 @@ import {
 } from "./ui/views/index.js";
 import { showToast, openModal, closeModal, openConfirm, Icons, SettingRow, Segmented } from "./ui/components/index.js";
 import { reconstructionModalMarkup } from "./ui/views/reconstruction.js";
+import { memoryReviewMarkup } from "./ui/views/memory-review.js";
+import {
+  extractMemoryCandidates,
+  setCandidateAccepted,
+  editCandidateText,
+  confirmMemoryCandidates,
+} from "./domain/memory-candidates.js";
 import {
   buildReconstructionDraft,
   buildDraftFromConversation,
@@ -917,6 +924,65 @@ const App = {
     } catch (err) {
       showToast({ message: "创建失败", type: "error" });
     }
+  },
+
+  _mem: { overlay: null, characterId: null, chatId: null, candidates: [], notice: "", error: "" },
+
+  openMemoryCandidates(characterId, chatId) {
+    closeModal(this._mem?.overlay);
+    const extracted = extractMemoryCandidates(characterId, chatId ? { chatId } : {});
+    this._mem = {
+      overlay: null,
+      characterId,
+      chatId: chatId || null,
+      candidates: extracted.candidates || [],
+      notice: extracted.notice || "",
+      error: extracted.ok ? "" : "无法提取记忆",
+    };
+    const spec = memoryReviewMarkup(this._mem);
+    this._mem.overlay = openModal(spec);
+  },
+  _paintMemoryReview() {
+    const spec = memoryReviewMarkup(this._mem);
+    if (!this._mem.overlay?.isConnected) {
+      this._mem.overlay = openModal(spec);
+      return;
+    }
+    const title = this._mem.overlay.querySelector(".modal-title");
+    const body = this._mem.overlay.querySelector(".modal-body");
+    const footer = this._mem.overlay.querySelector(".modal-footer");
+    if (title) title.textContent = spec.title;
+    if (body) body.innerHTML = spec.content;
+    if (footer) footer.innerHTML = spec.footer;
+  },
+  _captureMemoryEdits() {
+    this._mem.candidates = (this._mem.candidates || []).map((c) => {
+      const el = document.getElementById(`mem-text-${c.id}`);
+      return el ? { ...c, text: el.value } : c;
+    });
+  },
+  memoryCandidateToggle(id, accepted) {
+    this._mem.candidates = setCandidateAccepted(this._mem.candidates, id, accepted);
+  },
+  memoryCandidateEdit(id, text) {
+    this._mem.candidates = editCandidateText(this._mem.candidates, id, text);
+  },
+  memoryCandidateConfirm() {
+    this._captureMemoryEdits();
+    const postMoment = !!document.getElementById("mem-post-moment")?.checked;
+    const result = confirmMemoryCandidates(this._mem.characterId, this._mem.candidates, { postMoment });
+    closeModal(this._mem.overlay);
+    this._mem = { overlay: null, characterId: null, chatId: null, candidates: [], notice: "", error: "" };
+    this.render();
+    if (!result.ok) {
+      showToast({ message: "写入失败", type: "error" });
+      return;
+    }
+    const bits = [];
+    if (result.added) bits.push(`记下 ${result.added} 条`);
+    if (result.skipped) bits.push(`跳过 ${result.skipped} 条`);
+    if (result.momentId) bits.push("已发动态");
+    showToast({ message: bits.join(" · ") || "没有新的记忆", type: result.added ? "success" : "info" });
   },
 };
 

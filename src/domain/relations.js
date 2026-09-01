@@ -112,6 +112,21 @@ export function getAffinity(roleId, opts) {
   if (score >= 20) toneHint = "更亲近、更熟络";
   else if (score >= 10) toneHint = "略亲近";
   else if (score < 3) toneHint = "略疏离、礼貌";
+  const hasHistory = !!(role && turns > 0);
+  let stage = "none";
+  let stageLabel = "还没有聊过";
+  if (hasHistory) {
+    if (score >= 20 || turns >= 40 || streakDays >= 7) {
+      stage = "close";
+      stageLabel = "已经熟络";
+    } else if (score >= 8 || turns >= 12) {
+      stage = "familiar";
+      stageLabel = "渐渐熟悉";
+    } else {
+      stage = "warming";
+      stageLabel = "刚刚认识";
+    }
+  }
   return {
     score,
     turns,
@@ -125,6 +140,9 @@ export function getAffinity(roleId, opts) {
     lastProactiveAt: role ? Number(role.lastProactiveAt) || 0 : 0,
     toneHint,
     threshold: AFFINITY_THRESHOLD,
+    hasHistory,
+    stage,
+    stageLabel,
   };
 }
 

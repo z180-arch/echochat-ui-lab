@@ -34,6 +34,9 @@ jobs:
       - name: Reconstruction
         run: node tests/reconstruction_test.mjs
 
+      - name: Core Loop
+        run: node tests/core_loop_test.mjs
+
       - name: Syntax check (src)
         run: |
           set -euo pipefail

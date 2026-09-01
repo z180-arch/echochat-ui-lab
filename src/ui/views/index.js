@@ -319,6 +319,16 @@ function renderCharacterListPane(searchQuery, selectedCharacterId, hideListMobil
   </div>`;
 }
 
+function relationSummary(affinity) {
+  if (!affinity?.hasHistory) return "还没有聊过";
+  return `${esc(affinity.stageLabel)} · 认识${affinity.knownDays}天 · ${esc(affinity.toneHint)}`;
+}
+
+function relationScoreLine(affinity) {
+  if (!affinity?.hasHistory) return "还没有聊过";
+  return `${esc(affinity.stageLabel)} · 亲密度 ${affinity.score} · ${affinity.turns} 轮对话`;
+}
+
 function renderCharacterDetailPane(characterId) {
   const hub = listCharactersForHub().find((h) => h.id === characterId);
   const chats = store.getState().chats.filter((c) => c.roleId === characterId && !c.archivedAt);
@@ -339,7 +349,7 @@ function renderCharacterDetailPane(characterId) {
         ${Avatar({ src: avatar, size: "sm" })}
         <div>
           <div class="chat-header-name">${esc(name)}</div>
-          <div class="chat-header-status"><span class="status-dot"></span>${affinity ? `认识${affinity.knownDays}天 · ${affinity.toneHint}` : "刚刚认识"}</div>
+          <div class="chat-header-status"><span class="status-dot"></span>${relationSummary(affinity)}</div>
         </div>
       </div>
       <div style="display:flex;gap:8px;">
@@ -353,14 +363,14 @@ function renderCharacterDetailPane(characterId) {
           ${Avatar({ src: avatar, size: "lg" })}
           <div>
             <div style="font-size:20px;font-weight:700;">${esc(name)}</div>
-            <div style="font-size:13px;color:var(--color-text-secondary);">${affinity ? `亲密度 ${affinity.score} · ${affinity.turns} 轮对话` : "还没有聊过"}</div>
+            <div style="font-size:13px;color:var(--color-text-secondary);">${relationScoreLine(affinity)}</div>
           </div>
         </div>
         <div class="profile-section-title">她是谁</div>
         <div class="profile-section-content" style="font-size:14px;line-height:1.7;margin-bottom:16px;">${esc(identity?.slice(0, 280) || "暂无设定")}${identity?.length > 280 ? "…" : ""}</div>
         <div class="profile-section-title">关系</div>
         <div class="profile-section-content" style="margin-bottom:16px;">
-          ${affinity ? `认识 ${affinity.knownDays} 天 · 连续 ${affinity.streakDays} 天 · ${esc(affinity.toneHint)}` : "还在刚刚认识"}
+          ${affinity?.hasHistory ? `${esc(affinity.stageLabel)} · 认识 ${affinity.knownDays} 天 · 连续 ${affinity.streakDays} 天 · ${esc(affinity.toneHint)}` : "还没有聊过。多聊几轮，关系会慢慢靠近。"}
         </div>
         <div class="profile-section-title">对话</div>
         <div class="profile-section-content" style="margin-bottom:16px;">
@@ -376,7 +386,7 @@ function renderCharacterDetailPane(characterId) {
         </div>
         <div class="profile-section-title">记忆</div>
         <div class="profile-section-content" style="margin-bottom:16px;">
-          ${memories.length === 0 ? `<div style="color:var(--color-text-tertiary);font-size:13px;">还没有记忆。聊天里点「记住」，或在下面添加。</div>` :
+          ${memories.length === 0 ? `<div style="color:var(--color-text-tertiary);font-size:13px;">还没有记忆。聊天里点「记住」，或从对话提取。</div>` :
             memories.map((m) => `
               <div style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--color-border);">
                 <div style="flex:1;font-size:13px;">${esc(m.content)}</div>
@@ -386,6 +396,7 @@ function renderCharacterDetailPane(characterId) {
           <div style="display:flex;gap:8px;margin-top:10px;">
             <input class="input" id="hub-memory-input" placeholder="记下一件关于你的事…" />
             <button class="btn btn-secondary btn-sm" onclick="window.EchoApp.addCharacterMemory('${characterId}')">添加</button>
+            <button class="btn btn-ghost btn-sm" onclick="window.EchoApp.openMemoryCandidates('${characterId}')">从对话提取</button>
           </div>
         </div>
         <div class="profile-section-title">动态</div>
@@ -417,7 +428,7 @@ function renderChatPane(chat, hideChatMobile) {
         ${Avatar({ src: getRoleAvatar(chat), size: "sm" })}
         <div>
           <div class="chat-header-name">${esc(chat.name || "角色")}</div>
-          <div class="chat-header-status"><span class="status-dot"></span>在线 · ${affinity ? `认识${affinity.knownDays}天 · ${affinity.toneHint}` : "刚刚认识"}</div>
+          <div class="chat-header-status"><span class="status-dot"></span>在线 · ${relationSummary(affinity)}</div>
         </div>
       </div>
       <div style="display:flex;gap:8px;">
@@ -456,7 +467,7 @@ function renderMessage(m, index, chat) {
       <div class="msg-time">${formatDateTime(m.time)}</div>
       <div class="msg-actions">
         <button class="msg-action-btn" onclick="window.EchoApp.copyMessage(${index})">复制</button>
-        ${!isMe ? `<button class="msg-action-btn" onclick="window.EchoApp.rememberMessage(${index})">记住</button>` : ""}
+        <button class="msg-action-btn" onclick="window.EchoApp.rememberMessage(${index})">记住</button>
         ${!isMe ? `<button class="msg-action-btn" onclick="window.EchoApp.regenerateMessage(${index})">重生成</button>` : ""}
         ${isMe ? `<button class="msg-action-btn" onclick="window.EchoApp.editMessage(${index})">编辑</button>` : ""}
         <button class="msg-action-btn" style="color:var(--color-danger);" onclick="window.EchoApp.deleteMessage(${index})">删除</button>
@@ -478,7 +489,7 @@ function renderProfilePane(chat) {
       <button class="icon-btn" style="position:absolute;top:12px;right:12px;" onclick="window.EchoApp.toggleProfile()">${Icons.close}</button>
       ${Avatar({ src: getRoleAvatar(chat), size: "lg", className: "profile-avatar" })}
       <div class="profile-name">${esc(chat.name || "角色")}</div>
-      <div class="profile-status">在线 · ${affinity ? `认识${affinity.knownDays}天` : "刚刚认识"}</div>
+      <div class="profile-status">在线 · ${relationSummary(affinity)}</div>
     </div>
     <div class="profile-section">
       <div class="profile-section-title">性格</div>
@@ -487,7 +498,10 @@ function renderProfilePane(chat) {
     <div class="profile-section">
       <div class="profile-section-title">关系</div>
       <div class="profile-section-content">
-        ${affinity ? `
+        ${affinity?.hasHistory ? `
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+            <span>关系</span><span style="font-weight:600;color:var(--color-primary);">${esc(affinity.stageLabel)}</span>
+          </div>
           <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
             <span>亲密度</span><span style="font-weight:600;color:var(--color-primary);">${affinity.score}</span>
           </div>
@@ -497,14 +511,15 @@ function renderProfilePane(chat) {
           <div style="display:flex;justify-content:space-between;">
             <span>连续聊天</span><span>${affinity.streakDays}天</span>
           </div>
-        ` : "暂无数据"}
+        ` : "还没有聊过"}
       </div>
     </div>
     <div class="profile-section">
       <div class="profile-section-title">记忆</div>
       <div class="profile-section-content">
-        ${memories.length === 0 ? `<div style="color:var(--color-text-tertiary);font-size:13px;">暂无记忆，多聊一会儿就会有了</div>` :
+        ${memories.length === 0 ? `<div style="color:var(--color-text-tertiary);font-size:13px;">暂无记忆。点消息「记住」，或从对话提取。</div>` :
           memories.map(m => `<div style="padding:8px 0;border-bottom:1px solid var(--color-border);font-size:13px;">${esc(m.content)}</div>`).join("")}
+        ${roleId ? `<button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="window.EchoApp.openMemoryCandidates('${roleId}','${chat.id}')">从对话提取</button>` : ""}
       </div>
     </div>
     <div class="profile-section">

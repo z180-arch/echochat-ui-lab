@@ -458,6 +458,8 @@ Evidence: Message #47, Message #52
 - ✅ Memory 与 Worldbook 分离
 - ✅ Memory 正确绑定 characterId
 
+**Status: MVP COMPLETE（本波次）。** 对话启发式候选 + 审查写入现有 `longTermMemory`；未迁 Dexie、无向量检索。自动摘要仍依赖 API（有 Key 时）。
+
 ---
 
 ## 9. STAGE 7 — Relationship
@@ -909,17 +911,15 @@ Agent 继续开发
 
 ## 21. 当前 NEXT ACTION
 
-**STAGE 5 Character Reconstruction MVP 已完成。**
+**Core product loop（Hub / Reconstruction / Memory 候选确认 / Relationship stage / Behavior / Moments）已可连贯使用。**
 
 有意推迟：
 
 ```
-STAGE 6+ Memory 候选确认流水线 / 向量检索
-STAGE 7 Relationship Event History
+Memory Dexie 迁移 / 向量检索
+Relationship Event History
 Plugin / Cloud / UI V3
 ```
-
-**不要自动开始 Plugin / Cloud / UI V3。**
 
 ---
 

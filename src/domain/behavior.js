@@ -15,10 +15,11 @@ export function buildBehaviorContext({ persona, memories, affinity } = {}) {
     parts.push(`---\nAbout the user (remembered from past conversations):\n${lines.join("\n")}`);
   }
 
-  if (affinity && (affinity.toneHint || affinity.knownDays)) {
+  if (affinity && (affinity.toneHint || affinity.knownDays || affinity.stageLabel)) {
     const days = affinity.knownDays != null ? ` Known for ${affinity.knownDays} days.` : "";
     const tone = affinity.toneHint ? ` Tone: ${affinity.toneHint}.` : "";
-    parts.push(`---\nRelationship with the user.${days}${tone} Stay in character and keep this relationship tone.`);
+    const stage = affinity.stageLabel ? ` Stage: ${affinity.stageLabel}.` : "";
+    parts.push(`---\nRelationship with the user.${days}${tone}${stage} Stay in character and keep this relationship tone.`);
   }
 
   return parts.join("\n\n");

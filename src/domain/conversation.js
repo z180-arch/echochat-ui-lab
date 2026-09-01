@@ -18,6 +18,8 @@ import { events, EVT } from "../core/events.js";
 import { uid } from "../core/utils.js";
 import { getRoleId, getPersona, getRoleName } from "./persona.js";
 import { messageStore } from "./message-store.js";
+import { ConversationRepository } from "../repository/conversation.js";
+import { getStorageHooks } from "../repository/test-hooks.js";
 
 // ============================================================
 //  创建 Conversation
@@ -50,6 +52,15 @@ export function createConversationForCharacter(characterId, config = {}) {
     firstMessage: config.firstMessage || "",
   });
 
+  ConversationRepository.create({
+    id: chat.id,
+    characterId,
+    title: chat.name,
+    config: chat.config,
+    createdAt: chat.createdAt,
+  }).catch((e) => console.warn("[Conversation] Dexie create failed:", e.message));
+  messageStore.migrateChatMessages(chat.id).catch(() => {});
+
   events.emit(EVT.CHAT_CREATED, chat);
   return chat;
 }
@@ -59,13 +70,22 @@ export function createConversationForCharacter(characterId, config = {}) {
  */
 export function createCharacterAndConversation(template) {
   const roleId = "role_" + uid();
-  return store.createChat({
+  const chat = store.createChat({
     roleId,
     name: template.name,
     avatar: template.avatar,
     persona: template.persona,
     firstMessage: template.firstMessage,
   });
+  ConversationRepository.create({
+    id: chat.id,
+    characterId: roleId,
+    title: chat.name,
+    config: chat.config,
+    createdAt: chat.createdAt,
+  }).catch((e) => console.warn("[Conversation] Dexie create failed:", e.message));
+  messageStore.migrateChatMessages(chat.id).catch(() => {});
+  return chat;
 }
 
 // ============================================================
@@ -112,6 +132,7 @@ export function getAllCharacters() {
  */
 export function renameConversation(chatId, newName) {
   store.updateChat(chatId, { name: newName });
+  ConversationRepository.update(chatId, { title: newName }).catch(() => {});
   events.emit(EVT.TOAST, { message: "对话已重命名", type: "success" });
 }
 
@@ -121,6 +142,7 @@ export function renameConversation(chatId, newName) {
  */
 export function archiveConversation(chatId) {
   store.updateChat(chatId, { archivedAt: Date.now() });
+  ConversationRepository.archive(chatId).catch(() => {});
   events.emit(EVT.TOAST, { message: "对话已归档", type: "success" });
 }
 
@@ -130,6 +152,7 @@ export function archiveConversation(chatId) {
  */
 export function unarchiveConversation(chatId) {
   store.updateChat(chatId, { archivedAt: null });
+  ConversationRepository.unarchive(chatId).catch(() => {});
   events.emit(EVT.TOAST, { message: "对话已恢复", type: "success" });
 }
 
@@ -183,23 +206,19 @@ export function searchConversations(query) {
  */
 export async function deleteConversation(chatId, confirm = false) {
   const chat = store.getState().chats.find((c) => c.id === chatId);
-  if (!chat) return;
-
-  // 检查是否是该角色的最后一个 Conversation
-  const remaining = store.getState().chats.filter((c) => c.roleId === chat.roleId && c.id !== chatId);
-  const isLastForCharacter = remaining.length === 0;
-
-  if (isLastForCharacter) {
-    console.log(`[Conversation] Deleting last conversation for character ${chat.roleId}`);
-    // 注意：删除最后一个 Conversation 不会自动删除 Character 数据
-    // Character 的 memory/relationship 数据保留
+  if (!chat) {
+    await ConversationRepository.delete(chatId);
+    events.emit(EVT.CHAT_DELETED, chatId);
+    return;
   }
 
-  // 删除消息（双写）
-  await messageStore.deleteAllMessages(chatId);
+  const remaining = store.getState().chats.filter((c) => c.roleId === chat.roleId && c.id !== chatId);
+  if (remaining.length === 0) {
+    console.log(`[Conversation] Deleting last conversation for character ${chat.roleId}`);
+  }
 
-  // 删除 Conversation
-  store.deleteChat(chatId);
+  await messageStore.deleteAllMessages(chatId);
+  await ConversationRepository.delete(chatId);
   events.emit(EVT.CHAT_DELETED, chatId);
 }
 
@@ -211,6 +230,7 @@ export async function deleteConversation(chatId, confirm = false) {
 export function exportConversation(chatId) {
   const chat = store.getState().chats.find((c) => c.id === chatId);
   if (!chat) return null;
+  const messages = messageStore.peekMessages(chatId);
 
   return {
     format: "echodata-conversation",
@@ -228,7 +248,7 @@ export function exportConversation(chatId) {
       createdAt: chat.createdAt,
       config: chat.config,
     },
-    messages: (chat.messages || []).map((m) => ({
+    messages: (messages || []).map((m) => ({
       id: m.id,
       role: m.role,
       content: m.text,
@@ -236,6 +256,42 @@ export function exportConversation(chatId) {
       status: m.status,
     })),
   };
+}
+
+/**
+ * Copy conversation metadata from localStorage chats into Dexie.
+ * Non-destructive: chats and messages stay in place.
+ */
+export async function migrateAllConversations() {
+  const hooks = getStorageHooks();
+  if (!(await hooks.isAvailable())) {
+    return { migrated: 0, skipped: true, total: 0 };
+  }
+  const chats = store.getState().chats || [];
+  let migrated = 0;
+  for (const chat of chats) {
+    try {
+      const existing = await hooks.conversation.findById(chat.id);
+      if (existing) continue;
+      await hooks.conversation.create({
+        id: chat.id,
+        characterId: chat.roleId,
+        title: chat.name || "",
+        config: chat.config || {},
+        messageCount: chat.messages?.length || 0,
+        lastMessageAt: chat.messages?.length
+          ? chat.messages[chat.messages.length - 1].time
+          : chat.createdAt,
+        createdAt: chat.createdAt,
+        archivedAt: chat.archivedAt || null,
+        status: chat.archivedAt ? "archived" : "active",
+      });
+      migrated++;
+    } catch (e) {
+      console.error(`[Conversation] migrate ${chat.id} failed:`, e);
+    }
+  }
+  return { migrated, total: chats.length };
 }
 
 /**
@@ -247,7 +303,7 @@ export function getConversationStats(chatId) {
   const chat = store.getState().chats.find((c) => c.id === chatId);
   if (!chat) return null;
 
-  const messages = chat.messages || [];
+  const messages = messageStore.peekMessages(chatId);
   const userMsgs = messages.filter((m) => m.role === "me");
   const aiMsgs = messages.filter((m) => m.role === "her");
 
@@ -282,4 +338,5 @@ export const Conversation = {
   deleteConversation,
   exportConversation,
   getConversationStats,
+  migrateAllConversations,
 };

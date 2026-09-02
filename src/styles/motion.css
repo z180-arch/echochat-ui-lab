@@ -1049,12 +1049,15 @@
 
 /* ---- 降低动效偏好 ---- */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  .motion-enter,
+  .motion-sheet,
+  .motion-msg,
+  .msg-appear .msg-bubble,
+  .welcome-lead .lead-char,
+  .welcome-screen h1,
+  .welcome-actions,
+  .modal {
+    animation: none !important;
   }
   .ambient-layer {
     display: none;

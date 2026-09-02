@@ -173,14 +173,22 @@ ol {
   background: var(--color-text-tertiary);
 }
 
-/* ---- 减少动画偏好 ---- */
+/* ---- 减少动画偏好：保留颜色过渡，关掉位移/入场动画 ---- */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  .motion-enter,
+  .motion-sheet,
+  .motion-msg,
+  .msg-appear .msg-bubble,
+  .splash-screen,
+  .welcome-lead .lead-char,
+  .welcome-screen h1,
+  .welcome-actions,
+  .nav-rail-indicator,
+  .bottom-nav-indicator,
+  .typing-dot,
+  .skeleton {
+    animation: none !important;
+    transition: none !important;
   }
 }
 

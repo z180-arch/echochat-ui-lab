@@ -49,6 +49,9 @@ jobs:
       - name: Ambient Policy
         run: node tests/ambient_policy_test.mjs
 
+      - name: V1.1 Context
+        run: node tests/v1_1_context_test.mjs
+
       - name: Syntax check (src)
         run: |
           set -euo pipefail

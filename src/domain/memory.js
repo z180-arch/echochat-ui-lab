@@ -79,9 +79,8 @@ export function tokenizeForRetrieve(text) {
   const words = s.match(/[a-z0-9]{2,}/g) || [];
   words.forEach((w) => tokens.add(w));
   const cjk = s.replace(/[^\u4e00-\u9fff]/g, "");
-  for (let i = 0; i < cjk.length; i += 1) {
-    tokens.add(cjk[i]);
-    if (i + 1 < cjk.length) tokens.add(cjk.slice(i, i + 2));
+  for (let i = 0; i + 1 < cjk.length; i += 1) {
+    tokens.add(cjk.slice(i, i + 2));
   }
   return [...tokens];
 }
@@ -122,8 +121,9 @@ export function retrieveMemoriesForTurn(roleId, query, limit) {
   ranked.sort(
     (a, b) => b.score - a.score || (b.mem.importance || 0) - (a.mem.importance || 0) || (b.mem.createdAt || 0) - (a.mem.createdAt || 0)
   );
-  const items = ranked.slice(0, injectMax).map((r) => r.mem);
-  const hit = q ? ranked.find((r) => r.overlap > 0) : null;
+  const pool = q ? ranked.filter((r) => r.overlap > 0) : ranked;
+  const items = pool.slice(0, injectMax).map((r) => r.mem);
+  const hit = q ? pool[0] : null;
   const hadHit = !!(hit && items.some((m) => m.id === hit.mem.id));
   lastRetrieve = {
     roleId,

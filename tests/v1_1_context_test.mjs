@@ -141,7 +141,10 @@ test("retrieval prefers overlapping facts over unrelated high importance", () =>
   assert.equal(last.hadHit, true);
   const miss = retrieveMemoriesForTurn("role_r", "量子力学作业", 2);
   assert.equal(getLastMemoryRetrieve().hadHit, false);
-  void miss;
+  assert.equal(miss.length, 0);
+  const falseFriend = retrieveMemoriesForTurn("role_r", "圆周率小数点后十位是多少", 2);
+  assert.equal(getLastMemoryRetrieve().hadHit, false);
+  assert.equal(falseFriend.length, 0);
 });
 
 test("relationship brief appears next to tone", () => {

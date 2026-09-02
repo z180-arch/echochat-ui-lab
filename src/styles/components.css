@@ -25,7 +25,7 @@
   background: var(--color-primary-hover);
 }
 .btn-primary:active:not(:disabled) {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 .btn-secondary {
   background: var(--color-surface);

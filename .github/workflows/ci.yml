@@ -46,6 +46,9 @@ jobs:
       - name: Theme Tokens
         run: node tests/theme_tokens_test.mjs
 
+      - name: Ambient Policy
+        run: node tests/ambient_policy_test.mjs
+
       - name: Syntax check (src)
         run: |
           set -euo pipefail

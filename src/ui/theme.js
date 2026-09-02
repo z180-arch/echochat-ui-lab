@@ -125,6 +125,7 @@ export function computeThemeVars(mode, colors) {
     "--color-mint": m,
     "--color-primary-fg": readableOn(p),
     "--color-bg": mixCss(p, base.bg, dark ? 16 : 11),
+    "--color-surface-chat": mixCss(p, base.bg, dark ? 16 : 11),
     "--color-surface": mixCss(p, base.surface, dark ? 12 : 7),
     "--color-surface-2": mixCss(p, base.surface2, dark ? 14 : 11),
     "--color-surface-3": mixCss(p, base.surface3, dark ? 16 : 13),
@@ -180,7 +181,6 @@ export function applyTheme() {
   if (meta) meta.setAttribute("content", mode === "dark" ? shadeHex(colors.primary, -0.72) : colors.bubbleMe || "#FAFCFB");
 
   Ambient.setColors(colors.primary, colors.mint);
-  Ambient.setIntensity(s.particleIntensity || "medium");
 }
 
 let autoModeBound = false;

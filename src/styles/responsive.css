@@ -195,7 +195,7 @@
     max-width: 100%;
     max-height: min(92dvh, calc(100dvh - var(--safe-bottom)));
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-    animation: sheet-in var(--dur-normal) var(--ease-out);
+    animation: motion-sheet var(--dur-normal) var(--ease-drawer, var(--ease-out));
   }
   .modal-header,
   .modal-body {
@@ -208,14 +208,6 @@
   }
   .modal-footer .btn {
     flex: 1 1 calc(50% - 8px);
-  }
-  @keyframes sheet-in {
-    from {
-      transform: translateY(100%);
-    }
-    to {
-      transform: translateY(0);
-    }
   }
 
   .api-block,

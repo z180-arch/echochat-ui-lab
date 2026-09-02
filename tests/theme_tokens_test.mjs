@@ -69,6 +69,7 @@ test("computeThemeVars 覆盖背景/表面/文字/边框/输入/气泡", () => {
   const vars = computeThemeVars("light", colorsOf("mint"));
   for (const key of [
     "--color-bg",
+    "--color-surface-chat",
     "--color-surface",
     "--color-surface-2",
     "--color-surface-elevated",
@@ -82,6 +83,7 @@ test("computeThemeVars 覆盖背景/表面/文字/边框/输入/气泡", () => {
   ]) {
     assert.ok(vars[key], missing(key));
   }
+  assert.equal(vars["--color-surface-chat"], vars["--color-bg"]);
 });
 
 test("不同预设产生不同的背景 token", () => {

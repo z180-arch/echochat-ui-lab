@@ -24,6 +24,7 @@ import {
 } from "./ui/views/index.js";
 import { showToast, openModal, closeModal, openConfirm, Icons, SettingRow, Segmented, Avatar } from "./ui/components/index.js";
 import { Ambient } from "./ui/ambient.js";
+import { resolveAmbientPolicy } from "./ui/ambient-policy.js";
 import {
   THEME_PRESETS,
   PARTICLE_LEVELS,
@@ -211,7 +212,7 @@ const App = {
     const enteringApp = this.view === "app" && this._lastRenderedView !== "app";
     this._lastRenderedView = this.view;
 
-    Ambient.setMode(this.view === "app" ? "app" : "landing");
+    this.syncAmbient();
 
     if (this.view === "app") {
       if (enteringApp) app.querySelector(".app-shell")?.classList.add("app-enter");
@@ -326,6 +327,28 @@ const App = {
 
   applyTheme() {
     applyThemeVars();
+    this.syncAmbient();
+  },
+
+  syncAmbient() {
+    const state = store.getState();
+    const chatOpen =
+      this.view === "app" && state.ui.activeTab === "companion" && !!state.currentChatId;
+    const saveData =
+      typeof navigator !== "undefined" && !!(navigator.connection && navigator.connection.saveData);
+    const prefersReducedMotion =
+      typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const policy = resolveAmbientPolicy({
+      view: this.view,
+      activeTab: state.ui.activeTab,
+      chatOpen,
+      userIntensity: state.settings.particleIntensity,
+      viewportWidth: typeof window !== "undefined" ? window.innerWidth : 1024,
+      prefersReducedMotion,
+      saveData,
+    });
+    Ambient.setIntensity(policy.intensity);
+    Ambient.setMode(policy.mode);
   },
 
   bindGlobalEvents() {
@@ -335,11 +358,16 @@ const App = {
       }
     });
     let wide = typeof window !== "undefined" && window.innerWidth >= 1024;
+    let compact = typeof window !== "undefined" && window.innerWidth < 768;
     window.addEventListener("resize", () => {
       const now = window.innerWidth >= 1024;
+      const nowCompact = window.innerWidth < 768;
       if (now !== wide) {
         wide = now;
         this.render();
+      } else if (nowCompact !== compact) {
+        compact = nowCompact;
+        this.syncAmbient();
       }
     });
     this.bindVisualViewport();

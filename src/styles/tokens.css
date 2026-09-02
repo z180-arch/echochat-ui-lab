@@ -8,6 +8,7 @@
 
   /* ---- 颜色：Morning Mint / Brand Identity ---- */
   --color-bg: #FAFCFB;
+  --color-surface-chat: #FAFCFB;
   --color-surface: #ffffff;
   --color-surface-2: #F3F7F6;
   --color-surface-3: #E8EEED;
@@ -81,6 +82,7 @@
   /* ---- 动画 ---- */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --dur-fast: 150ms;
   --dur-normal: 250ms;
   --dur-slow: 350ms;
@@ -110,6 +112,7 @@
 /* ---- 暗色主题 ---- */
 [data-theme="dark"] {
   --color-bg: #0f1419;
+  --color-surface-chat: #0f1419;
   --color-surface: #1a2028;
   --color-surface-2: #232b35;
   --color-surface-3: #2d3642;

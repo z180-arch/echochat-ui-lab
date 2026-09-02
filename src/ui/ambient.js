@@ -150,6 +150,17 @@ export const Ambient = {
       if (document.hidden) this.pause();
       else if (this.mode !== "off") this.start();
     });
+    const motionMq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onMotionPref = () => {
+      if (motionMq.matches) {
+        this.pause();
+        this.clearCanvases();
+      } else if (this.mode !== "off" && !document.hidden) {
+        this.start();
+      }
+    };
+    if (motionMq.addEventListener) motionMq.addEventListener("change", onMotionPref);
+    else if (motionMq.addListener) motionMq.addListener(onMotionPref);
     this.resize();
   },
 
@@ -240,6 +251,7 @@ export const Ambient = {
 
   start() {
     if (!this.canvas || prefersReducedMotion() || this.mode === "off") return;
+    if (typeof document !== "undefined" && document.hidden) return;
     if (this.running) return;
     this.running = true;
     this.frame = 0;

@@ -83,6 +83,75 @@ export function Avatar({ src, size = "md", circle = false, alt = "", className =
   return `<img class="avatar ${sizeClass} ${circleClass} ${className}" src="${esc(src)}" alt="${esc(alt)}" loading="lazy" />`;
 }
 
+/** Character Chromium — shared face language across Hub / Chat / Profile / Moments. */
+export function CharacterAvatar({ src, size = "md", alt = "", name = "", className = "" }) {
+  const sizeClass = `character-avatar-${size}`;
+  return `<span class="character-avatar ${sizeClass} ${className}">${Avatar({
+    src,
+    size,
+    circle: true,
+    alt,
+    name,
+  })}</span>`;
+}
+
+export function StageChip({ label = "", stage = "none" }) {
+  const text = String(label || "").trim();
+  if (!text) return "";
+  const safeStage = ["none", "warming", "familiar", "close"].includes(stage) ? stage : "none";
+  return `<span class="stage-chip stage-tag stage-${safeStage}">${esc(text)}</span>`;
+}
+
+export function CharacterCard({
+  name = "",
+  avatar = "",
+  preview = "",
+  time = "",
+  stage = "none",
+  stageLabel = "",
+  active = false,
+  onClick = "",
+}) {
+  return `<button type="button" class="list-item character-card motion-press ${active ? "list-item-active" : ""}" ${
+    onClick ? `onclick="${onClick}"` : ""
+  }>
+    <span class="list-item-av">${CharacterAvatar({ src: avatar, size: "md", alt: name, name })}</span>
+    <div class="list-item-content">
+      <div class="list-item-top">
+        <span class="list-item-title">${esc(name)}</span>
+        <span class="list-item-time">${esc(time || "")}</span>
+      </div>
+      <div class="list-item-subtitle">${esc(preview || "还没有聊过")}</div>
+      <div class="list-item-meta">${StageChip({ label: stageLabel, stage })}</div>
+    </div>
+  </button>`;
+}
+
+export function MemoryRow({ content = "", onDelete = "" }) {
+  if (!content) return "";
+  return `<div class="mem-line memory-row">
+    <span class="memory-row-text">${esc(content)}</span>
+    ${onDelete ? `<button type="button" class="memory-row-del" onclick="${onDelete}" aria-label="删除这条记忆">${Icons.close}</button>` : ""}
+  </div>`;
+}
+
+export function RelationshipBrief({ affinity = null, lastEvent = "" }) {
+  if (!affinity?.hasHistory) {
+    return `<div class="relationship-brief">
+      <p class="profile-muted">还没有聊过。开口第一句，关系从这里开始。</p>
+    </div>`;
+  }
+  const event = String(lastEvent || affinity.lastEvent || "").trim();
+  const brief = String(affinity.brief || "").trim();
+  const days = affinity.knownDays ? ` · 相处 ${affinity.knownDays} 天` : "";
+  return `<div class="relationship-brief">
+    <div class="relationship-brief-head">${StageChip({ label: affinity.stageLabel, stage: affinity.stage })}</div>
+    <p class="relationship-brief-copy">${esc(affinity.stageLabel || "")}。${esc(affinity.toneHint || "")}${esc(days)}。多聊，关系会自己靠近——没有数值可以调。</p>
+    ${brief ? `<p class="relationship-brief-text">${esc(brief)}</p>` : ""}
+    ${event ? `<p class="profile-muted">最近：${esc(event)}</p>` : ""}
+  </div>`;
+}
+
 // 空状态
 export function EmptyState({ icon = "", title = "", desc = "", actionText = "", actionOnClick = "" }) {
   return `<div class="empty-state">

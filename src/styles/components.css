@@ -194,6 +194,98 @@
 .avatar-fallback.avatar-xl {
   font-size: 36px;
 }
+.character-avatar {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  border-radius: 50%;
+  line-height: 0;
+}
+.character-avatar::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in oklab, var(--color-primary), var(--color-mint) 42%);
+  pointer-events: none;
+}
+.character-avatar-lg::after {
+  inset: -3px;
+  border-width: 2px;
+}
+.stage-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary-soft);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-primary);
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stage-chip.stage-none {
+  background: var(--color-surface-2);
+  color: var(--color-text-secondary);
+}
+.memory-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.memory-row-text {
+  flex: 1;
+  min-width: 0;
+}
+.memory-row-del {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  color: var(--color-text-tertiary);
+  border-radius: var(--radius-sm);
+}
+.memory-row-del svg {
+  width: 14px;
+  height: 14px;
+}
+.memory-row-del:hover {
+  color: var(--color-danger);
+  background: var(--color-surface-2);
+}
+.relationship-brief-head {
+  margin-bottom: 8px;
+}
+.relationship-brief-copy,
+.relationship-brief-text {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--color-text);
+}
+.relationship-brief-text {
+  color: var(--color-text-secondary);
+}
+.recall-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 var(--space-3);
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary-soft);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* ---- 消息气泡 ---- */
 .msg {
@@ -688,10 +780,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 52px;
+  height: 52px;
+}
+.list-item-av .avatar {
   width: 48px;
   height: 48px;
 }
-.list-item-av .avatar {
+.list-item-av .character-avatar {
   width: 48px;
   height: 48px;
 }

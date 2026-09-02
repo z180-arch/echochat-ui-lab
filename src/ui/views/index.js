@@ -5,9 +5,21 @@
 
 import { store } from "../../core/store.js";
 import { esc, formatDateTime, relativeTime, renderMarkdown } from "../../core/utils.js";
-import { Icons, Avatar, EmptyState, IconButton, TypingIndicator, LogoMark } from "../components/index.js";
-import { getRoleId, getRoleAvatar, getPersona } from "../../domain/persona.js";
-import { getMemoryList } from "../../domain/memory.js";
+import {
+  Icons,
+  Avatar,
+  CharacterAvatar,
+  CharacterCard,
+  StageChip,
+  MemoryRow,
+  RelationshipBrief,
+  EmptyState,
+  IconButton,
+  TypingIndicator,
+  LogoMark,
+} from "../components/index.js";
+import { getRoleId, getRoleAvatar } from "../../domain/persona.js";
+import { getMemoryList, getLastMemoryRetrieve } from "../../domain/memory.js";
 import { listMoments } from "../../domain/moments.js";
 import { getAffinity } from "../../domain/relations.js";
 import { isSending, getStreamingChatId } from "../../domain/chat.js";
@@ -15,6 +27,8 @@ import { needsApiSetup } from "../../domain/provider.js";
 import { THEME_PRESETS, findThemePreset, isCustomTheme } from "../theme.js";
 import { peekMessages } from "../../domain/message-store.js";
 import { listCharactersForHub, listActiveConversations, resolveAvatarSrc } from "../../domain/character-hub.js";
+import { getCharacterSlots } from "../../domain/context-builder.js";
+import { listBooks } from "../../domain/worldbook.js";
 
 function isWide() {
   return typeof window !== "undefined" && window.innerWidth >= 1024;
@@ -183,19 +197,16 @@ function renderCompanionInbox(searchQuery, currentChat, hideListMobile) {
         : hub.map((h) => {
             const affinity = getAffinity(h.id, { moments: listMoments(h.id) });
             const preview = h.lastPreview || "";
-            const stage = companionStage(affinity, !!preview);
-            return `
-          <button type="button" class="list-item ${currentRole === h.id ? "list-item-active" : ""}" onclick="window.EchoApp.selectCharacter('${h.id}')">
-            <span class="list-item-av">${Avatar({ src: resolveAvatarSrc(h.avatar), size: "md", circle: true, alt: h.name })}</span>
-            <div class="list-item-content">
-              <div class="list-item-top">
-                <span class="list-item-title">${esc(h.name)}</span>
-                <span class="list-item-time">${h.lastAt ? relativeTime(h.lastAt) : ""}</span>
-              </div>
-              <div class="list-item-subtitle">${esc(preview || "还没有聊过")}</div>
-              <div class="list-item-meta"><span class="stage-tag">${esc(stage)}</span></div>
-            </div>
-          </button>`;
+            return CharacterCard({
+              name: h.name,
+              avatar: resolveAvatarSrc(h.avatar),
+              preview,
+              time: h.lastAt ? relativeTime(h.lastAt) : "",
+              stage: affinity?.stage || "none",
+              stageLabel: companionStage(affinity, !!preview),
+              active: currentRole === h.id,
+              onClick: `window.EchoApp.selectCharacter('${h.id}')`,
+            });
           }).join("")}
     </div>
   </div>`;
@@ -223,15 +234,18 @@ function renderChatPane(chat, hideChatMobile) {
   const empty = messages.length === 0;
   const stage = companionStage(affinity, messages.length > 0);
 
+  const recall = getLastMemoryRetrieve();
+  const showRecall = recall.hadHit && recall.chatId === chat.id && recall.preview;
+
   return `
   <div class="chat-pane ${hideChatMobile ? "hidden-mobile" : ""}">
     <div class="chat-header">
       <button class="icon-btn chat-back-btn" onclick="window.EchoApp.backToList()" aria-label="返回陪伴列表">${Icons.back}</button>
       <div class="chat-header-center" onclick="window.EchoApp.toggleProfile()" role="button" tabindex="0">
-        ${Avatar({ src: getRoleAvatar(chat), size: "sm", circle: true, alt: chat.name || "角色" })}
+        ${CharacterAvatar({ src: getRoleAvatar(chat), size: "sm", alt: chat.name || "角色", name: chat.name || "角色" })}
         <div class="chat-header-copy">
           <div class="chat-header-name">${esc(chat.name || "角色")}</div>
-          <div class="chat-header-status">${esc(stage)}</div>
+          <div class="chat-header-status">${StageChip({ label: stage, stage: affinity?.stage || "none" })}</div>
         </div>
       </div>
       <div class="chat-header-actions">
@@ -241,6 +255,7 @@ function renderChatPane(chat, hideChatMobile) {
         ${IconButton({ icon: Icons.more, title: "相处中", onClick: "window.EchoApp.toggleProfile()" })}
       </div>
     </div>
+    ${showRecall ? `<div class="recall-chip" aria-live="polite">想起了 ${esc(recall.preview)}</div>` : ""}
     ${convos.length > 1 ? `<button type="button" class="conv-hint" onclick="window.EchoApp.openConversationSwitcher()">当前 · ${esc(chat.name || "日常相处")}</button>` : ""}
     ${needsApiSetup(chat)
       ? `<div class="composer-hint">
@@ -251,6 +266,7 @@ function renderChatPane(chat, hideChatMobile) {
     <div class="chat-messages" id="chat-messages">
       ${empty
         ? `<div class="chat-empty">
+            ${CharacterAvatar({ src: getRoleAvatar(chat), size: "lg", alt: chat.name || "角色", name: chat.name || "角色" })}
             <div class="chat-empty-t">${messages.length || affinity?.hasHistory ? `继续和 ${esc(chat.name || "TA")} 相处` : `还没有和 ${esc(chat.name || "TA")} 聊过`}</div>
             <p>直接说一句就好。重要的事确认后，会成为你们的记忆。</p>
           </div>`
@@ -262,7 +278,7 @@ function renderChatPane(chat, hideChatMobile) {
         <textarea class="chat-input" id="chat-input" placeholder="和 ${esc(chat.name || "TA")} 说点什么…" rows="1" onkeydown="window.EchoApp.handleInputKey(event)" oninput="window.EchoApp.onChatInput(this)"></textarea>
         ${sending
           ? `<button class="chat-send-btn chat-send-stop" onclick="window.EchoApp.stopSend()" title="停止">${Icons.stop}</button>`
-          : `<button class="chat-send-btn" onclick="window.EchoApp.sendMessage()" title="发送">${Icons.send}</button>`}
+          : `<button class="chat-send-btn motion-press" onclick="window.EchoApp.sendMessage()" title="发送">${Icons.send}</button>`}
       </div>
       <div class="composer-count" id="chat-count">0 / 2000</div>
       </div>
@@ -284,7 +300,7 @@ function renderMessage(m, index, chat) {
         ${Avatar({ src: settings.myAvatar || "assets/avatars/user-default.svg", size: "sm", circle: true, alt: myName })}
       </button>`
     : `<button type="button" class="msg-avatar-btn" onclick="window.EchoApp.editCharacterFromChat()" aria-label="编辑角色资料">
-        ${Avatar({ src: getRoleAvatar(chat), size: "sm", circle: true, alt: chat.name || "角色" })}
+        ${CharacterAvatar({ src: getRoleAvatar(chat), size: "sm", alt: chat.name || "角色", name: chat.name || "角色" })}
       </button>`;
   return `
   <div class="msg ${isMe ? "msg-me" : "msg-her"} ${isStreaming ? "msg-streaming" : ""} ${isError ? "msg-error" : ""}" data-msg-index="${index}">
@@ -306,29 +322,60 @@ function renderMessage(m, index, chat) {
   </div>`;
 }
 
+function peekWorldbook(roleId) {
+  const rows = [];
+  for (const book of listBooks()) {
+    const mine = book.scope === "global" || book.roleId === roleId || book.roleKey === roleId;
+    if (!mine) continue;
+    for (const entry of book.entries || []) {
+      if (entry.enabled === false) continue;
+      const label = entry.name || (entry.keys || []).join("、") || "条目";
+      rows.push({ label, keys: entry.keys || [] });
+      if (rows.length >= 6) return rows;
+    }
+  }
+  return rows;
+}
+
 function renderProfilePane(chat) {
   const roleId = getRoleId(chat);
   const memories = roleId ? getMemoryList(roleId, 8) : [];
   const moments = roleId ? listMoments(roleId).slice(0, 4) : [];
   const affinity = roleId ? getAffinity(roleId, { moments: listMoments(roleId) }) : null;
-  const persona = getPersona(chat);
+  const slots = getCharacterSlots(chat);
   const convos = roleId ? listActiveConversations(roleId) : [];
   const hasTalk = (peekMessages(chat.id) || []).length > 0;
+  const worldPeek = roleId ? peekWorldbook(roleId) : [];
 
   return `
   <aside class="profile-pane open">
     <div class="profile-header">
       <button class="icon-btn profile-close" onclick="window.EchoApp.toggleProfile()" aria-label="关闭">${Icons.close}</button>
-      ${Avatar({ src: getRoleAvatar(chat), size: "lg", circle: true, className: "profile-avatar", alt: chat.name || "角色" })}
+      ${CharacterAvatar({ src: getRoleAvatar(chat), size: "lg", className: "profile-avatar", alt: chat.name || "角色", name: chat.name || "角色" })}
       <div class="profile-name">${esc(chat.name || "角色")}</div>
-      <div class="profile-status">${esc(companionStage(affinity, hasTalk))}${affinity?.hasHistory ? ` · 相处 ${affinity.knownDays} 天` : ""}</div>
+      <div class="profile-status">${StageChip({ label: companionStage(affinity, hasTalk), stage: affinity?.stage || "none" })}${affinity?.hasHistory ? `<span>相处 ${affinity.knownDays} 天</span>` : ""}</div>
+    </div>
+    <div class="profile-section">
+      <div class="profile-section-title">关于 TA</div>
+      <div class="profile-section-content">
+        ${slots.identity
+          ? `<div class="persona-clip">${esc(slots.identity.slice(0, 220))}${slots.identity.length > 220 ? "…" : ""}</div>`
+          : `<div class="profile-muted">暂无设定</div>`}
+        ${slots.scenario ? `<p class="profile-slot"><span>情景</span>${esc(slots.scenario.slice(0, 160))}</p>` : ""}
+        ${slots.speakingStyle ? `<p class="profile-slot"><span>语气</span>${esc(slots.speakingStyle.slice(0, 120))}</p>` : ""}
+        ${slots.examples ? `<p class="profile-slot"><span>示例</span>${esc(slots.examples.slice(0, 120))}</p>` : ""}
+      </div>
+      ${roleId ? `
+        <div class="profile-tools">
+          <button class="btn btn-secondary btn-sm" onclick="window.EchoApp.editCharacter('${roleId}')">编辑</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.EchoApp.exportCharacterCard('${roleId}')">导出角色卡</button>
+        </div>
+      ` : ""}
     </div>
     <div class="profile-section">
       <div class="profile-section-title">关系</div>
       <div class="profile-section-content">
-        ${affinity?.hasHistory
-          ? `${esc(affinity.stageLabel)}。${esc(affinity.toneHint)}。多聊，关系会自己靠近——没有数值可以调。`
-          : "还没有聊过。开口第一句，关系从这里开始。"}
+        ${RelationshipBrief({ affinity })}
       </div>
     </div>
     <div class="profile-section">
@@ -336,8 +383,20 @@ function renderProfilePane(chat) {
       <div class="profile-section-content">
         ${memories.length === 0
           ? `<div class="profile-muted">还没有已确认的记忆。聊天里点「记住」，或从对话提取。</div>`
-          : memories.map((m) => `<div class="mem-line">${esc(m.content)}</div>`).join("")}
+          : memories.map((m) => MemoryRow({
+              content: m.content,
+              onDelete: roleId ? `window.EchoApp.deleteCharacterMemory('${roleId}','${m.id}')` : "",
+            })).join("")}
         ${roleId ? `<button class="btn btn-ghost btn-sm profile-extract" onclick="window.EchoApp.openMemoryCandidates('${roleId}','${chat.id}')">从对话提取</button>` : ""}
+      </div>
+    </div>
+    <div class="profile-section">
+      <div class="profile-section-title">世界书</div>
+      <div class="profile-section-content">
+        ${worldPeek.length === 0
+          ? `<div class="profile-muted">还没有会注入对话的设定条目。</div>`
+          : worldPeek.map((w) => `<div class="mem-line">${esc(w.label)}${w.keys.length ? `<span class="profile-muted"> · ${esc(w.keys.slice(0, 3).join("、"))}</span>` : ""}</div>`).join("")}
+        <button class="btn btn-ghost btn-sm profile-extract" onclick="window.EchoApp.openSettings('worldbook')">管理条目</button>
       </div>
     </div>
     <div class="profile-section">
@@ -360,16 +419,6 @@ function renderProfilePane(chat) {
         `).join("")}
         ${roleId ? `<button class="btn btn-ghost btn-sm" onclick="window.EchoApp.startNewConversation('${roleId}')">开一条新的相处线</button>` : ""}
       </div>
-    </div>
-    <div class="profile-section">
-      <div class="profile-section-title">关于 TA</div>
-      <div class="profile-section-content persona-clip">${esc(persona?.slice(0, 220) || "暂无设定")}${persona?.length > 220 ? "…" : ""}</div>
-      ${roleId ? `
-        <div class="profile-tools">
-          <button class="btn btn-secondary btn-sm" onclick="window.EchoApp.editCharacter('${roleId}')">编辑</button>
-          <button class="btn btn-ghost btn-sm" onclick="window.EchoApp.exportCharacterCard('${roleId}')">导出角色卡</button>
-        </div>
-      ` : ""}
     </div>
   </aside>`;
 }
@@ -404,7 +453,7 @@ function renderMomentsPane() {
         : moments.map((m) => `
           <article class="moment-entry">
             <div class="moment-header">
-              ${Avatar({ src: resolveAvatarSrc(avatarByRole[m.roleId] || m.avatar), size: "sm", circle: true, alt: m.roleName })}
+              ${CharacterAvatar({ src: resolveAvatarSrc(avatarByRole[m.roleId] || m.avatar), size: "sm", alt: m.roleName, name: m.roleName })}
               <div>
                 <button type="button" class="moment-who" onclick="window.EchoApp.selectCharacter('${m.roleId || ""}')">${esc(m.roleName)}</button>
                 <div class="moment-when">${relativeTime(m.createdAt)}</div>
@@ -496,7 +545,7 @@ function renderMePane() {
         <div class="me-settings-group-title">更多</div>
         <div class="me-settings-list">
           ${[
-            { icon: Icons.book, title: "世界书", desc: "设定注入", action: "openSettings('worldbook')" },
+            { icon: Icons.book, title: "世界书", desc: "关键词设定注入", action: "openSettings('worldbook')" },
             { icon: Icons.volume, title: "语音", desc: state.settings.ttsEnabled ? "朗读已开" : "朗读与麦克风", action: "openSettings('voice')" },
             { icon: Icons.sparkles, title: "Prompt 预览", desc: "查看当前组装", action: "openPromptPreview()" },
             { icon: Icons.refresh, title: "重新看引导", desc: "回到欢迎页", action: "resetOnboarding()" },

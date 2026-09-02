@@ -12,6 +12,7 @@ import { sendMessage, stopGeneration, regenerate, editMessage, deleteMessage, co
 import { createFromTemplate, getSystemTemplates, buildCharacterCard, importCharacter, getRoleId } from "./domain/persona.js";
 import { rememberMessage, addMemory, deleteMemory } from "./domain/memory.js";
 import { listMoments, toggleLike, addComment } from "./domain/moments.js";
+import { listBooks, addEntry, deleteEntry } from "./domain/worldbook.js";
 import { getApiPresets, findPreset } from "./domain/provider.js";
 import { continueCharacter as continueCharacterHub, startConversationForCharacter } from "./domain/character-hub.js";
 import { Character } from "./domain/character.js";
@@ -574,6 +575,13 @@ const App = {
     const personaStr =
       document.getElementById("edit-char-identity")?.value ??
       (typeof persona === "string" ? persona : persona.persona || "");
+    const scenario =
+      document.getElementById("edit-char-scenario")?.value ?? chat?.config?.scenario ?? "";
+    const examples =
+      document.getElementById("edit-char-examples")?.value ?? chat?.config?.mesExample ?? "";
+    const speaking =
+      document.getElementById("edit-char-style")?.value ??
+      (typeof chat?.config?.speakingStyle === "string" ? chat.config.speakingStyle : chat?.config?.speakingStyle?.notes || "");
     const avatar = this._charDraftAvatar || chat?.avatar;
     document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
     openModal({
@@ -584,7 +592,13 @@ const App = {
         <label class="field-label">名字</label>
         <input class="input" id="edit-char-name" value="${esc(name)}" />
         <label class="field-label">TA 是谁</label>
-        <textarea class="input" id="edit-char-identity" rows="6" style="min-height:120px;">${esc(personaStr)}</textarea>
+        <textarea class="input" id="edit-char-identity" rows="5" style="min-height:100px;">${esc(personaStr)}</textarea>
+        <label class="field-label">情景（可选）</label>
+        <textarea class="input" id="edit-char-scenario" rows="2">${esc(scenario)}</textarea>
+        <label class="field-label">语气 / 说话方式（可选）</label>
+        <textarea class="input" id="edit-char-style" rows="2">${esc(speaking)}</textarea>
+        <label class="field-label">对话示例（可选）</label>
+        <textarea class="input" id="edit-char-examples" rows="2">${esc(examples)}</textarea>
       `,
       footer: `
         <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">取消</button>
@@ -596,12 +610,16 @@ const App = {
   saveCharacterEdit(characterId) {
     const name = document.getElementById("edit-char-name")?.value?.trim();
     const identity = document.getElementById("edit-char-identity")?.value || "";
+    const scenario = document.getElementById("edit-char-scenario")?.value || "";
+    const mesExample = document.getElementById("edit-char-examples")?.value || "";
+    const speakingStyle = document.getElementById("edit-char-style")?.value || "";
     const avatar = this._charDraftAvatar;
     this._charDraftAvatar = null;
     Character.updateCharacter(characterId, {
       name: name || undefined,
       identity,
-      personality: { description: identity },
+      personality: { description: identity, scenario, mesExample },
+      speakingStyle: speakingStyle ? { notes: speakingStyle } : {},
       ...(avatar ? { avatar } : {}),
     }).then(() => {
       const chats = store.getState().chats.filter((c) => c.roleId === characterId);
@@ -609,7 +627,7 @@ const App = {
         store.updateChat(c.id, {
           name: name || c.name,
           ...(avatar ? { avatar } : {}),
-          config: { ...c.config, persona: identity },
+          config: { ...c.config, persona: identity, scenario, mesExample, speakingStyle },
         });
       });
       document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
@@ -626,6 +644,7 @@ const App = {
   _paintUserProfile() {
     const s = store.getState().settings;
     const name = document.getElementById("user-name")?.value ?? s.myName ?? "我";
+    const userPersona = document.getElementById("user-persona")?.value ?? s.userPersona ?? "";
     const avatar = this._userDraftAvatar || s.myAvatar || "assets/avatars/user-default.svg";
     document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
     openModal({
@@ -635,6 +654,8 @@ const App = {
         ${this._avatarPickerMarkup("user", avatar, name)}
         <label class="field-label">昵称</label>
         <input class="input" id="user-name" value="${esc(name)}" placeholder="你的名字" maxlength="24" />
+        <label class="field-label">我是谁（可选）</label>
+        <textarea class="input" id="user-persona" rows="4" placeholder="角色会用这段来理解你。空着就不注入。">${esc(userPersona)}</textarea>
       `,
       footer: `
         <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">取消</button>
@@ -651,6 +672,8 @@ const App = {
     }
     const patch = { myName: name };
     if (this._userDraftAvatar) patch.myAvatar = this._userDraftAvatar;
+    const userPersona = document.getElementById("user-persona")?.value ?? "";
+    patch.userPersona = userPersona;
     this._userDraftAvatar = null;
     store.updateSettings(patch);
     document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
@@ -1054,6 +1077,25 @@ const App = {
     addComment(id, "me", text);
     showToast({ message: "评论已发布", type: "success" });
   },
+  addWorldbookEntry() {
+    const keys = document.getElementById("wb-keys")?.value || "";
+    const content = String(document.getElementById("wb-content")?.value || "").trim();
+    if (!content) {
+      showToast({ message: "先写一点设定", type: "warning" });
+      return;
+    }
+    addEntry("global", {
+      name: keys.split(",")[0]?.trim() || "条目",
+      keys,
+      content: content.slice(0, 1200),
+    });
+    this._paintSettings("worldbook");
+    showToast({ message: "条目已添加", type: "success" });
+  },
+  deleteWorldbookEntry(bookId, entryId) {
+    deleteEntry(bookId, entryId);
+    this._paintSettings("worldbook");
+  },
 
   // ============================================================
   //  设置：按分区打开，每层都能返回「我的」
@@ -1118,8 +1160,30 @@ const App = {
         </div>`;
       footer = `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">返回</button>`;
     } else if (section === "worldbook") {
-      content = `<p class="create-sub">世界书条目会在对话时按关键词注入设定，让角色记得共同的背景。</p>
-        <div class="api-hint"><span>当前版本从角色人设与记忆里自动组装上下文，独立条目管理即将开放。</span></div>`;
+      const books = listBooks();
+      const global = books.find((b) => b.id === "global") || books[0];
+      const entries = (global?.entries || []).slice(0, 24);
+      content = `
+        <p class="create-sub">提到关键词时，条目会注入当前对话。每条最多 1200 字。不改匹配规则。</p>
+        <label class="field-label">关键词（逗号分隔）</label>
+        <input class="input" id="wb-keys" placeholder="雨天, 咖啡馆" />
+        <label class="field-label">设定</label>
+        <textarea class="input" id="wb-content" rows="4" maxlength="1200" placeholder="只有提到关键词时才会用到。"></textarea>
+        <button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px" onclick="window.EchoApp.addWorldbookEntry()">添加条目</button>
+        <div class="wb-list" style="margin-top:16px">
+          ${entries.length
+            ? entries
+                .map(
+                  (e) => `<div class="mem-line memory-row">
+              <span class="memory-row-text"><b>${esc(e.name || (e.keys || []).join("、") || "条目")}</b>${
+                    (e.keys || []).length ? ` · ${esc((e.keys || []).join("、"))}` : ""
+                  }</span>
+              <button type="button" class="memory-row-del" onclick="window.EchoApp.deleteWorldbookEntry('${global.id}','${e.id}')" aria-label="删除条目">${Icons.close}</button>
+            </div>`
+                )
+                .join("")
+            : `<p class="profile-muted">还没有条目。</p>`}
+        </div>`;
       footer = `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">返回</button>`;
     } else if (section === "voice") {
       content = `

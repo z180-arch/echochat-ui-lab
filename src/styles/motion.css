@@ -356,13 +356,13 @@
 .create-sub {
   font-size: 13px;
   color: var(--color-text-secondary);
-  line-height: 1.5;
-  margin-bottom: 14px;
+  line-height: 1.55;
+  margin-bottom: 16px;
 }
 .create-cards {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 .create-card {
   width: 100%;
@@ -426,13 +426,14 @@
   font-size: 15px;
   display: block;
   color: var(--color-text);
+  line-height: 1.35;
 }
 .create-card-desc {
   font-size: 12px;
   color: var(--color-text-secondary);
-  margin-top: 4px;
+  margin-top: 6px;
   display: block;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 /* ---- API 配置提示条 ---- */
@@ -478,6 +479,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 14px;
+  min-width: 0;
 }
 .api-block-ready {
   border-color: var(--color-mint);
@@ -489,10 +491,13 @@
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 10px;
+  min-width: 0;
 }
 .api-block-head h4 {
   font-size: 14px;
   font-weight: 600;
+  min-width: 0;
+  line-height: 1.35;
 }
 .api-status {
   font-size: 11px;
@@ -555,8 +560,9 @@
   font-size: 11px;
   color: var(--color-text-tertiary);
   margin-top: 6px;
-  line-height: 1.4;
+  line-height: 1.45;
   display: block;
+  overflow-wrap: anywhere;
 }
 .api-hero {
   margin-bottom: 4px;
@@ -574,6 +580,9 @@
   font-size: 12px;
   color: var(--color-text-secondary);
   line-height: 1.55;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .key-steps ol {
   padding-left: 18px;
@@ -606,6 +615,8 @@
   font-size: 11px;
   font-weight: 400;
   color: var(--color-text-secondary);
+  min-width: 0;
+  text-align: right;
 }
 .api-more {
   display: none;
@@ -919,9 +930,11 @@
   display: flex;
   gap: 8px;
   margin-top: 8px;
+  min-width: 0;
 }
 .moment-comment-row .input {
   flex: 1;
+  min-width: 0;
   min-height: 36px;
 }
 

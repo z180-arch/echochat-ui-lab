@@ -342,6 +342,26 @@ const App = {
         this.render();
       }
     });
+    this.bindVisualViewport();
+  },
+
+  bindVisualViewport() {
+    if (this._vvBound || typeof window === "undefined" || !window.visualViewport) return;
+    this._vvBound = true;
+    const sync = () => {
+      const vv = window.visualViewport;
+      const mobile = window.innerWidth < 768;
+      if (!mobile) {
+        document.documentElement.style.removeProperty("--app-height");
+        document.documentElement.style.removeProperty("--vv-top");
+        return;
+      }
+      document.documentElement.style.setProperty("--app-height", `${Math.round(vv.height)}px`);
+      document.documentElement.style.setProperty("--vv-top", `${Math.round(vv.offsetTop)}px`);
+    };
+    window.visualViewport.addEventListener("resize", sync);
+    window.visualViewport.addEventListener("scroll", sync);
+    sync();
   },
 
   // ============================================================
@@ -894,8 +914,8 @@ const App = {
     if (!cap) return;
     const n = el?.value?.length || 0;
     const over = n > MAX_USER_MESSAGE_CHARS;
-    cap.hidden = n < Math.floor(MAX_USER_MESSAGE_CHARS * 0.8) && !over;
-    cap.textContent = `${n}/${MAX_USER_MESSAGE_CHARS}`;
+    cap.hidden = false;
+    cap.textContent = `${n} / ${MAX_USER_MESSAGE_CHARS}`;
     cap.classList.toggle("is-over", over);
   },
   onChatInput(el) {
@@ -1024,6 +1044,7 @@ const App = {
   _paintSettings(section) {
     if (section === "api") this._apiSurface = "settings";
     document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+    document.querySelectorAll(".toast").forEach((t) => t.remove());
     const titles = {
       api: "API 与模型",
       memory: "记忆",

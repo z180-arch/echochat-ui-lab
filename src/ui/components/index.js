@@ -111,6 +111,7 @@ export function showToast({ message, type = "info", action = null, duration = 30
     toastContainer.className = "toast-container";
     document.body.appendChild(toastContainer);
   }
+  toastContainer.querySelectorAll(".toast").forEach((t) => t.remove());
   const toast = document.createElement("div");
   toast.className = `toast toast-${type}`;
   toast.innerHTML = `<span>${esc(message)}</span>${action ? `<span class="toast-action">${esc(action.label)}</span>` : ""}`;
@@ -132,7 +133,7 @@ export function showToast({ message, type = "info", action = null, duration = 30
 export function openModal({ title, content, footer = "", width = "560px" }) {
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
-  overlay.innerHTML = `<div class="modal" style="max-width:${width}">
+  overlay.innerHTML = `<div class="modal modal-split" style="--modal-width:${width}">
     ${title ? `<div class="modal-header"><span class="modal-title">${esc(title)}</span>${IconButton({ icon: Icons.close, title: "关闭", onClick: "this.closest('.modal-overlay').remove()" })}</div>` : ""}
     <div class="modal-body">${content}</div>
     ${footer ? `<div class="modal-footer">${footer}</div>` : ""}

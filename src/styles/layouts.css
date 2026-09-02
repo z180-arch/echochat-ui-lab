@@ -58,7 +58,7 @@
 }
 .nav-item-active {
   background: var(--color-primary-soft);
-  color: var(--color-text);
+  color: var(--color-primary);
 }
 .nav-item svg {
   width: 22px;
@@ -95,17 +95,18 @@
   justify-content: space-between;
 }
 .inbox-head {
-  padding: 20px 16px 8px;
+  padding: 22px 16px 12px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-4);
+  min-width: 0;
 }
 .inbox-lead {
   font-size: var(--font-caption);
   color: var(--color-text-secondary);
-  margin-top: 4px;
-  line-height: 1.45;
+  margin-top: 6px;
+  line-height: 1.5;
   letter-spacing: 0;
 }
 .list-title {
@@ -248,15 +249,15 @@
 .chat-input-area {
   border-top: 1px solid var(--color-border);
   background: var(--color-surface);
-  padding: 10px var(--space-3);
-  padding-bottom: calc(10px + var(--safe-bottom));
+  padding: 12px var(--space-3);
+  padding-bottom: calc(12px + var(--safe-bottom));
   flex-shrink: 0;
 }
 .chat-input-wrap {
   display: flex;
   align-items: flex-end;
   gap: var(--space-2);
-  background: var(--color-surface-2);
+  background: var(--color-input, var(--color-surface-2));
   border-radius: var(--radius-lg);
   padding: var(--space-2);
   border: 1px solid var(--color-border);
@@ -281,10 +282,12 @@
   color: var(--color-text-tertiary);
 }
 .composer-count {
-  margin-top: 6px;
+  margin-top: 8px;
   text-align: right;
   font-size: var(--font-caption);
   color: var(--color-text-tertiary);
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
 }
 .composer-count.is-over {
   color: var(--color-danger);
@@ -343,11 +346,14 @@
 .profile-name {
   font-size: 20px;
   font-weight: var(--weight-semibold);
+  line-height: 1.35;
+  margin-top: 2px;
 }
 .profile-status {
   font-size: var(--font-caption);
   color: var(--color-text-secondary);
-  margin-top: 4px;
+  margin-top: 6px;
+  line-height: 1.45;
 }
 .profile-section {
   padding: var(--space-4);
@@ -357,7 +363,7 @@
   font-size: var(--font-label);
   font-weight: var(--weight-semibold);
   color: var(--color-text-secondary);
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
   letter-spacing: 0;
 }
 .profile-section-content {
@@ -582,6 +588,8 @@
 }
 .moments-filter {
   width: auto;
+  max-width: 42%;
+  min-width: 0;
   padding: 8px 12px;
   min-height: 40px;
 }
@@ -682,8 +690,8 @@
   overflow: hidden;
 }
 .me-profile-copy { flex: 1; min-width: 0; }
-.me-name { font-size: 18px; font-weight: 600; }
-.me-meta { font-size: 13px; color: var(--color-text-secondary); margin-top: 4px; }
+.me-name { font-size: 18px; font-weight: 600; line-height: 1.35; }
+.me-meta { font-size: 13px; color: var(--color-text-secondary); margin-top: 6px; line-height: 1.45; }
 .me-settings-item {
   display: flex;
   align-items: center;
@@ -715,15 +723,19 @@
 }
 .me-settings-item-content {
   flex: 1;
+  min-width: 0;
 }
 .me-settings-item-title {
   font-size: var(--font-body);
   font-weight: var(--weight-medium);
+  line-height: 1.35;
 }
 .me-settings-item-desc {
   font-size: var(--font-caption);
   color: var(--color-text-secondary);
-  margin-top: 2px;
+  margin-top: 4px;
+  line-height: 1.45;
+}
 }
 .me-settings-item-arrow {
   color: var(--color-text-tertiary);

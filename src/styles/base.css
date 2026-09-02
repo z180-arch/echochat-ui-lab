@@ -58,8 +58,8 @@ button:disabled {
   cursor: not-allowed;
 }
 .btn-primary:disabled {
-  background: #EEF2F1;
-  color: #7A8A8E;
+  background: var(--color-surface-3);
+  color: var(--color-text-tertiary);
 }
 button:focus-visible,
 input:focus-visible,

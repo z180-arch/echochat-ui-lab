@@ -31,6 +31,9 @@
   --color-bubble-me-text: #243238;
   --color-bubble-her-text: #243238;
   --color-glass: rgba(250, 252, 251, 0.88);
+  --color-input: #ffffff;
+  --color-surface-elevated: #ffffff;
+  --color-primary-fg: #ffffff;
 
   /* ---- 字号 ---- */
   --font-display: 28px;
@@ -125,6 +128,9 @@
   --color-bubble-her: #232b35;
   --color-bubble-her-text: #e8eef4;
   --color-glass: rgba(26, 32, 40, 0.85);
+  --color-input: #1a2028;
+  --color-surface-elevated: #1e252e;
+  --color-primary-fg: #ffffff;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.4);
@@ -135,41 +141,65 @@
   --color-primary: #7CB8E8;
   --color-primary-hover: #6AABE0;
   --color-primary-soft: #EEF7FD;
-  --color-bubble-me: #EDF9F4;
+  --color-mint: #9DD9C2;
+  --color-mint-soft: #EDF9F4;
+  --color-bubble-me: #EEF7FD;
   --color-bubble-me-text: #243238;
+  --color-bubble-her: #EDF9F4;
+  --color-bubble-her-text: #243238;
 }
 [data-theme-preset="sky"] {
   --color-primary: #5b9cf6;
   --color-primary-hover: #4a8be5;
   --color-primary-soft: #e8f1fd;
-  --color-bubble-me: #5b9cf6;
-  --color-bubble-me-text: #fff;
+  --color-mint: #7ec8e8;
+  --color-mint-soft: #e5f4fa;
+  --color-bubble-me: #e8f1fd;
+  --color-bubble-me-text: #243238;
+  --color-bubble-her: #e5f4fa;
+  --color-bubble-her-text: #243238;
 }
 [data-theme-preset="lavender"] {
   --color-primary: #8b7cf6;
   --color-primary-hover: #7a6be5;
   --color-primary-soft: #f0edfd;
-  --color-bubble-me: #8b7cf6;
-  --color-bubble-me-text: #fff;
+  --color-mint: #b4a7f8;
+  --color-mint-soft: #ede9fe;
+  --color-bubble-me: #f0edfd;
+  --color-bubble-me-text: #243238;
+  --color-bubble-her: #ede9fe;
+  --color-bubble-her-text: #243238;
 }
 [data-theme-preset="rose"] {
   --color-primary: #f472b6;
   --color-primary-hover: #e561a5;
   --color-primary-soft: #fde8f3;
-  --color-bubble-me: #f472b6;
-  --color-bubble-me-text: #fff;
+  --color-mint: #f9a8d4;
+  --color-mint-soft: #fdf2f8;
+  --color-bubble-me: #fde8f3;
+  --color-bubble-me-text: #243238;
+  --color-bubble-her: #fdf2f8;
+  --color-bubble-her-text: #243238;
 }
 [data-theme-preset="sage"] {
-  --color-primary: #84cc84;
-  --color-primary-hover: #73bb73;
-  --color-primary-soft: #eef7ee;
-  --color-bubble-me: #84cc84;
-  --color-bubble-me-text: #fff;
+  --color-primary: #6eb87a;
+  --color-primary-hover: #5da769;
+  --color-primary-soft: #e8f5ea;
+  --color-mint: #84cc84;
+  --color-mint-soft: #ecfdf0;
+  --color-bubble-me: #e8f5ea;
+  --color-bubble-me-text: #243238;
+  --color-bubble-her: #ecfdf0;
+  --color-bubble-her-text: #243238;
 }
 [data-theme-preset="cloud"] {
   --color-primary: #94a3b8;
   --color-primary-hover: #8392a7;
-  --color-primary-soft: #f1f3f6;
-  --color-bubble-me: #94a3b8;
-  --color-bubble-me-text: #fff;
+  --color-primary-soft: #f1f5f9;
+  --color-mint: #b0bac9;
+  --color-mint-soft: #f8fafc;
+  --color-bubble-me: #f1f5f9;
+  --color-bubble-me-text: #243238;
+  --color-bubble-her: #f8fafc;
+  --color-bubble-her-text: #243238;
 }

@@ -43,6 +43,9 @@ jobs:
       - name: Chat Send
         run: node tests/chat_send_test.mjs
 
+      - name: Theme Tokens
+        run: node tests/theme_tokens_test.mjs
+
       - name: Syntax check (src)
         run: |
           set -euo pipefail

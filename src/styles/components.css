@@ -19,7 +19,7 @@
 }
 .btn-primary {
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-primary-fg, #fff);
 }
 .btn-primary:hover:not(:disabled) {
   background: var(--color-primary-hover);
@@ -97,8 +97,10 @@
 .textarea,
 .select {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: var(--space-3) var(--space-4);
-  background: var(--color-surface);
+  background: var(--color-input, var(--color-surface));
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   font-size: var(--font-body);
@@ -196,23 +198,31 @@
 /* ---- 消息气泡 ---- */
 .msg {
   display: flex;
-  gap: 8px;
-  padding: 6px 16px;
+  gap: 10px;
+  padding: 8px 16px;
   align-items: flex-end;
 }
 .msg-me {
   flex-direction: row-reverse;
 }
 .msg-col {
-  max-width: 78%;
+  max-width: min(78%, 36em);
   min-width: 0;
 }
 .msg-bubble {
-  padding: 9px 13px;
+  padding: 10px 14px;
   border-radius: 16px;
-  font-size: 15px;
-  line-height: 1.55;
+  font-size: var(--font-body);
+  line-height: var(--line-relaxed);
+  letter-spacing: 0.01em;
+  overflow-wrap: break-word;
   word-break: break-word;
+  line-break: auto;
+}
+.msg-bubble br + br {
+  display: block;
+  margin-top: 0.55em;
+  content: "";
 }
 .msg-me .msg-bubble {
   background: var(--color-bubble-me);
@@ -320,12 +330,15 @@
   to { opacity: 1; }
 }
 .modal {
-  background: var(--color-surface);
+  background: var(--color-surface-elevated, var(--color-surface));
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-xl);
-  width: 100%;
-  max-width: 560px;
-  max-height: 85vh;
+  width: min(100%, var(--modal-width, 560px));
+  max-width: 100%;
+  max-height: min(85vh, calc(100dvh - 24px));
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   animation: modal-in var(--dur-normal) var(--ease-out);
@@ -344,24 +357,39 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+  min-width: 0;
 }
 .modal-title {
   font-size: var(--font-section);
   font-weight: var(--weight-semibold);
+  min-width: 0;
+  line-height: 1.35;
 }
 .modal-body {
   padding: var(--space-5);
   overflow-y: auto;
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 .modal-footer {
   padding: var(--space-4) var(--space-5);
   border-top: 1px solid var(--color-border);
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-3);
   justify-content: flex-end;
+  flex-shrink: 0;
+  background: var(--color-surface-elevated, var(--color-surface));
+}
+.modal-footer .btn {
+  min-width: 0;
 }
 
 /* ---- 设置面板（Settings modal） ---- */
@@ -418,7 +446,8 @@
 .setting-row-desc {
   font-size: var(--font-caption);
   color: var(--color-text-tertiary);
-  margin-top: 2px;
+  margin-top: 4px;
+  line-height: 1.45;
 }
 .setting-row-right {
   display: flex;

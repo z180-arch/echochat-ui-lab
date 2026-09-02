@@ -281,7 +281,6 @@ function renderChatPane(chat, hideChatMobile) {
           : `<button class="chat-send-btn motion-press" onclick="window.EchoApp.sendMessage()" title="发送">${Icons.send}</button>`}
       </div>
       <div class="composer-count" id="chat-count">0 / 2000</div>
-      </div>
     </div>
   </div>`;
 }

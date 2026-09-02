@@ -37,6 +37,12 @@ jobs:
       - name: Core Loop
         run: node tests/core_loop_test.mjs
 
+      - name: Reply Clean
+        run: node tests/reply_clean_test.mjs
+
+      - name: Chat Send
+        run: node tests/chat_send_test.mjs
+
       - name: Syntax check (src)
         run: |
           set -euo pipefail

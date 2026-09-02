@@ -43,9 +43,10 @@ export function buildMessages(chat, systemPrompt, historyMessages) {
   const maxMsgs = CFG.contextMaxMessages || 40;
   const history = (historyMessages || chat.messages || []).slice(-maxMsgs);
   history.forEach((m) => {
+    if (m.status === "streaming") return;
     if (m.role === "me") {
       messages.push({ role: "user", content: m.text });
-    } else if (m.role === "her") {
+    } else if (m.role === "her" && (m.text || "").trim()) {
       messages.push({ role: "assistant", content: m.text });
     }
   });

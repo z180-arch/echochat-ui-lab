@@ -255,15 +255,16 @@ function renderChatPane(chat, hideChatMobile) {
             <p>直接说一句就好。重要的事确认后，会成为你们的记忆。</p>
           </div>`
         : messages.map((m, i) => renderMessage(m, i, chat)).join("")}
-      ${sending ? `<div class="msg msg-her"><div class="msg-col"><div class="msg-bubble">${TypingIndicator()}</div></div></div>` : ""}
     </div>
     <div class="chat-input-area">
       <div class="chat-input-wrap">
         ${IconButton({ icon: Icons.mic, title: "语音输入", onClick: "window.EchoApp.toggleSTT()", className: "chat-mic-btn" })}
-        <textarea class="chat-input" id="chat-input" placeholder="和 ${esc(chat.name || "TA")} 说点什么…" rows="1" onkeydown="window.EchoApp.handleInputKey(event)" oninput="window.EchoApp.autoGrowInput(this)"></textarea>
+        <textarea class="chat-input" id="chat-input" placeholder="和 ${esc(chat.name || "TA")} 说点什么…" rows="1" onkeydown="window.EchoApp.handleInputKey(event)" oninput="window.EchoApp.onChatInput(this)"></textarea>
         ${sending
           ? `<button class="chat-send-btn chat-send-stop" onclick="window.EchoApp.stopSend()" title="停止">${Icons.stop}</button>`
           : `<button class="chat-send-btn" onclick="window.EchoApp.sendMessage()" title="发送">${Icons.send}</button>`}
+      </div>
+      <div class="composer-count" id="chat-count" hidden></div>
       </div>
     </div>
   </div>`;
@@ -273,7 +274,9 @@ function renderMessage(m, index, chat) {
   const isMe = m.role === "me";
   const isStreaming = m.status === "streaming";
   const isError = m.status === "error";
-  const text = renderMarkdown(m.text || "");
+  const raw = m.text || "";
+  const showTyping = isStreaming && !raw.trim();
+  const text = showTyping ? "" : renderMarkdown(raw);
   const settings = store.getState().settings;
   const myName = settings.myName || "我";
   const avatar = isMe
@@ -289,7 +292,7 @@ function renderMessage(m, index, chat) {
     <button type="button" class="msg-more-btn" aria-label="消息操作" onclick="window.EchoApp.toggleMessageActions(this)">${Icons.more}</button>
     <div class="msg-col">
       <div class="msg-name">${esc(isMe ? myName : chat.name || "TA")}</div>
-      <div class="msg-bubble">${text || ""}</div>
+      <div class="msg-bubble">${showTyping ? TypingIndicator() : text || ""}</div>
       <div class="msg-time">${formatDateTime(m.time)}</div>
       ${isError ? `<div class="msg-status">没发出去<button type="button" onclick="window.EchoApp.regenerateMessage(${index})">重试</button></div>` : ""}
       <div class="msg-actions">

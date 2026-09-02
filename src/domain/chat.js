@@ -16,6 +16,7 @@ import { maybeAutoSummary } from "./memory.js";
 import { messageStore } from "./message-store.js";
 import { listMoments } from "./moments.js";
 import { buildBehaviorContext } from "./behavior.js";
+import { cleanAssistantReply, MAX_USER_MESSAGE_CHARS } from "./reply-clean.js";
 
 let abortCtrl = null;
 let sending = false;
@@ -27,6 +28,34 @@ export function isSending() {
 
 export function getStreamingChatId() {
   return streamingChatId;
+}
+
+function finishStreamingPlaceholders(chatId) {
+  if (!chatId) return;
+  const msgs = messageStore.peekMessages(chatId);
+  for (const m of msgs) {
+    if (m.role !== "her" || m.status !== "streaming") continue;
+    const cleaned = cleanAssistantReply(m.text || "");
+    if (!cleaned) messageStore.deleteMessage(chatId, m.id);
+    else messageStore.updateMessage(chatId, m.id, { text: cleaned, status: "sent" });
+  }
+}
+
+function throwIfAborted() {
+  if (abortCtrl?.signal?.aborted) {
+    const err = new Error("aborted");
+    err.name = "AbortError";
+    throw err;
+  }
+}
+
+function endSend(chatId) {
+  sending = false;
+  streamingChatId = null;
+  abortCtrl = null;
+  finishStreamingPlaceholders(chatId);
+  events.emit(EVT.STREAM_DONE, { chatId });
+  events.emit("rerender");
 }
 
 // 构建系统提示词（人设 + 记忆 + 关系语气 + 世界书）
@@ -50,10 +79,13 @@ export function buildSystemPrompt(chat) {
 // 发送消息
 export async function sendMessage(text) {
   const chat = store.getCurrentChat();
-  if (!chat || sending || !text?.trim()) return;
+  if (!chat || sending) return;
+  const trimmed = String(text || "").trim();
+  if (!trimmed) return;
+  if (trimmed.length > MAX_USER_MESSAGE_CHARS) return;
 
   // Persist the user message first so a missing API key never drops it.
-  const userMsg = await messageStore.addMessage(chat.id, { role: "me", text: text.trim(), status: "sent" });
+  const userMsg = await messageStore.addMessage(chat.id, { role: "me", text: trimmed, status: "sent" });
   events.emit(EVT.MESSAGE_SENT, { chatId: chat.id, message: userMsg });
 
   if (needsApiSetup(chat)) {
@@ -70,58 +102,54 @@ export async function sendMessage(text) {
     return;
   }
 
-  // 2. 设置发送状态
   sending = true;
   streamingChatId = chat.id;
   abortCtrl = new AbortController();
-
   events.emit(EVT.STREAM_START, { chatId: chat.id });
 
+  const tempMsg = await messageStore.addMessage(chat.id, {
+    role: "her",
+    text: "",
+    status: "streaming",
+  });
+
   try {
-    // 3. 心理停顿（亲密话语）
-    if (isIntimate(text)) {
+    if (isIntimate(trimmed)) {
       await sleep(rand(1200, 2600));
       await sleep(1000);
     }
+    throwIfAborted();
 
-    // 4. 构建请求
     const systemPrompt = buildSystemPrompt(chat);
     const messages = buildMessages(chat, systemPrompt, messageStore.peekMessages(chat.id));
+    throwIfAborted();
 
-    // 5. 创建临时 AI 消息（流式中）
-    const tempMsg = await messageStore.addMessage(chat.id, {
-      role: "her",
-      text: "",
-      status: "streaming",
-    });
-
-    // 6. 流式请求
     const reply = await streamChat(chat, messages, abortCtrl.signal, (full) => {
-      messageStore.updateMessage(chat.id, tempMsg.id, { text: full, status: "streaming" });
+      messageStore.updateMessage(chat.id, tempMsg.id, {
+        text: cleanAssistantReply(full),
+        status: "streaming",
+      });
     });
 
-    // 7. 完成
-    if (reply?.trim()) {
+    const cleaned = cleanAssistantReply(reply || "");
+    if (cleaned) {
       messageStore.updateMessage(chat.id, tempMsg.id, {
-        text: reply.trim(),
+        text: cleaned,
         status: "sent",
       });
       events.emit(EVT.MESSAGE_RECEIVED, { chatId: chat.id, message: tempMsg });
 
-      // 8. 记录关系
       const roleId = getRoleId(chat);
       if (roleId) {
         recordChatTurn(roleId, getRoleName(chat));
         events.emit(EVT.RELATION_UPDATE, { roleId });
       }
 
-      // 9. 自动摘要（非阻塞）
       maybeAutoSummary(store.getCurrentChat() || chat);
     } else {
       messageStore.deleteMessage(chat.id, tempMsg.id);
     }
   } catch (e) {
-    // 错误处理
     if (e.name === "AbortError") {
       events.emit(EVT.STREAM_ABORT, { chatId: chat.id });
       events.emit(EVT.TOAST, { message: "已停止生成", type: "info" });
@@ -133,22 +161,23 @@ export async function sendMessage(text) {
         action: { label: "重试", handler: () => retryLastMessage() },
       });
     }
-    // 清理临时消息
     const current = store.getCurrentChat();
-    if (current) {
-      const msgs = messageStore.peekMessages(current.id);
-      const lastMsg = msgs[msgs.length - 1];
-      if (lastMsg?.status === "streaming") {
-        messageStore.updateMessage(current.id, lastMsg.id, {
+    const id = current?.id || chat.id;
+    const msgs = messageStore.peekMessages(id);
+    const lastMsg = msgs[msgs.length - 1];
+    if (lastMsg?.status === "streaming") {
+      const cleaned = cleanAssistantReply(lastMsg.text || "");
+      if (!cleaned) {
+        messageStore.deleteMessage(id, lastMsg.id);
+      } else {
+        messageStore.updateMessage(id, lastMsg.id, {
+          text: cleaned,
           status: e.name === "AbortError" ? "stopped" : "error",
         });
       }
     }
   } finally {
-    sending = false;
-    streamingChatId = null;
-    abortCtrl = null;
-    events.emit(EVT.STREAM_DONE, { chatId: chat.id });
+    endSend(chat.id);
   }
 }
 

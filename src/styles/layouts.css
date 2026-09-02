@@ -280,6 +280,16 @@
 .chat-input::placeholder {
   color: var(--color-text-tertiary);
 }
+.composer-count {
+  margin-top: 6px;
+  text-align: right;
+  font-size: var(--font-caption);
+  color: var(--color-text-tertiary);
+}
+.composer-count.is-over {
+  color: var(--color-danger);
+  font-weight: 600;
+}
 .chat-send-btn {
   width: 44px;
   height: 44px;

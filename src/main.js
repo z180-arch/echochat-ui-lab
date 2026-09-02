@@ -34,6 +34,7 @@ import {
   watchSystemTheme,
 } from "./ui/theme.js";
 import { needsApiSetup } from "./domain/provider.js";
+import { MAX_USER_MESSAGE_CHARS } from "./domain/reply-clean.js";
 import { reconstructionModalMarkup } from "./ui/views/reconstruction.js";
 import { memoryReviewMarkup } from "./ui/views/memory-review.js";
 import {
@@ -61,6 +62,7 @@ const App = {
   _meScrollTop: 0,
   _lastRenderedView: null,
   _sendPulse: false,
+  _chatDraft: "",
 
   // 初始化
   async init() {
@@ -188,6 +190,8 @@ const App = {
     // 保存「我的」页滚动位置：innerHTML 替换会把它清零
     const meScroll = document.getElementById("me-scroll");
     if (meScroll) this._meScrollTop = meScroll.scrollTop;
+    const chatInput = document.getElementById("chat-input");
+    if (chatInput) this._chatDraft = chatInput.value;
 
     let html = "";
     switch (this.view) {
@@ -259,6 +263,13 @@ const App = {
     }
 
     this.bindMessageGestures();
+
+    const input = document.getElementById("chat-input");
+    if (input) {
+      if (this._chatDraft) input.value = this._chatDraft;
+      this.autoGrowInput(input);
+      this.updateChatCount(input);
+    }
   },
 
   bindRippleButtons() {
@@ -846,8 +857,15 @@ const App = {
     const input = document.getElementById("chat-input");
     const text = input?.value?.trim();
     if (!text) return;
+    if (text.length > MAX_USER_MESSAGE_CHARS) {
+      showToast({ message: `单条最多 ${MAX_USER_MESSAGE_CHARS} 字，请删短后再发`, type: "info" });
+      this.updateChatCount(input);
+      return;
+    }
     input.value = "";
+    this._chatDraft = "";
     this.autoGrowInput(input);
+    this.updateChatCount(input);
     // 模型未配置时不报错，先收下这句话，连接完成后自动发出去
     if (needsApiSetup(store.getCurrentChat())) {
       this._pendingSend = text;
@@ -855,7 +873,7 @@ const App = {
       return;
     }
     this._sendPulse = true;
-    sendMessage(text);
+    return sendMessage(text);
   },
   stopSend() {
     stopGeneration();
@@ -867,8 +885,23 @@ const App = {
     }
   },
   autoGrowInput(el) {
+    if (!el) return;
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, 140) + "px";
+  },
+  updateChatCount(el) {
+    const cap = document.getElementById("chat-count");
+    if (!cap) return;
+    const n = el?.value?.length || 0;
+    const over = n > MAX_USER_MESSAGE_CHARS;
+    cap.hidden = n < Math.floor(MAX_USER_MESSAGE_CHARS * 0.8) && !over;
+    cap.textContent = `${n}/${MAX_USER_MESSAGE_CHARS}`;
+    cap.classList.toggle("is-over", over);
+  },
+  onChatInput(el) {
+    this.autoGrowInput(el);
+    this._chatDraft = el?.value || "";
+    this.updateChatCount(el);
   },
   copyMessage(index) {
     const chat = store.getCurrentChat();

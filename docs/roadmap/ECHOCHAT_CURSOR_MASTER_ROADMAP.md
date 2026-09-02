@@ -1,9 +1,10 @@
 # EchoChat Cursor Master Roadmap
 
-> 文档版本：1.0
-> 创建日期：2026-08-31
-> 状态：**ACTIVE — Cursor 接管后的最高级开发路线**
-> 适用对象：Cursor（主开发 Agent）、独立审查 Agent、项目维护者
+> 文档版本：1.0  
+> 创建日期：2026-08-31  
+> 状态：**HISTORICAL — 不再是默认执行模型**
+>
+> V1.1 RC 已在 `403e721` 上线。不要按 Stage 0→13 自动往下做。当前状态与开发循环见 [`docs/baseline/V1_1_RC_CURRENT_STATE.md`](../baseline/V1_1_RC_CURRENT_STATE.md)。
 
 ---
 

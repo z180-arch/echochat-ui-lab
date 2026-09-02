@@ -3,7 +3,7 @@
 > **Phase**: 0 — Baseline Lock
 > **Date**: 2026-08-31
 > **Commit**: 79d8e58
-> **Status**: V1 Candidate confirmed runnable
+> **Status**: V1 runtime / storage / API **contract lock** (still in force). Product surface after this lock is V1.1 RC at `403e721` — see [`V1_1_RC_CURRENT_STATE.md`](./V1_1_RC_CURRENT_STATE.md). This file still defines frozen storage keys, schema v2, and the API contract. V1.1 did not change that contract.
 
 ## 1. Repository Baseline
 

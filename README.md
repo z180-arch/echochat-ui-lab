@@ -2,37 +2,25 @@
 
 > 念念不忘，必有回响。
 
-**EchoChat is a local-first AI character chat application under active development.**
+**EchoChat Lite is a local-first AI character companion.** V1.1 RC is live.
 
 EchoChat 是一个本地优先的 AI 角色对话应用，支持角色对话、长期记忆、关系养成、角色动态和世界书。项目采用模块化 ES Module 架构，零构建依赖，可直接部署为静态站点或 PWA。
 
-The project is currently in **active development**. APIs, storage architecture, UI, and platform targets may evolve as the project matures.
+当前执行状态以 [`docs/baseline/V1_1_RC_CURRENT_STATE.md`](docs/baseline/V1_1_RC_CURRENT_STATE.md) 为准。不要把仓库里的 Foundation / Stage 0–13 路线图当成未完成工作。
 
 ---
 
 ## Development Status
 
-**当前阶段：Foundation Closure → Cursor Handoff**
+**当前阶段：V1.1 RC（已上线）**
 
-EchoChat 已完成 Phase 0-6 Foundation 施工（Repository / Dexie / Message / Character / Conversation / Asset），正在进行 Cursor 接管前的最终整理。
+基线 commit：`403e721` (`fix: tighten CJK memory retrieval matching`)
 
-```
-Foundation Closure
-        ↓
-Independent Verification (STAGE 0)
-        ↓
-Storage Cutover (STAGE 1-3)
-        ↓
-Character Experience (STAGE 4)
-        ↓
-Character Reconstruction (STAGE 5)
-        ↓
-Memory / Relationship / Behavior (STAGE 6-9)
-        ↓
-Moments / Product Polish (STAGE 10-13)
-```
+GitHub `main` 已同步。Vercel 从 `main` 自动部署，生产环境为 V1.1 RC。
 
-**不是 Production Ready。不是 All Features Complete。** 基础设施已建立，产品功能正在逐步推进。
+已完成并验收：Character Chromium、Context Builder、User Persona 注入、按轮记忆检索、保守记忆写入、关系 brief/events、世界书/Profile、真实「想起了」芯片、氛围策略、动效 primitive。真实 SiliconFlow send path、390 / 1440、回归测试均 PASS。
+
+下一步不是旧 roadmap 的 Stage 6/7/9，而是：生产观察 → 证据 / 用户反馈 → 小工作包。
 
 ---
 
@@ -51,33 +39,25 @@ Moments / Product Polish (STAGE 10-13)
 
 ## 功能特性
 
-### 已实现（V1）
+### 已实现（V1.1 RC）
 - **角色对话**：流式回复、停止生成、重试/重生成、消息编辑
-- **长期记忆**：自动摘要 + 手动记忆，角色记住你说过的事
-- **关系养成**：亲密度系统、连续聊天天数、语气随关系变化
-- **角色动态**：角色自动发布生活动态，支持点赞评论
-- **世界书**：关键词触发设定注入，支持 SillyTavern 格式导入
-- **多主题**：亮色/暗色 + 主题色预设
-- **响应式**：移动端单栏 + 底部导航，桌面端多栏布局
-- **PWA**：可安装到桌面，支持离线访问静态资源
-- **数据迁移**：v1→v2 自动迁移，带 staging recovery 机制
+- **Character Continuity**：Hub / Chat / Profile / Moments 共用头像环、名字、阶段芯片
+- **Context Builder**：人设槽位 + 用户 Persona 注入；空槽省略
+- **长期记忆**：按本轮 overlap 检索；候选确认 / 记住写入；自动摘要不再倾倒进长期记忆
+- **想起了**：仅在真实 retrieval hit 时显示
+- **关系养成**：亲密度公式未改；附加 first-meeting / stage-change 事件与 brief
+- **角色重建**：从聊天记录审查后创建角色
+- **角色动态 / 世界书 / Profile**：相处中分组（关于 TA / 关系 / 记忆 / 世界书 / 瞬间 / 相处线）
+- **多主题**：亮色/暗色 + 主题色预设（Morning Mint）
+- **响应式**：390 单栏 + 底栏；1440 轨 / 列表 / 聊天 / 资料
+- **PWA**：可安装，离线静态资源
+- **数据迁移**：v1→v2 staging recovery；Message/Character/Conversation Dexie 路径
 
-### 基础设施完成（UI 待接入）
-- **Repository 层**：12 个 Repository 接口 + Legacy Adapter
-- **Dexie 数据库**：13 表 schema + Adapter + Migration
-- **Message 双写**：localStorage + Dexie，支持分页/搜索/分支
-- **Character 一级实体**：Domain + Repository，级联删除策略
-- **Conversation 多对话**：一角色多对话，Archive/Rename/Pin
-- **Asset 系统**：Metadata + Binary 分离
-
-### 未实现
-- Character Reconstruction（从聊天记录重建角色）
-- Memory 分层检索 / Context Builder
-- Relationship Current State + Event History
-- Behavior Engine
+### 未实现（不是当前执行队列）
 - Plugin System
 - Cloud / Account / Sync
 - Desktop / Mobile Native
+- 向量记忆 / Memory 迁 Dexie
 
 ---
 
@@ -87,7 +67,7 @@ Moments / Product Polish (STAGE 10-13)
 
 ```bash
 git clone https://github.com/z180-arch/echochat-ui-lab.git
-cd echat-ui-lab
+cd echochat-ui-lab
 python3 -m http.server 8080
 # 打开 http://localhost:8080
 ```
@@ -252,6 +232,9 @@ node tests/migration_atomicity_test.mjs
 # Foundation 综合测试（24 tests）
 node tests/foundation_test.mjs
 
+# V1.1 context / retrieval
+node tests/v1_1_context_test.mjs
+
 # 语法检查
 node --check src/your-file.js
 ```
@@ -272,6 +255,7 @@ import("./src/domain/message-perf-test.js").then(m => m.runPerformanceTest());
 
 | 文件 | 说明 |
 |------|------|
+| [docs/baseline/V1_1_RC_CURRENT_STATE.md](docs/baseline/V1_1_RC_CURRENT_STATE.md) | **当前状态（V1.1 RC）** |
 | [LICENSE](LICENSE) | 源代码许可证（PolyForm Noncommercial 1.0.0） |
 | [COPYRIGHT.md](COPYRIGHT.md) | 版权声明和资产分类 |
 | [TRADEMARKS.md](TRADEMARKS.md) | 品牌使用政策 |
@@ -300,4 +284,4 @@ EchoChat 源代码采用 **PolyForm Noncommercial License 1.0.0**。
 
 ---
 
-*EchoChat · Active Development · 2026*
+*EchoChat Lite · V1.1 RC · 2026*

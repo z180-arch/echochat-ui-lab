@@ -1,9 +1,12 @@
 # EchoChat Current State
 
-> 最后更新：2026-09-01
-> 当前 Commit：见 git log（Core Product Completion Wave）
-> 状态：**CORE PRODUCT LOOP — Memory candidates + relationship stage COMPLETE**
-> CI：push 后由 GitHub Actions 验证
+> **Superseded.** Current product state is [`V1_1_RC_CURRENT_STATE.md`](./V1_1_RC_CURRENT_STATE.md) at commit `403e721`.
+>
+> 本文档是 2026-09-01 Core Product Loop 的历史快照。其中的 Stage 0–13、“下一步 STAGE 6”、以及「Context Builder / Relationship Event History 未实现」**不能**当作当前待办。V1.1 RC 已上线。
+>
+> 最后更新（本文快照）：2026-09-01  
+> 当前 Commit（本文快照）：Core Product Completion Wave  
+> 状态：**HISTORICAL** — 权威状态见 V1.1 RC Current State
 
 ---
 
@@ -396,7 +399,8 @@ UI V3
 
 | 文档 | 路径 | 用途 |
 |------|------|------|
-| Master Roadmap | `docs/roadmap/ECHOCHAT_CURSOR_MASTER_ROADMAP.md` | Cursor 最高级开发路线 |
+| **V1.1 RC Current State** | `docs/baseline/V1_1_RC_CURRENT_STATE.md` | **当前权威状态** |
+| Master Roadmap | `docs/roadmap/ECHOCHAT_CURSOR_MASTER_ROADMAP.md` | 历史 Stage 路线（不再作为默认执行模型） |
 | Cursor Handoff | `docs/baseline/CURSOR_HANDOFF_BASELINE.md` | Cursor 接管第一份文件 |
 | Foundation Gate | `docs/baseline/PHASE_0_6_FOUNDATION_GATE_REPORT.md` | Phase 0-6 验收报告 |
 | 长期架构 | `docs/architecture/ECHOCHAT_LONG_TERM_ARCHITECTURE.md` | 2-3 年架构方向 |

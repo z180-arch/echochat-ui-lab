@@ -1,8 +1,11 @@
 # EchoChat Cursor Handoff Baseline
 
-> **这是你（Cursor）打开这个仓库后应该读的第一份文件。**
-> 最后更新：2026-08-31
-> 当前阶段：**Foundation Closure → STAGE 0 Verification**
+> **Superseded as the first file to read.** Start at [`V1_1_RC_CURRENT_STATE.md`](./V1_1_RC_CURRENT_STATE.md).
+>
+> 最后更新（本文）：2026-08-31  
+> 当前阶段（本文原文）：Foundation Closure → STAGE 0 — **这已不是当前执行状态。**
+>
+> V1.1 RC (`403e721`) 已上线。STAGE 0–13 不是未完成队列。Message Dexie 读、Character Hub、Reconstruction、Memory 候选、Relationship brief/events、Context Builder 均已存在于代码中。下一步按生产观察与证据选择小工作包，不要从 STAGE 0 重做。
 
 ---
 
@@ -10,8 +13,8 @@
 
 你是 EchoChat Lite 的**主开发 Agent（Cursor）**。
 
-你的任务不是重新设计架构，不是写漂亮文档，而是：
-> 按照已批准的路线，逐步把 EchoChat 从 Foundation 阶段推进到可用的产品阶段。
+你的任务不是重新设计架构，也不是从 Foundation 重做。V1.1 RC 已上线。
+> 按 [`V1_1_RC_CURRENT_STATE.md`](./V1_1_RC_CURRENT_STATE.md) 的维护循环工作：观察 → 证据 → 小工作包。旧 Stage 路线仅作历史。
 
 ---
 
@@ -64,7 +67,7 @@ EchoChat 是一个 **Local-first AI Character Chat Application**。
 | **接线审计** | `docs/baseline/PHASE_0_6_WIRING_AUDIT.md` | 需要修改存储层时参考 |
 | **性能基线** | `docs/baseline/PHASE_0_6_PERFORMANCE_BASELINE.md` | 需要做性能优化时参考 |
 
-**规则**：Master Roadmap 是最高级执行路线。任何与它冲突的旧文档，以 Master Roadmap 为准。
+**规则**：V1.1 RC 之后，[`V1_1_RC_CURRENT_STATE.md`](./V1_1_RC_CURRENT_STATE.md) 是当前状态。本文与 Master Roadmap 仅作历史交接。
 
 ---
 

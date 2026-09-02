@@ -26,6 +26,8 @@ export function listCharactersForHub() {
     if (!id) continue;
     const preview = getLastMessagePreview(chat.id);
     const lastAt = preview?.time || chat.createdAt || 0;
+    // 身份取最早那轮对话：后开的对话名是会话标题（“第二对话”），不是角色名
+    const bornAt = chat.createdAt || 0;
     const existing = map.get(id);
     if (!existing) {
       map.set(id, {
@@ -36,15 +38,20 @@ export function listCharactersForHub() {
         lastConversationId: chat.id,
         lastPreview: (preview?.text || "").slice(0, 40),
         lastAt,
+        bornAt,
       });
     } else {
       existing.conversationCount += 1;
+      // chats 是新→旧，同毫秒创建时用 <= 让后遍历到的那条（更旧的）胜出
+      if (bornAt <= existing.bornAt) {
+        existing.bornAt = bornAt;
+        existing.name = chat.name || existing.name;
+        existing.avatar = resolveAvatarSrc(chat.avatar || existing.avatar);
+      }
       if (lastAt >= existing.lastAt) {
         existing.lastAt = lastAt;
         existing.lastConversationId = chat.id;
         existing.lastPreview = (preview?.text || existing.lastPreview || "").slice(0, 40);
-        existing.name = chat.name || existing.name;
-        existing.avatar = resolveAvatarSrc(chat.avatar || existing.avatar);
       }
     }
   }

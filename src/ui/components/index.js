@@ -37,7 +37,21 @@ export const Icons = {
   users: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
   upload: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>`,
   warning: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+  switch: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="14" height="14" rx="2"/><path d="M4 6a2 2 0 0 1 2-2h10"/><path d="M4 10v10a2 2 0 0 0 2 2h10"/></svg>`,
 };
+
+let _logoUid = 0;
+export function LogoMark({ size = 40 } = {}) {
+  const id = `ecr${++_logoUid}`;
+  return `<svg class="logo-ripple" width="${size}" height="${size}" viewBox="0 0 48 48" aria-hidden="true">
+    <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7CB8E8"/><stop offset="100%" stop-color="#9DD9C2"/></linearGradient></defs>
+    <rect width="48" height="48" rx="12" fill="url(#${id})"/>
+    <circle cx="14" cy="24" r="2.2" fill="#fff" opacity=".95"/>
+    <path d="M17 20c5 0 5 8 0 8" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".42"/>
+    <path d="M17 17c8.5 0 8.5 14 0 14" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".68"/>
+    <path d="M17 14c12 0 12 20 0 20" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round"/>
+  </svg>`;
+}
 
 // 按钮组件
 export function Button({ text, variant = "primary", size = "md", icon = "", onClick = "", className = "", disabled = false }) {
@@ -50,11 +64,23 @@ export function IconButton({ icon, title = "", onClick = "", className = "", act
   return `<button class="icon-btn ${active ? "icon-btn-active" : ""} ${className}" title="${esc(title)}" aria-label="${esc(title)}" ${onClick ? `onclick="${onClick}"` : ""}>${icon}</button>`;
 }
 
-// 头像
-export function Avatar({ src, size = "md", circle = false, alt = "" }) {
+const DEFAULT_AVATARS = new Set(["assets/avatars/default.svg", "assets/avatars/user-default.svg"]);
+
+function initialOf(name) {
+  const s = String(name || "").trim();
+  return s ? s.slice(0, 1) : "?";
+}
+
+// 头像：没有自定义图时用「首字 + 品牌渐变」，比灰色占位图更贴合 Morning Mint
+export function Avatar({ src, size = "md", circle = false, alt = "", className = "", name = "" }) {
   const sizeClass = `avatar-${size}`;
   const circleClass = circle ? "avatar-circle" : "";
-  return `<img class="avatar ${sizeClass} ${circleClass}" src="${esc(src || "assets/avatars/default.svg")}" alt="${esc(alt)}" loading="lazy" />`;
+  const label = name || alt;
+  const useFallback = !src || DEFAULT_AVATARS.has(src);
+  if (useFallback) {
+    return `<span class="avatar avatar-fallback ${sizeClass} ${circleClass} ${className}" role="img" aria-label="${esc(label || "头像")}">${esc(initialOf(label))}</span>`;
+  }
+  return `<img class="avatar ${sizeClass} ${circleClass} ${className}" src="${esc(src)}" alt="${esc(alt)}" loading="lazy" />`;
 }
 
 // 空状态

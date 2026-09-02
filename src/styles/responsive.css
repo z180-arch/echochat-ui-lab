@@ -14,8 +14,23 @@
   .profile-pane {
     display: flex;
   }
+  .profile-close {
+    display: none;
+  }
   .list-pane {
     display: flex;
+  }
+  .app-shell {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+  }
+  .chat-pane {
+    min-width: 360px;
+    flex: 1;
+  }
+  .profile-pane {
+    width: var(--profile-width);
   }
 }
 
@@ -56,8 +71,21 @@
   .nav-rail {
     display: none;
   }
+  .app-shell {
+    flex-direction: column;
+  }
   .bottom-nav {
     display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    width: 100%;
+  }
+  .moments-pane,
+  .me-pane {
+    padding-bottom: calc(var(--bottom-nav-height) + var(--safe-bottom));
   }
   .chat-back-btn {
     display: flex;
@@ -88,6 +116,9 @@
     z-index: var(--z-sticky);
     background: var(--color-bg);
   }
+  .app-shell-chat .chat-pane {
+    bottom: 0;
+  }
   .chat-pane.hidden-mobile {
     display: none;
   }
@@ -109,21 +140,20 @@
     animation: drawer-in var(--dur-normal) var(--ease-out);
   }
 
-  /* Landing 响应式 */
-  .landing-hero {
-    grid-template-columns: 1fr;
-    gap: var(--space-6);
-    padding: var(--space-6) var(--space-4);
-    min-height: auto;
+  /* Landing */
+  .welcome-screen {
+    padding: 40px 20px 48px;
+    justify-content: center;
   }
-  .landing-title {
-    font-size: 28px;
+  .welcome-screen h1 {
+    font-size: 24px;
   }
-  .landing-preview {
-    min-height: 240px;
+  .welcome-lead {
+    font-size: 14px;
+    max-width: none;
   }
-  .landing-roles-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .onboard-grid {
+    grid-template-columns: 1fr 1fr;
   }
 
   /* Onboarding */
@@ -184,7 +214,10 @@
     --font-section: 16px;
     --font-title: 18px;
   }
-  .landing-roles-grid {
+  .welcome-screen h1 {
+    font-size: 22px;
+  }
+  .onboard-grid {
     grid-template-columns: 1fr;
   }
   .msg-bubble {
@@ -215,14 +248,8 @@
 /* ---- 大屏优化（>1440px）---- */
 @media (min-width: 1440px) {
   :root {
-    --list-width: 300px;
-    --profile-width: 320px;
-  }
-  .landing-hero {
-    max-width: 1100px;
-  }
-  .chat-messages {
-    padding: var(--space-5) 0;
+    --list-width: 340px;
+    --profile-width: 360px;
   }
 }
 

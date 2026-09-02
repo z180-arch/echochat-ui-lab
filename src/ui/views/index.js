@@ -1,206 +1,128 @@
 // ============================================================
-//  EchoChat Rebuild · Views
-//  各页面视图渲染函数
+//  EchoChat · Views
+//  陪伴优先：角色 Inbox → 聊天 → 相处中
 // ============================================================
 
 import { store } from "../../core/store.js";
-import { events, EVT } from "../../core/events.js";
 import { esc, formatDateTime, relativeTime, renderMarkdown } from "../../core/utils.js";
-import { Icons, Avatar, EmptyState, Button, IconButton, TypingIndicator, showToast, openModal } from "../components/index.js";
-import { getSystemTemplates, getRoleId, getRoleName, getRoleAvatar, getPersona } from "../../domain/persona.js";
+import { Icons, Avatar, EmptyState, IconButton, TypingIndicator, LogoMark } from "../components/index.js";
+import { getRoleId, getRoleAvatar, getPersona } from "../../domain/persona.js";
 import { getMemoryList } from "../../domain/memory.js";
-import { listMoments, toggleLike, addComment } from "../../domain/moments.js";
+import { listMoments } from "../../domain/moments.js";
 import { getAffinity } from "../../domain/relations.js";
 import { isSending, getStreamingChatId } from "../../domain/chat.js";
-import { peekMessages, getLastMessagePreview } from "../../domain/message-store.js";
+import { needsApiSetup } from "../../domain/provider.js";
+import { THEME_PRESETS, findThemePreset, isCustomTheme } from "../theme.js";
+import { peekMessages } from "../../domain/message-store.js";
 import { listCharactersForHub, listActiveConversations, resolveAvatarSrc } from "../../domain/character-hub.js";
 
-const CFG = window.ECHOCHAT_CONFIG || {};
+function isWide() {
+  return typeof window !== "undefined" && window.innerWidth >= 1024;
+}
+
+function companionStage(affinity, hasTalk) {
+  if (affinity?.hasHistory) return affinity.stageLabel;
+  if (hasTalk) return "刚刚认识";
+  return "还没有聊过";
+}
 
 // ============================================================
-// Landing 页
+// Landing — 一句 slogan + 创建 / 开聊
 // ============================================================
+const LANDING_SLOGAN = "念念不忘，必有回响";
+
 export function renderLanding() {
-  const roles = getSystemTemplates();
+  const slogan = LANDING_SLOGAN.split("")
+    .map((ch) => `<span class="lead-char">${ch === " " ? "&nbsp;" : esc(ch)}</span>`)
+    .join("");
   return `
   <div class="landing">
-    <div class="landing-hero">
-      <div>
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
-          <div class="nav-logo">E</div>
-          <span style="font-size:20px;font-weight:700;">EchoChat</span>
-        </div>
-        <h1 class="landing-title">让角色记住你，<br>让关系继续发展。</h1>
-        <p class="landing-subtitle" style="font-size:16px;color:var(--color-primary);font-weight:600;">念念不忘，必有回响</p>
-        <p class="landing-desc">和角色持续对话。她会记住你说过的事，关系会慢慢靠近，动态里留下生活痕迹。人设、记忆与世界书都留在本机。</p>
-        <div class="landing-cta-group">
-          <button class="btn btn-primary" style="min-width:140px;" onclick="window.EchoApp.startOnboarding()">开始聊天</button>
-          <button class="btn btn-secondary" onclick="window.EchoApp.showMore()">了解更多</button>
-        </div>
-        <div style="font-size:13px;color:var(--color-text-tertiary);cursor:pointer;" onclick="window.EchoApp.importBackup()">导入完整备份</div>
-        <div style="font-size:13px;color:var(--color-text-tertiary);cursor:pointer;margin-top:8px;" onclick="window.EchoApp.openReconstruction()">从聊天记录重建角色</div>
-        <div class="landing-features" style="margin-top:32px;">
-          ${[
-            { icon: Icons.sparkles, title: "角色", desc: "不是通用聊天机器人" },
-            { icon: Icons.message, title: "对话", desc: "持续、可读、流式回复" },
-            { icon: Icons.brain, title: "记忆", desc: "她记得你说过的" },
-            { icon: Icons.heart, title: "关系", desc: "认识几天，越来越熟悉" },
-            { icon: Icons.moments, title: "动态", desc: "角色生活留下的痕迹" },
-          ].map(f => `
-            <div class="landing-feature">
-              <div class="landing-feature-icon">${f.icon}</div>
-              <div class="landing-feature-text"><h4>${f.title}</h4><p>${f.desc}</p></div>
-            </div>
-          `).join("")}
-        </div>
-      </div>
-      <div class="landing-preview">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-          ${Avatar({ src: "assets/avatars/baiyueguang.svg", size: "md" })}
-          <div>
-            <div style="font-weight:600;">白若</div>
-            <div style="font-size:12px;color:var(--color-text-secondary);display:flex;align-items:center;gap:4px;"><span class="status-dot"></span>在线 · 刚刚认识</div>
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:12px;flex:1;">
-          <div class="msg msg-her" style="padding:0;">
-            <div class="msg-bubble">嗯，你来了。今天……还好吗。</div>
-          </div>
-          <div class="msg msg-me" style="padding:0;justify-content:flex-end;">
-            <div class="msg-bubble">挺好的，就是有点累。</div>
-          </div>
-          <div class="msg msg-her" style="padding:0;">
-            <div class="msg-bubble">辛苦了。要不要说说发生了什么？我在呢。</div>
-          </div>
-        </div>
-        <div style="font-size:12px;color:var(--color-text-tertiary);text-align:center;margin-top:8px;">对话与记忆只存在本机浏览器，不经过我们的服务器。</div>
-      </div>
-    </div>
-    <div class="landing-roles">
-      <h2 class="landing-roles-title">先认识这些声音</h2>
-      <div class="landing-roles-grid">
-        ${roles.slice(0, 8).map(r => `
-          <div class="role-card" onclick="window.EchoApp.selectTemplate('${r.name}')">
-            ${Avatar({ src: r.avatar, size: "md" })}
-            <div class="role-card-name">${esc(r.name)}</div>
-            <div class="role-card-tag">${esc(r.tag || "")}</div>
-            <div class="role-card-preview">${esc(r.firstMessage?.slice(0, 40) || "")}…</div>
-          </div>
-        `).join("")}
+    <div class="welcome-screen">
+      <div class="welcome-mark">${LogoMark({ size: 64 })}</div>
+      <h1>EchoChat</h1>
+      <p class="welcome-lead">${slogan}</p>
+      <div class="welcome-actions">
+        <button class="btn btn-primary welcome-cta" onclick="window.EchoApp.openBring()">创建角色</button>
+        <button class="btn btn-ghost" onclick="window.EchoApp.enterAppEmpty()">开始聊天</button>
       </div>
     </div>
   </div>`;
 }
 
-// ============================================================
-// Onboarding 引导页
-// ============================================================
-let onboardState = { step: 1, gender: "female", selectedTemplate: null };
+// slogan 逐字浮现：DOM 就绪后由 main.js 在 landing 渲染后调用
+export function animateLanding() {
+  if (typeof document === "undefined") return;
+  const chars = document.querySelectorAll(".welcome-lead .lead-char");
+  const title = document.querySelector(".welcome-screen h1");
+  const actions = document.querySelector(".welcome-actions");
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduced) {
+    chars.forEach((c) => c.classList.add("on"));
+    title?.classList.add("on");
+    actions?.classList.add("on");
+    return;
+  }
+  requestAnimationFrame(() => {
+    title?.classList.add("on");
+    chars.forEach((c, i) => setTimeout(() => c.classList.add("on"), 140 + i * 48));
+    setTimeout(() => actions?.classList.add("on"), 160 + chars.length * 48);
+  });
+}
 
+// Onboarding view retired — reconstruction is the first path.
 export function renderOnboarding() {
-  const templates = getSystemTemplates(onboardState.gender);
-  const selected = onboardState.selectedTemplate;
-  return `
-  <div class="onboarding">
-    <div class="onboarding-progress"><div class="onboarding-progress-bar" style="width:${onboardState.step * 50}%"></div></div>
-    <div class="onboarding-body">
-      <h2 class="onboarding-title">选一个角色</h2>
-      <p class="onboarding-desc">每个人设有独立记忆。点一张卡片，看看开场白。</p>
-      <div class="segmented" style="margin-bottom:20px;">
-        <button class="segmented-btn ${onboardState.gender === "female" ? "segmented-btn-active" : ""}" onclick="window.EchoApp.setOnboardGender('female')">女生</button>
-        <button class="segmented-btn ${onboardState.gender === "male" ? "segmented-btn-active" : ""}" onclick="window.EchoApp.setOnboardGender('male')">男生</button>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
-        ${templates.map(t => `
-          <div class="role-card ${selected?.name === t.name ? "card-active" : ""}" style="padding:16px;" onclick="window.EchoApp.selectOnboardTemplate('${t.name}')">
-            <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
-              ${Avatar({ src: t.avatar, size: "sm" })}
-              <span style="font-weight:600;">${esc(t.name)}</span>
-            </div>
-            <div style="font-size:12px;color:var(--color-text-secondary);">${esc(t.tag || "")}</div>
-          </div>
-        `).join("")}
-      </div>
-      <div class="card" style="padding:16px;margin-bottom:20px;min-height:60px;">
-        ${selected ? `<div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:4px;">开场白预览</div><div style="font-size:15px;">${esc(selected.firstMessage || "")}</div>` : `<div style="font-size:13px;color:var(--color-text-tertiary);">点选上方角色后显示</div>`}
-      </div>
-    </div>
-    <div class="onboarding-footer">
-      <button class="btn btn-ghost" onclick="window.EchoApp.openReconstruction()">从记录重建</button>
-      <button class="btn btn-ghost" onclick="window.EchoApp.skipOnboarding()">跳过·用默认</button>
-      <button class="btn btn-primary" ${!selected ? "disabled" : ""} onclick="window.EchoApp.finishOnboarding()">下一步</button>
-    </div>
-  </div>`;
+  return renderLanding();
 }
 
-export function setOnboardGender(gender) {
-  onboardState.gender = gender;
-  onboardState.selectedTemplate = null;
-  events.emit("rerender");
-}
-
-export function selectOnboardTemplate(name) {
-  const all = getSystemTemplates();
-  onboardState.selectedTemplate = all.find(t => t.name === name) || null;
-  events.emit("rerender");
-}
-
+export function setOnboardGender() {}
+export function selectOnboardTemplate() {}
 export function getOnboardSelection() {
-  return onboardState.selectedTemplate;
+  return null;
 }
-
-export function resetOnboarding() {
-  onboardState = { step: 1, gender: "female", selectedTemplate: null };
-}
+export function resetOnboarding() {}
 
 // ============================================================
-// 主应用外壳（三栏布局）
+// Shell
 // ============================================================
 export function renderAppShell() {
   const state = store.getState();
   const activeTab = state.ui.activeTab;
   const currentChat = store.getCurrentChat();
-  const chats = (state.chats || []).filter((c) => !c.archivedAt);
   const searchQuery = state.ui.searchQuery || "";
-  const selectedCharacterId = state.ui.selectedCharacterId || null;
-  const filteredChats = searchQuery
-    ? chats.filter((c) => c.name?.toLowerCase().includes(searchQuery.toLowerCase()))
-    : chats;
-  const sortedChats = filteredChats
-    .map((c) => ({ c, preview: getLastMessagePreview(c.id) }))
-    .sort((a, b) => (b.preview?.time || b.c.createdAt || 0) - (a.preview?.time || a.c.createdAt || 0))
-    .map((x) => x.c);
+  const wide = isWide();
+  const mobile = typeof window !== "undefined" && window.innerWidth < 768;
+  const hideListMobile = activeTab === "companion" && !!currentChat;
+  const showProfile = activeTab === "companion" && currentChat && (wide || state.ui.profileOpen);
+  const hideBottom = mobile && activeTab === "companion" && !!currentChat;
 
-  const hideListMobile =
-    (activeTab === "messages" && !!currentChat) || (activeTab === "characters" && !!selectedCharacterId);
-  const hideChatMobile = activeTab === "messages" && !currentChat;
+  const showMask = !wide && showProfile;
 
   return `
-  <div class="app-shell">
+  <div class="app-shell ${hideBottom ? "app-shell-chat" : ""}">
     ${renderNavRail(activeTab)}
-    ${activeTab === "messages" ? renderListPane(sortedChats, currentChat, searchQuery, hideListMobile) : ""}
-    ${activeTab === "characters" ? renderCharacterListPane(searchQuery, selectedCharacterId, hideListMobile) : ""}
+    ${activeTab === "companion" ? renderCompanionInbox(searchQuery, currentChat, hideListMobile) : ""}
     ${activeTab === "moments" ? renderMomentsPane() : ""}
     ${activeTab === "me" ? renderMePane() : ""}
-    ${activeTab === "messages" && currentChat ? renderChatPane(currentChat, hideChatMobile) : (activeTab === "messages" ? renderEmptyChat() : "")}
-    ${activeTab === "characters" && selectedCharacterId ? renderCharacterDetailPane(selectedCharacterId) : (activeTab === "characters" ? renderEmptyCharacter() : "")}
-    ${activeTab === "messages" && currentChat && state.ui.profileOpen ? renderProfilePane(currentChat) : ""}
-    ${renderBottomNav(activeTab)}
+    ${activeTab === "companion" && currentChat ? renderChatPane(currentChat, false) : ""}
+    ${activeTab === "companion" && !currentChat ? renderEmptyChat() : ""}
+    ${showMask ? `<div class="profile-mask" onclick="window.EchoApp.toggleProfile()"></div>` : ""}
+    ${showProfile ? renderProfilePane(currentChat) : ""}
+    ${hideBottom ? "" : renderBottomNav(activeTab)}
   </div>`;
 }
 
+const TAB_ORDER = ["companion", "moments", "me"];
+
 function renderNavRail(activeTab) {
   return `
-  <nav class="nav-rail">
-    <div class="nav-logo">E</div>
-    <button class="nav-item ${activeTab === "messages" ? "nav-item-active" : ""}" onclick="window.EchoApp.switchTab('messages')" title="消息">
-      ${Icons.message}<span class="nav-item-label">消息</span>
+  <nav class="nav-rail" aria-label="主导航">
+    <div class="nav-logo" aria-hidden="true">${LogoMark({ size: 36 })}</div>
+    <span class="nav-rail-indicator" aria-hidden="true"></span>
+    <button class="nav-item ${activeTab === "companion" ? "nav-item-active" : ""}" onclick="window.EchoApp.switchTab('companion')" title="陪伴">
+      ${Icons.message}<span class="nav-item-label">陪伴</span>
     </button>
-    <button class="nav-item ${activeTab === "characters" ? "nav-item-active" : ""}" onclick="window.EchoApp.switchTab('characters')" title="角色">
-      ${Icons.users}<span class="nav-item-label">角色</span>
-    </button>
-    <button class="nav-item ${activeTab === "moments" ? "nav-item-active" : ""}" onclick="window.EchoApp.switchTab('moments')" title="动态">
-      ${Icons.moments}<span class="nav-item-label">动态</span>
+    <button class="nav-item ${activeTab === "moments" ? "nav-item-active" : ""}" onclick="window.EchoApp.switchTab('moments')" title="瞬间">
+      ${Icons.moments}<span class="nav-item-label">瞬间</span>
     </button>
     <div class="nav-spacer"></div>
     <button class="nav-item ${activeTab === "me" ? "nav-item-active" : ""}" onclick="window.EchoApp.switchTab('me')" title="我的">
@@ -210,16 +132,16 @@ function renderNavRail(activeTab) {
 }
 
 function renderBottomNav(activeTab) {
+  const idx = Math.max(0, TAB_ORDER.indexOf(activeTab));
+  const left = `${(idx + 0.5) * (100 / TAB_ORDER.length)}%`;
   return `
-  <nav class="bottom-nav">
-    <button class="bottom-nav-item ${activeTab === "messages" ? "bottom-nav-item-active" : ""}" onclick="window.EchoApp.switchTab('messages')">
-      ${Icons.message}<span>消息</span>
-    </button>
-    <button class="bottom-nav-item ${activeTab === "characters" ? "bottom-nav-item-active" : ""}" onclick="window.EchoApp.switchTab('characters')">
-      ${Icons.users}<span>角色</span>
+  <nav class="bottom-nav" aria-label="主导航" style="--tab-indicator-left:${left}">
+    <span class="bottom-nav-indicator" aria-hidden="true"></span>
+    <button class="bottom-nav-item ${activeTab === "companion" ? "bottom-nav-item-active" : ""}" onclick="window.EchoApp.switchTab('companion')">
+      ${Icons.message}<span>陪伴</span>
     </button>
     <button class="bottom-nav-item ${activeTab === "moments" ? "bottom-nav-item-active" : ""}" onclick="window.EchoApp.switchTab('moments')">
-      ${Icons.moments}<span>动态</span>
+      ${Icons.moments}<span>瞬间</span>
     </button>
     <button class="bottom-nav-item ${activeTab === "me" ? "bottom-nav-item-active" : ""}" onclick="window.EchoApp.switchTab('me')">
       ${Icons.me}<span>我的</span>
@@ -227,43 +149,54 @@ function renderBottomNav(activeTab) {
   </nav>`;
 }
 
-function renderListPane(chats, currentChat, searchQuery, hideListMobile) {
+function renderCompanionInbox(searchQuery, currentChat, hideListMobile) {
+  const hub = listCharactersForHub().filter((h) => {
+    if (!searchQuery) return true;
+    return (h.name || "").toLowerCase().includes(searchQuery.toLowerCase());
+  });
+  const currentRole = currentChat ? getRoleId(currentChat) : null;
+
   return `
   <div class="list-pane ${hideListMobile ? "hidden-mobile" : ""}">
-    <div class="list-header">
-      <span class="list-title">消息</span>
-      <div style="display:flex;gap:8px;">
-        ${IconButton({ icon: Icons.plus, title: "新建对话", onClick: "window.EchoApp.newChat()" })}
-        ${IconButton({ icon: Icons.settings, title: "设置", onClick: "window.EchoApp.openSettings()" })}
+    <div class="inbox-head">
+      <div>
+        <h1 class="list-title">陪伴</h1>
+        <p class="inbox-lead">和你长期相处的人</p>
       </div>
+        ${IconButton({ icon: Icons.plus, title: "创建角色", onClick: "window.EchoApp.openBring()" })}
     </div>
     <div class="list-search">
-      <div style="position:relative;">
-        <input class="input" type="text" placeholder="搜索会话…" value="${esc(searchQuery)}" oninput="window.EchoApp.setSearch(this.value)" style="padding-left:36px;" />
-        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--color-text-tertiary);">${Icons.search}</span>
+      <div class="search-wrap">
+        <span class="search-ic" aria-hidden="true">${Icons.search}</span>
+        <input class="input input-search" type="search" placeholder="搜索角色" value="${esc(searchQuery)}" oninput="window.EchoApp.setSearch(this.value)" />
       </div>
     </div>
     <div class="list-body">
-      ${chats.length === 0 ? EmptyState({ icon: Icons.message, title: "还没有对话", desc: "点击右上角 + 创建新对话", actionText: "新建对话", actionOnClick: "window.EchoApp.newChat()" }) :
-        chats.map(c => {
-          const preview = getLastMessagePreview(c.id);
-          return `
-          <div class="list-item ${currentChat?.id === c.id ? "list-item-active" : ""}" onclick="window.EchoApp.selectChat('${c.id}')">
-            ${Avatar({ src: getRoleAvatar(c), size: "md" })}
+      ${hub.length === 0
+        ? EmptyState({
+            icon: Icons.message,
+            title: "还没有你的角色",
+            desc: "创建角色后，就可以开始相处。",
+            actionText: "创建角色",
+            actionOnClick: "window.EchoApp.openBring()",
+          })
+        : hub.map((h) => {
+            const affinity = getAffinity(h.id, { moments: listMoments(h.id) });
+            const preview = h.lastPreview || "";
+            const stage = companionStage(affinity, !!preview);
+            return `
+          <button type="button" class="list-item ${currentRole === h.id ? "list-item-active" : ""}" onclick="window.EchoApp.selectCharacter('${h.id}')">
+            <span class="list-item-av">${Avatar({ src: resolveAvatarSrc(h.avatar), size: "md", circle: true, alt: h.name })}</span>
             <div class="list-item-content">
-              <div class="list-item-title">${esc(c.name || "未命名")}</div>
-              <div class="list-item-subtitle">${esc(preview?.text?.slice(0, 30) || "开始对话吧")}</div>
-            </div>
-            <div style="text-align:right;">
-              <div style="font-size:11px;color:var(--color-text-tertiary);">${preview?.time ? formatDateTime(preview.time) : ""}</div>
-              <div style="margin-top:4px;display:flex;gap:4px;justify-content:flex-end;">
-                <button class="icon-btn" style="width:28px;height:28px;" title="导出" onclick="event.stopPropagation();window.EchoApp.exportChat('${c.id}')">${Icons.download}</button>
-                <button class="icon-btn" style="width:28px;height:28px;" title="删除" onclick="event.stopPropagation();window.EchoApp.deleteChat('${c.id}')">${Icons.trash}</button>
+              <div class="list-item-top">
+                <span class="list-item-title">${esc(h.name)}</span>
+                <span class="list-item-time">${h.lastAt ? relativeTime(h.lastAt) : ""}</span>
               </div>
+              <div class="list-item-subtitle">${esc(preview || "还没有聊过")}</div>
+              <div class="list-item-meta"><span class="stage-tag">${esc(stage)}</span></div>
             </div>
-          </div>
-        `;
-        }).join("")}
+          </button>`;
+          }).join("")}
     </div>
   </div>`;
 }
@@ -271,146 +204,13 @@ function renderListPane(chats, currentChat, searchQuery, hideListMobile) {
 function renderEmptyChat() {
   return `
   <div class="chat-pane hidden-mobile">
-    ${EmptyState({ icon: Icons.message, title: "选择一个对话", desc: "从左侧列表打开角色，继续聊天", actionText: "+ 新建对话", actionOnClick: "window.EchoApp.newChat()" })}
-  </div>`;
-}
-
-function renderEmptyCharacter() {
-  return `
-  <div class="chat-pane hidden-mobile">
-    ${EmptyState({ icon: Icons.users, title: "选择一个角色", desc: "角色是独立的人。点左边打开，看看她是谁，再继续聊。也可以从聊天记录重建。", actionText: "从记录重建", actionOnClick: "window.EchoApp.openReconstruction()" })}
-  </div>`;
-}
-
-function renderCharacterListPane(searchQuery, selectedCharacterId, hideListMobile) {
-  const hub = listCharactersForHub().filter((h) => {
-    if (!searchQuery) return true;
-    return (h.name || "").toLowerCase().includes(searchQuery.toLowerCase());
-  });
-  return `
-  <div class="list-pane ${hideListMobile ? "hidden-mobile" : ""}">
-    <div class="list-header">
-      <span class="list-title">角色</span>
-      <div style="display:flex;gap:8px;">
-        ${IconButton({ icon: Icons.sparkles, title: "从聊天记录重建", onClick: "window.EchoApp.openReconstruction()" })}
-        ${IconButton({ icon: Icons.upload, title: "导入角色卡", onClick: "window.EchoApp.importCharacterCard()" })}
-        ${IconButton({ icon: Icons.plus, title: "新建角色", onClick: "window.EchoApp.newChat()" })}
-      </div>
-    </div>
-    <div class="list-search">
-      <div style="position:relative;">
-        <input class="input" type="text" placeholder="搜索角色…" value="${esc(searchQuery)}" oninput="window.EchoApp.setSearch(this.value)" style="padding-left:36px;" />
-        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--color-text-tertiary);">${Icons.search}</span>
-      </div>
-    </div>
-    <div class="list-body">
-      ${hub.length === 0 ? EmptyState({ icon: Icons.users, title: "还没有角色", desc: "从模板创建、导入角色卡，或粘贴聊天记录重建", actionText: "从记录重建", actionOnClick: "window.EchoApp.openReconstruction()" }) :
-        hub.map((h) => `
-          <div class="list-item ${selectedCharacterId === h.id ? "list-item-active" : ""}" onclick="window.EchoApp.selectCharacter('${h.id}')">
-            ${Avatar({ src: resolveAvatarSrc(h.avatar), size: "md" })}
-            <div class="list-item-content">
-              <div class="list-item-title">${esc(h.name)}</div>
-              <div class="list-item-subtitle">${esc(h.lastPreview || `${h.conversationCount} 个对话`)}</div>
-            </div>
-            <div style="text-align:right;font-size:11px;color:var(--color-text-tertiary);">${h.conversationCount} 对话</div>
-          </div>
-        `).join("")}
-    </div>
-  </div>`;
-}
-
-function relationSummary(affinity) {
-  if (!affinity?.hasHistory) return "还没有聊过";
-  return `${esc(affinity.stageLabel)} · 认识${affinity.knownDays}天 · ${esc(affinity.toneHint)}`;
-}
-
-function relationScoreLine(affinity) {
-  if (!affinity?.hasHistory) return "还没有聊过";
-  return `${esc(affinity.stageLabel)} · 亲密度 ${affinity.score} · ${affinity.turns} 轮对话`;
-}
-
-function renderCharacterDetailPane(characterId) {
-  const hub = listCharactersForHub().find((h) => h.id === characterId);
-  const chats = store.getState().chats.filter((c) => c.roleId === characterId && !c.archivedAt);
-  const sample = chats[0] || null;
-  const identity = sample ? getPersona(sample) : "";
-  const name = hub?.name || sample?.name || "角色";
-  const avatar = resolveAvatarSrc(hub?.avatar || sample?.avatar);
-  const memories = getMemoryList(characterId, 8);
-  const moments = listMoments(characterId).slice(0, 3);
-  const affinity = getAffinity(characterId, { moments: listMoments(characterId) });
-  const convos = listActiveConversations(characterId);
-
-  return `
-  <div class="chat-pane character-detail">
-    <div class="chat-header">
-      <button class="icon-btn chat-back-btn" onclick="window.EchoApp.backToCharacterList()">${Icons.back}</button>
-      <div class="chat-header-center">
-        ${Avatar({ src: avatar, size: "sm" })}
-        <div>
-          <div class="chat-header-name">${esc(name)}</div>
-          <div class="chat-header-status"><span class="status-dot"></span>${relationSummary(affinity)}</div>
-        </div>
-      </div>
-      <div style="display:flex;gap:8px;">
-        ${IconButton({ icon: Icons.download, title: "导出角色卡", onClick: `window.EchoApp.exportCharacterCard('${characterId}')` })}
-        ${IconButton({ icon: Icons.edit, title: "编辑", onClick: `window.EchoApp.editCharacter('${characterId}')` })}
-      </div>
-    </div>
-    <div class="chat-messages character-detail-body">
-      <div class="profile-section" style="padding:0 4px;">
-        <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">
-          ${Avatar({ src: avatar, size: "lg" })}
-          <div>
-            <div style="font-size:20px;font-weight:700;">${esc(name)}</div>
-            <div style="font-size:13px;color:var(--color-text-secondary);">${relationScoreLine(affinity)}</div>
-          </div>
-        </div>
-        <div class="profile-section-title">她是谁</div>
-        <div class="profile-section-content" style="font-size:14px;line-height:1.7;margin-bottom:16px;">${esc(identity?.slice(0, 280) || "暂无设定")}${identity?.length > 280 ? "…" : ""}</div>
-        <div class="profile-section-title">关系</div>
-        <div class="profile-section-content" style="margin-bottom:16px;">
-          ${affinity?.hasHistory ? `${esc(affinity.stageLabel)} · 认识 ${affinity.knownDays} 天 · 连续 ${affinity.streakDays} 天 · ${esc(affinity.toneHint)}` : "还没有聊过。多聊几轮，关系会慢慢靠近。"}
-        </div>
-        <div class="profile-section-title">对话</div>
-        <div class="profile-section-content" style="margin-bottom:16px;">
-          ${convos.length === 0 ? `<div style="color:var(--color-text-tertiary);font-size:13px;">还没有对话</div>` :
-            convos.map((c) => `
-              <div class="list-item" style="padding:8px 0;border-bottom:1px solid var(--color-border);cursor:pointer;" onclick="window.EchoApp.openConversation('${c.id}')">
-                <div class="list-item-content">
-                  <div class="list-item-title">${esc(c.name || "对话")}</div>
-                  <div class="list-item-subtitle">${esc((c.lastPreview || "开始对话吧").slice(0, 36))}</div>
-                </div>
-              </div>
-            `).join("")}
-        </div>
-        <div class="profile-section-title">记忆</div>
-        <div class="profile-section-content" style="margin-bottom:16px;">
-          ${memories.length === 0 ? `<div style="color:var(--color-text-tertiary);font-size:13px;">还没有记忆。聊天里点「记住」，或从对话提取。</div>` :
-            memories.map((m) => `
-              <div style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--color-border);">
-                <div style="flex:1;font-size:13px;">${esc(m.content)}</div>
-                <button class="icon-btn" style="width:28px;height:28px;" title="删除" onclick="window.EchoApp.deleteCharacterMemory('${characterId}','${m.id}')">${Icons.close}</button>
-              </div>
-            `).join("")}
-          <div style="display:flex;gap:8px;margin-top:10px;">
-            <input class="input" id="hub-memory-input" placeholder="记下一件关于你的事…" />
-            <button class="btn btn-secondary btn-sm" onclick="window.EchoApp.addCharacterMemory('${characterId}')">添加</button>
-            <button class="btn btn-ghost btn-sm" onclick="window.EchoApp.openMemoryCandidates('${characterId}')">从对话提取</button>
-          </div>
-        </div>
-        <div class="profile-section-title">动态</div>
-        <div class="profile-section-content" style="margin-bottom:20px;">
-          ${moments.length === 0 ? `<div style="color:var(--color-text-tertiary);font-size:13px;">还没有动态</div>` :
-            moments.map((m) => `<div style="padding:8px 0;border-bottom:1px solid var(--color-border);font-size:13px;">${esc(m.content)}</div>`).join("")}
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-primary" onclick="window.EchoApp.continueCharacter('${characterId}')">继续对话</button>
-          <button class="btn btn-secondary" onclick="window.EchoApp.startNewConversation('${characterId}')">新对话</button>
-          ${convos.length ? `<button class="btn btn-ghost" onclick="window.EchoApp.openReconstructionFromChat('${convos[0].id}')">用对话重建新角色</button>` : ""}
-        </div>
-      </div>
-    </div>
+    ${EmptyState({
+      icon: Icons.message,
+      title: "选一个角色开始聊",
+      desc: "从左侧列表进入，或先创建一个角色。",
+      actionText: "创建角色",
+      actionOnClick: "window.EchoApp.openBring()",
+    })}
   </div>`;
 }
 
@@ -419,36 +219,51 @@ function renderChatPane(chat, hideChatMobile) {
   const sending = isSending() && getStreamingChatId() === chat.id;
   const roleId = getRoleId(chat);
   const affinity = roleId ? getAffinity(roleId, { moments: listMoments(roleId) }) : null;
+  const convos = roleId ? listActiveConversations(roleId) : [];
+  const empty = messages.length === 0;
+  const stage = companionStage(affinity, messages.length > 0);
 
   return `
   <div class="chat-pane ${hideChatMobile ? "hidden-mobile" : ""}">
     <div class="chat-header">
-      <button class="icon-btn chat-back-btn" onclick="window.EchoApp.backToList()">${Icons.back}</button>
-      <div class="chat-header-center" onclick="window.EchoApp.toggleProfile()">
-        ${Avatar({ src: getRoleAvatar(chat), size: "sm" })}
-        <div>
+      <button class="icon-btn chat-back-btn" onclick="window.EchoApp.backToList()" aria-label="返回陪伴列表">${Icons.back}</button>
+      <div class="chat-header-center" onclick="window.EchoApp.toggleProfile()" role="button" tabindex="0">
+        ${Avatar({ src: getRoleAvatar(chat), size: "sm", circle: true, alt: chat.name || "角色" })}
+        <div class="chat-header-copy">
           <div class="chat-header-name">${esc(chat.name || "角色")}</div>
-          <div class="chat-header-status"><span class="status-dot"></span>在线 · ${relationSummary(affinity)}</div>
+          <div class="chat-header-status">${esc(stage)}</div>
         </div>
       </div>
-      <div style="display:flex;gap:8px;">
-        ${IconButton({ icon: Icons.volume, title: "朗读设置", onClick: "window.EchoApp.toggleTTS()" })}
-        ${IconButton({ icon: Icons.more, title: "更多", onClick: "window.EchoApp.toggleProfile()" })}
+      <div class="chat-header-actions">
+        ${convos.length > 1
+          ? `<button class="chip-btn" onclick="window.EchoApp.openConversationSwitcher()">${Icons.switch}<span>相处线</span></button>`
+          : ""}
+        ${IconButton({ icon: Icons.more, title: "相处中", onClick: "window.EchoApp.toggleProfile()" })}
       </div>
     </div>
+    ${convos.length > 1 ? `<button type="button" class="conv-hint" onclick="window.EchoApp.openConversationSwitcher()">当前 · ${esc(chat.name || "日常相处")}</button>` : ""}
+    ${needsApiSetup(chat)
+      ? `<div class="composer-hint">
+          <span>连接模型后即可开始对话</span>
+          <button type="button" class="link-btn" onclick="window.EchoApp.openApiConnect()">去配置</button>
+        </div>`
+      : ""}
     <div class="chat-messages" id="chat-messages">
-      ${messages.length === 0 ? EmptyState({ icon: Icons.sparkles, title: "开始对话吧", desc: "和角色聊聊，她会慢慢记住你" }) :
-        messages.map((m, i) => renderMessage(m, i, chat)).join("")}
-      ${sending ? `<div class="msg msg-her"><div class="msg-bubble">${TypingIndicator()}</div></div>` : ""}
+      ${empty
+        ? `<div class="chat-empty">
+            <div class="chat-empty-t">${messages.length || affinity?.hasHistory ? `继续和 ${esc(chat.name || "TA")} 相处` : `还没有和 ${esc(chat.name || "TA")} 聊过`}</div>
+            <p>直接说一句就好。重要的事确认后，会成为你们的记忆。</p>
+          </div>`
+        : messages.map((m, i) => renderMessage(m, i, chat)).join("")}
+      ${sending ? `<div class="msg msg-her"><div class="msg-col"><div class="msg-bubble">${TypingIndicator()}</div></div></div>` : ""}
     </div>
     <div class="chat-input-area">
       <div class="chat-input-wrap">
         ${IconButton({ icon: Icons.mic, title: "语音输入", onClick: "window.EchoApp.toggleSTT()", className: "chat-mic-btn" })}
-        <textarea class="chat-input" id="chat-input" placeholder="说点什么…" rows="1" onkeydown="window.EchoApp.handleInputKey(event)" oninput="window.EchoApp.autoGrowInput(this)"></textarea>
-        ${sending ?
-          `<button class="chat-send-btn" style="background:var(--color-danger);" onclick="window.EchoApp.stopSend()" title="停止">${Icons.stop}</button>` :
-          `<button class="chat-send-btn" onclick="window.EchoApp.sendMessage()" title="发送">${Icons.send}</button>`
-        }
+        <textarea class="chat-input" id="chat-input" placeholder="和 ${esc(chat.name || "TA")} 说点什么…" rows="1" onkeydown="window.EchoApp.handleInputKey(event)" oninput="window.EchoApp.autoGrowInput(this)"></textarea>
+        ${sending
+          ? `<button class="chat-send-btn chat-send-stop" onclick="window.EchoApp.stopSend()" title="停止">${Icons.stop}</button>`
+          : `<button class="chat-send-btn" onclick="window.EchoApp.sendMessage()" title="发送">${Icons.send}</button>`}
       </div>
     </div>
   </div>`;
@@ -459,18 +274,30 @@ function renderMessage(m, index, chat) {
   const isStreaming = m.status === "streaming";
   const isError = m.status === "error";
   const text = renderMarkdown(m.text || "");
+  const settings = store.getState().settings;
+  const myName = settings.myName || "我";
+  const avatar = isMe
+    ? `<button type="button" class="msg-avatar-btn" onclick="window.EchoApp.openUserProfile()" aria-label="编辑我的资料">
+        ${Avatar({ src: settings.myAvatar || "assets/avatars/user-default.svg", size: "sm", circle: true, alt: myName })}
+      </button>`
+    : `<button type="button" class="msg-avatar-btn" onclick="window.EchoApp.editCharacterFromChat()" aria-label="编辑角色资料">
+        ${Avatar({ src: getRoleAvatar(chat), size: "sm", circle: true, alt: chat.name || "角色" })}
+      </button>`;
   return `
-  <div class="msg ${isMe ? "msg-me" : "msg-her"} ${isStreaming ? "msg-streaming" : ""} ${isError ? "msg-error" : ""}">
-    ${!isMe ? Avatar({ src: getRoleAvatar(chat), size: "sm" }) : ""}
-    <div style="max-width:75%;">
-      <div class="msg-bubble">${text || (isStreaming ? "" : "")}</div>
+  <div class="msg ${isMe ? "msg-me" : "msg-her"} ${isStreaming ? "msg-streaming" : ""} ${isError ? "msg-error" : ""}" data-msg-index="${index}">
+    ${avatar}
+    <button type="button" class="msg-more-btn" aria-label="消息操作" onclick="window.EchoApp.toggleMessageActions(this)">${Icons.more}</button>
+    <div class="msg-col">
+      <div class="msg-name">${esc(isMe ? myName : chat.name || "TA")}</div>
+      <div class="msg-bubble">${text || ""}</div>
       <div class="msg-time">${formatDateTime(m.time)}</div>
+      ${isError ? `<div class="msg-status">没发出去<button type="button" onclick="window.EchoApp.regenerateMessage(${index})">重试</button></div>` : ""}
       <div class="msg-actions">
         <button class="msg-action-btn" onclick="window.EchoApp.copyMessage(${index})">复制</button>
         <button class="msg-action-btn" onclick="window.EchoApp.rememberMessage(${index})">记住</button>
         ${!isMe ? `<button class="msg-action-btn" onclick="window.EchoApp.regenerateMessage(${index})">重生成</button>` : ""}
         ${isMe ? `<button class="msg-action-btn" onclick="window.EchoApp.editMessage(${index})">编辑</button>` : ""}
-        <button class="msg-action-btn" style="color:var(--color-danger);" onclick="window.EchoApp.deleteMessage(${index})">删除</button>
+        <button class="msg-action-btn msg-action-danger" onclick="window.EchoApp.deleteMessage(${index})">删除</button>
       </div>
     </div>
   </div>`;
@@ -478,66 +305,72 @@ function renderMessage(m, index, chat) {
 
 function renderProfilePane(chat) {
   const roleId = getRoleId(chat);
-  const memories = roleId ? getMemoryList(roleId, 5) : [];
-  const moments = roleId ? listMoments(roleId).slice(0, 3) : [];
-  const affinity = roleId ? getAffinity(roleId, { moments }) : null;
+  const memories = roleId ? getMemoryList(roleId, 8) : [];
+  const moments = roleId ? listMoments(roleId).slice(0, 4) : [];
+  const affinity = roleId ? getAffinity(roleId, { moments: listMoments(roleId) }) : null;
   const persona = getPersona(chat);
+  const convos = roleId ? listActiveConversations(roleId) : [];
+  const hasTalk = (peekMessages(chat.id) || []).length > 0;
 
   return `
   <aside class="profile-pane open">
     <div class="profile-header">
-      <button class="icon-btn" style="position:absolute;top:12px;right:12px;" onclick="window.EchoApp.toggleProfile()">${Icons.close}</button>
-      ${Avatar({ src: getRoleAvatar(chat), size: "lg", className: "profile-avatar" })}
+      <button class="icon-btn profile-close" onclick="window.EchoApp.toggleProfile()" aria-label="关闭">${Icons.close}</button>
+      ${Avatar({ src: getRoleAvatar(chat), size: "lg", circle: true, className: "profile-avatar", alt: chat.name || "角色" })}
       <div class="profile-name">${esc(chat.name || "角色")}</div>
-      <div class="profile-status">在线 · ${relationSummary(affinity)}</div>
-    </div>
-    <div class="profile-section">
-      <div class="profile-section-title">性格</div>
-      <div class="profile-section-content" style="font-size:14px;line-height:1.6;">${esc(persona?.slice(0, 200) || "暂无设定")}${persona?.length > 200 ? "…" : ""}</div>
+      <div class="profile-status">${esc(companionStage(affinity, hasTalk))}${affinity?.hasHistory ? ` · 相处 ${affinity.knownDays} 天` : ""}</div>
     </div>
     <div class="profile-section">
       <div class="profile-section-title">关系</div>
       <div class="profile-section-content">
-        ${affinity?.hasHistory ? `
-          <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-            <span>关系</span><span style="font-weight:600;color:var(--color-primary);">${esc(affinity.stageLabel)}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-            <span>亲密度</span><span style="font-weight:600;color:var(--color-primary);">${affinity.score}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-            <span>聊天轮次</span><span>${affinity.turns}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;">
-            <span>连续聊天</span><span>${affinity.streakDays}天</span>
-          </div>
-        ` : "还没有聊过"}
+        ${affinity?.hasHistory
+          ? `${esc(affinity.stageLabel)}。${esc(affinity.toneHint)}。多聊，关系会自己靠近——没有数值可以调。`
+          : "还没有聊过。开口第一句，关系从这里开始。"}
       </div>
     </div>
     <div class="profile-section">
       <div class="profile-section-title">记忆</div>
       <div class="profile-section-content">
-        ${memories.length === 0 ? `<div style="color:var(--color-text-tertiary);font-size:13px;">暂无记忆。点消息「记住」，或从对话提取。</div>` :
-          memories.map(m => `<div style="padding:8px 0;border-bottom:1px solid var(--color-border);font-size:13px;">${esc(m.content)}</div>`).join("")}
-        ${roleId ? `<button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="window.EchoApp.openMemoryCandidates('${roleId}','${chat.id}')">从对话提取</button>` : ""}
+        ${memories.length === 0
+          ? `<div class="profile-muted">还没有已确认的记忆。聊天里点「记住」，或从对话提取。</div>`
+          : memories.map((m) => `<div class="mem-line">${esc(m.content)}</div>`).join("")}
+        ${roleId ? `<button class="btn btn-ghost btn-sm profile-extract" onclick="window.EchoApp.openMemoryCandidates('${roleId}','${chat.id}')">从对话提取</button>` : ""}
       </div>
     </div>
     <div class="profile-section">
-      <div class="profile-section-title">动态</div>
+      <div class="profile-section-title">瞬间</div>
       <div class="profile-section-content">
-        ${moments.length === 0 ? `<div style="color:var(--color-text-tertiary);font-size:13px;">暂无动态</div>` :
-          moments.map(m => `<div style="padding:8px 0;border-bottom:1px solid var(--color-border);"><div style="font-size:13px;">${esc(m.content)}</div><div style="font-size:11px;color:var(--color-text-tertiary);margin-top:4px;">${relativeTime(m.createdAt)}</div></div>`).join("")}
+        ${moments.length === 0
+          ? `<div class="profile-muted">还没有瞬间。确认记忆后会出现在这里。</div>`
+          : moments.map((m) => `<div class="mom-line">${esc(m.content)}<span>${relativeTime(m.createdAt)}</span></div>`).join("")}
       </div>
     </div>
-    <div class="profile-section" style="margin-top:auto;">
-      <button class="btn btn-secondary btn-block" onclick="window.EchoApp.openChatSettings()">打开聊天设置</button>
+    <div class="profile-section">
+      <div class="profile-section-title">相处线</div>
+      <div class="profile-section-content">
+        <p class="profile-muted">同一位 ${esc(chat.name || "TA")} 的不同聊天主题。记忆与关系共享。</p>
+        ${convos.map((c) => `
+          <button type="button" class="conv-item ${c.id === chat.id ? "on" : ""}" onclick="window.EchoApp.openConversation('${c.id}')">
+            <div class="n">${esc(c.name || "日常相处")}</div>
+            <div class="d">${esc((c.lastPreview || "还没有聊过").slice(0, 42))}</div>
+          </button>
+        `).join("")}
+        ${roleId ? `<button class="btn btn-ghost btn-sm" onclick="window.EchoApp.startNewConversation('${roleId}')">开一条新的相处线</button>` : ""}
+      </div>
+    </div>
+    <div class="profile-section">
+      <div class="profile-section-title">关于 TA</div>
+      <div class="profile-section-content persona-clip">${esc(persona?.slice(0, 220) || "暂无设定")}${persona?.length > 220 ? "…" : ""}</div>
+      ${roleId ? `
+        <div class="profile-tools">
+          <button class="btn btn-secondary btn-sm" onclick="window.EchoApp.editCharacter('${roleId}')">编辑</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.EchoApp.exportCharacterCard('${roleId}')">导出角色卡</button>
+        </div>
+      ` : ""}
     </div>
   </aside>`;
 }
 
-// ============================================================
-// 动态页
-// ============================================================
 function renderMomentsPane() {
   const filter = store.getState().ui.momentsFilter || "all";
   const all = listMoments("all");
@@ -546,106 +379,135 @@ function renderMomentsPane() {
   const avatarByRole = Object.fromEntries(hub.map((h) => [h.id, h.avatar]));
   return `
   <div class="moments-pane">
-    <div class="list-header">
-      <span class="list-title">动态</span>
-      <select class="select" style="width:auto;padding:8px 12px;" onchange="window.EchoApp.setMomentsFilter(this.value)">
+    <div class="inbox-head">
+      <div>
+        <h1 class="list-title">瞬间</h1>
+        <p class="inbox-lead">从相处里留下来的痕迹</p>
+      </div>
+      <select class="select moments-filter" onchange="window.EchoApp.setMomentsFilter(this.value)">
         <option value="all" ${filter === "all" ? "selected" : ""}>全部</option>
         ${hub.map((h) => `<option value="${esc(h.id)}" ${filter === h.id ? "selected" : ""}>${esc(h.name)}</option>`).join("")}
       </select>
     </div>
     <div class="moments-feed">
-      ${moments.length === 0 ? EmptyState({ icon: Icons.moments, title: "还没有动态", desc: "和角色多聊一会儿，这里会留下生活痕迹", actionText: "去消息里聊聊", actionOnClick: "window.EchoApp.switchTab('messages')" }) :
-        moments.map((m) => `
-          <div class="moment-card">
+      ${moments.length === 0
+        ? EmptyState({
+            icon: Icons.moments,
+            title: "还没有瞬间",
+            desc: "和角色多聊一会儿，确认记忆后会出现在这里。",
+            actionText: "去相处",
+            actionOnClick: "window.EchoApp.switchTab('companion')",
+          })
+        : moments.map((m) => `
+          <article class="moment-entry">
             <div class="moment-header">
-              ${Avatar({ src: resolveAvatarSrc(avatarByRole[m.roleId] || m.avatar), size: "sm", circle: true })}
+              ${Avatar({ src: resolveAvatarSrc(avatarByRole[m.roleId] || m.avatar), size: "sm", circle: true, alt: m.roleName })}
               <div>
-                <div style="font-weight:600;font-size:14px;cursor:pointer;" onclick="window.EchoApp.selectCharacter('${m.roleId || ""}')">${esc(m.roleName)}</div>
-                <div style="font-size:12px;color:var(--color-text-tertiary);">${relativeTime(m.createdAt)}</div>
+                <button type="button" class="moment-who" onclick="window.EchoApp.selectCharacter('${m.roleId || ""}')">${esc(m.roleName)}</button>
+                <div class="moment-when">${relativeTime(m.createdAt)}</div>
               </div>
             </div>
             <div class="moment-content">${esc(m.content)}</div>
             <div class="moment-actions">
-              <div class="moment-action ${m.likedByUser ? "moment-action-liked" : ""}" onclick="window.EchoApp.toggleMomentLike('${m.id}')">
+              <button type="button" class="moment-action ${m.likedByUser ? "moment-action-liked" : ""}" onclick="window.EchoApp.toggleMomentLike('${m.id}', this)">
                 ${Icons.heart}<span>${m.likes || 0}</span>
-              </div>
-              <div class="moment-action" onclick="window.EchoApp.commentMoment('${m.id}')">
+              </button>
+              <button type="button" class="moment-action" onclick="document.getElementById('cmt-${m.id}')?.focus()">
                 ${Icons.comment}<span>${m.comments?.length || 0}</span>
-              </div>
+              </button>
             </div>
-          </div>
+            ${(m.comments || []).length
+              ? `<div class="moment-comments">${m.comments
+                  .map((c) => `<div class="moment-comment"><b>${esc(c.who || c.author || "我")}</b> ${esc(c.text || c.content || "")}</div>`)
+                  .join("")}</div>`
+              : ""}
+            <div class="moment-comment-row">
+              <input class="input" id="cmt-${m.id}" placeholder="写评论…"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();window.EchoApp.commentMoment('${m.id}')}" />
+              <button type="button" class="btn btn-secondary btn-sm" onclick="window.EchoApp.commentMoment('${m.id}')">发送</button>
+            </div>
+          </article>
         `).join("")}
     </div>
   </div>`;
 }
 
-// ============================================================
-// 我的/设置页
-// ============================================================
+function apiSummary(settings) {
+  if (needsApiSetup()) return "未配置";
+  const provider = (settings.apiPresetId || "").replace(/^\w/, (c) => c.toUpperCase());
+  const model = (settings.model || "").split("/").pop() || settings.model;
+  return `${provider || "已配置"} · ${model || "模型"}`;
+}
+
+function appearanceSummary(settings) {
+  if (settings.theme === "dark") return "暗色";
+  if (settings.theme === "auto") return "跟随系统";
+  if (isCustomTheme(settings)) return "自定义配色";
+  return findThemePreset(settings.themePreset).name;
+}
+
 function renderMePane() {
   const state = store.getState();
   const characterCount = listCharactersForHub().length;
+  const myName = state.settings.myName || "我";
   return `
-  <div class="me-pane">
-    <div class="list-header">
-      <span class="list-title">我的</span>
-      <button class="btn btn-ghost btn-sm" onclick="window.EchoApp.openSettings()">设置</button>
+  <div class="me-pane" id="me-scroll">
+    <div class="inbox-head">
+      <div>
+        <h1 class="list-title">我的</h1>
+        <p class="inbox-lead">都留在这台设备上</p>
+      </div>
     </div>
     <div class="me-content">
-      <div class="me-profile">
-        ${Avatar({ src: state.settings.myAvatar || "assets/avatars/user-default.svg", size: "lg", circle: true })}
-        <div style="flex:1;">
-          <div style="font-size:18px;font-weight:700;">我</div>
-          <div style="font-size:13px;color:var(--color-text-secondary);">本地保存 · ${characterCount} 个角色 · ${state.chats?.length || 0} 个对话</div>
+      <button type="button" class="me-profile" onclick="window.EchoApp.openUserProfile()">
+        ${Avatar({ src: state.settings.myAvatar || "assets/avatars/user-default.svg", size: "lg", circle: true, alt: myName })}
+        <div class="me-profile-copy">
+          <div class="me-name">${esc(myName)}</div>
+          <div class="me-meta">${characterCount} 位角色 · 本地保存</div>
         </div>
-        <button class="icon-btn" onclick="window.EchoApp.uploadMyAvatar()" title="更换头像">${Icons.edit}</button>
-      </div>
+        <span class="me-profile-edit">编辑资料</span>
+      </button>
 
       <div class="me-settings-group">
-        <div class="me-settings-group-title">核心设置</div>
+        <div class="me-settings-group-title">这台设备</div>
         <div class="me-settings-list">
           ${[
-            { icon: Icons.database, title: "API 与模型", desc: `${state.settings.model || "未配置"}`, action: "openSettings('api')" },
-            { icon: Icons.book, title: "世界书", desc: "全局与角色设定注入", action: "openSettings('worldbook')" },
-            { icon: Icons.brain, title: "长期记忆", desc: `最多每角色 ${state.memoryCfg.maxPerRole} 条`, action: "openSettings('memory')" },
-            { icon: Icons.palette, title: "主题", desc: state.settings.theme === "dark" ? "暗色" : "亮色", action: "openSettings('appearance')" },
-            { icon: Icons.download, title: "导出导入备份", desc: "JSON 格式全量备份", action: "openSettings('backup')" },
-          ].map(item => `
-            <div class="me-settings-item" onclick="window.EchoApp.${item.action}">
+            { icon: Icons.database, title: "API 与模型", desc: apiSummary(state.settings), action: "openSettings('api')" },
+            { icon: Icons.brain, title: "记忆", desc: `每位最多 ${state.memoryCfg.maxPerRole} 条`, action: "openSettings('memory')" },
+            { icon: Icons.palette, title: "外观", desc: appearanceSummary(state.settings), action: "openSettings('appearance')" },
+            { icon: Icons.download, title: "备份", desc: "导出或导入全部数据", action: "openSettings('backup')" },
+          ].map((item) => `
+            <button type="button" class="me-settings-item" onclick="window.EchoApp.${item.action}">
               <div class="me-settings-item-icon">${item.icon}</div>
               <div class="me-settings-item-content">
                 <div class="me-settings-item-title">${item.title}</div>
                 <div class="me-settings-item-desc">${item.desc}</div>
               </div>
               <span class="me-settings-item-arrow">${Icons.chevronRight}</span>
-            </div>
+            </button>
           `).join("")}
         </div>
       </div>
 
       <div class="me-settings-group">
-        <div class="me-settings-group-title">更多工具</div>
+        <div class="me-settings-group-title">更多</div>
         <div class="me-settings-list">
           ${[
-            { icon: Icons.sparkles, title: "Prompt 结构预览", desc: "查看当前组装", action: "openPromptPreview()" },
-            { icon: Icons.edit, title: "默认人设 / 预设库", desc: "全局人设与角色卡预设", action: "openSettings('persona')" },
-            { icon: Icons.volume, title: "语音 TTS / STT", desc: "朗读与麦克风", action: "openSettings('voice')" },
-            { icon: Icons.refresh, title: "重新查看引导", desc: "Landing 与新手流程", action: "resetOnboarding()" },
-          ].map(item => `
-            <div class="me-settings-item" onclick="window.EchoApp.${item.action}">
+            { icon: Icons.book, title: "世界书", desc: "设定注入", action: "openSettings('worldbook')" },
+            { icon: Icons.volume, title: "语音", desc: state.settings.ttsEnabled ? "朗读已开" : "朗读与麦克风", action: "openSettings('voice')" },
+            { icon: Icons.sparkles, title: "Prompt 预览", desc: "查看当前组装", action: "openPromptPreview()" },
+            { icon: Icons.refresh, title: "重新看引导", desc: "回到欢迎页", action: "resetOnboarding()" },
+          ].map((item) => `
+            <button type="button" class="me-settings-item" onclick="window.EchoApp.${item.action}">
               <div class="me-settings-item-icon">${item.icon}</div>
               <div class="me-settings-item-content">
                 <div class="me-settings-item-title">${item.title}</div>
                 <div class="me-settings-item-desc">${item.desc}</div>
               </div>
               <span class="me-settings-item-arrow">${Icons.chevronRight}</span>
-            </div>
+            </button>
           `).join("")}
         </div>
-      </div>
-
-      <div style="text-align:center;padding:20px 0;font-size:12px;color:var(--color-text-tertiary);">
-        EchoChat Rebuild · 本地优先 · v2.0
       </div>
     </div>
   </div>`;

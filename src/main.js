@@ -9,7 +9,7 @@ import { runMigrations, storage, KEYS } from "./core/storage.js";
 import { uid, esc, downloadFile, readFileAsText } from "./core/utils.js";
 import { APP_VERSION } from "./core/version.js";
 import { sendMessage, stopGeneration, regenerate, editMessage, deleteMessage, copyMessage, isSending, buildSystemPrompt } from "./domain/chat.js";
-import { createFromTemplate, getSystemTemplates, buildCharacterCard, importCharacter } from "./domain/persona.js";
+import { createFromTemplate, getSystemTemplates, buildCharacterCard, importCharacter, getRoleId } from "./domain/persona.js";
 import { rememberMessage, addMemory, deleteMemory } from "./domain/memory.js";
 import { listMoments, toggleLike, addComment } from "./domain/moments.js";
 import { getApiPresets, findPreset } from "./domain/provider.js";
@@ -19,12 +19,21 @@ import {
   renderLanding,
   renderOnboarding,
   renderAppShell,
-  setOnboardGender,
-  selectOnboardTemplate,
-  getOnboardSelection,
   resetOnboarding,
+  animateLanding,
 } from "./ui/views/index.js";
-import { showToast, openModal, closeModal, openConfirm, Icons, SettingRow, Segmented } from "./ui/components/index.js";
+import { showToast, openModal, closeModal, openConfirm, Icons, SettingRow, Segmented, Avatar } from "./ui/components/index.js";
+import { Ambient } from "./ui/ambient.js";
+import {
+  THEME_PRESETS,
+  PARTICLE_LEVELS,
+  findThemePreset,
+  activeThemeColors,
+  isCustomTheme,
+  applyTheme as applyThemeVars,
+  watchSystemTheme,
+} from "./ui/theme.js";
+import { needsApiSetup } from "./domain/provider.js";
 import { reconstructionModalMarkup } from "./ui/views/reconstruction.js";
 import { memoryReviewMarkup } from "./ui/views/memory-review.js";
 import {
@@ -47,6 +56,11 @@ import {
 const App = {
   view: "landing", // landing | onboarding | app
   initialized: false,
+  _pendingSend: "",
+  _tabAnim: false,
+  _meScrollTop: 0,
+  _lastRenderedView: null,
+  _sendPulse: false,
 
   // 初始化
   async init() {
@@ -76,8 +90,10 @@ const App = {
     // 2. 注册 Service Worker + 监听更新
     this.registerServiceWorker();
 
-    // 3. 应用主题
+    // 3. 应用主题 + 背景氛围层
+    Ambient.mount();
     this.applyTheme();
+    watchSystemTheme(() => this.render());
 
     // 4. 判断初始视图
     const onboardDone = storage.getRaw(KEYS.ONBOARD_DONE);
@@ -115,10 +131,7 @@ const App = {
     splash.classList.add("splash-active");
   },
   finishSplashAnimation() {
-    const splash = document.getElementById("splash-screen");
-    if (!splash) return;
-    splash.classList.add("splash-exit");
-    setTimeout(() => splash.remove(), 400);
+    document.getElementById("splash-screen")?.remove();
   },
 
   // Service Worker 注册 + 更新检测
@@ -172,6 +185,10 @@ const App = {
     const app = document.getElementById("app");
     if (!app) return;
 
+    // 保存「我的」页滚动位置：innerHTML 替换会把它清零
+    const meScroll = document.getElementById("me-scroll");
+    if (meScroll) this._meScrollTop = meScroll.scrollTop;
+
     let html = "";
     switch (this.view) {
       case "landing":
@@ -187,10 +204,25 @@ const App = {
     }
     app.innerHTML = html;
 
-    // 渲染后处理
+    const enteringApp = this.view === "app" && this._lastRenderedView !== "app";
+    this._lastRenderedView = this.view;
+
+    Ambient.setMode(this.view === "app" ? "app" : "landing");
+
     if (this.view === "app") {
+      if (enteringApp) app.querySelector(".app-shell")?.classList.add("app-enter");
+      if (this._tabAnim) {
+        this._tabAnim = false;
+        const shell = app.querySelector(".app-shell");
+        shell?.classList.add("tab-enter");
+        setTimeout(() => shell?.classList.remove("tab-enter"), 400);
+      }
       this.afterRenderApp();
+    } else {
+      animateLanding();
     }
+
+    this.bindRippleButtons();
   },
 
   afterRenderApp() {
@@ -202,20 +234,101 @@ const App = {
         msgBox.scrollTop = msgBox.scrollHeight;
       }
     }
+
+    // 「我的」页回到离开时的位置，避免每次重渲染都跳回顶部
+    const meScroll = document.getElementById("me-scroll");
+    if (meScroll && this._meScrollTop) meScroll.scrollTop = this._meScrollTop;
+
+    // 侧栏指示器跟随当前 Tab
+    const rail = document.querySelector(".nav-rail");
+    const indicator = rail?.querySelector(".nav-rail-indicator");
+    const activeItem = rail?.querySelector(".nav-item-active");
+    if (indicator && activeItem) {
+      indicator.style.transform = `translateY(${activeItem.offsetTop}px)`;
+    } else if (indicator) {
+      indicator.style.opacity = "0";
+    }
+
+    if (this._sendPulse) {
+      this._sendPulse = false;
+      const btn = document.querySelector(".chat-send-btn");
+      if (btn) {
+        btn.classList.add("sent");
+        setTimeout(() => btn.classList.remove("sent"), 420);
+      }
+    }
+
+    this.bindMessageGestures();
+  },
+
+  bindRippleButtons() {
+    document.querySelectorAll(".btn-primary").forEach((btn) => {
+      if (btn.dataset.rippleBound) return;
+      btn.dataset.rippleBound = "1";
+      btn.addEventListener("pointerdown", (e) => {
+        const r = btn.getBoundingClientRect();
+        btn.style.setProperty("--ripple-x", `${((e.clientX - r.left) / r.width) * 100}%`);
+        btn.style.setProperty("--ripple-y", `${((e.clientY - r.top) / r.height) * 100}%`);
+        btn.classList.add("ripple");
+        setTimeout(() => btn.classList.remove("ripple"), 420);
+      });
+    });
+  },
+
+  // 移动端长按气泡呼出操作条（桌面端用 hover）
+  bindMessageGestures() {
+    if (window.innerWidth >= 768) return;
+    document.querySelectorAll(".msg").forEach((msg) => {
+      if (msg.dataset.gestureBound) return;
+      msg.dataset.gestureBound = "1";
+      let timer = null;
+      const clear = () => {
+        if (timer) clearTimeout(timer);
+        timer = null;
+      };
+      msg.addEventListener(
+        "touchstart",
+        () => {
+          clear();
+          timer = setTimeout(() => {
+            document.querySelectorAll(".msg.show-actions").forEach((m) => {
+              if (m !== msg) m.classList.remove("show-actions");
+            });
+            msg.classList.add("show-actions");
+          }, 480);
+        },
+        { passive: true }
+      );
+      msg.addEventListener("touchend", clear, { passive: true });
+      msg.addEventListener("touchmove", clear, { passive: true });
+    });
+  },
+
+  toggleMessageActions(btn) {
+    const msg = btn.closest(".msg");
+    if (!msg) return;
+    document.querySelectorAll(".msg.show-actions").forEach((m) => {
+      if (m !== msg) m.classList.remove("show-actions");
+    });
+    msg.classList.toggle("show-actions");
   },
 
   applyTheme() {
-    const s = store.getState().settings;
-    document.documentElement.setAttribute("data-theme", s.theme || "light");
-    document.documentElement.setAttribute("data-theme-preset", "mint");
+    applyThemeVars();
   },
 
   bindGlobalEvents() {
-    // 键盘事件
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
-        // 关闭弹窗
         document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+      }
+    });
+    let wide = typeof window !== "undefined" && window.innerWidth >= 1024;
+    window.addEventListener("resize", () => {
+      const now = window.innerWidth >= 1024;
+      if (now !== wide) {
+        wide = now;
+        this.render();
       }
     });
   },
@@ -224,14 +337,33 @@ const App = {
   //  全局 API（供 HTML onclick 调用）
   // ============================================================
 
-  // Landing
+  // Landing — reconstruction is the primary path
   startOnboarding() {
-    resetOnboarding();
-    this.view = "onboarding";
-    this.render();
+    this.openReconstruction();
+  },
+  enterAppEmpty() {
+    this._leaveLanding(() => {
+      storage.setRaw(KEYS.ONBOARD_DONE, "1");
+      this.view = "app";
+      store.selectChat(null);
+      store.setActiveTab("companion");
+      this.render();
+    });
+  },
+
+  // 落地页淡出后再切视图，避免硬切换
+  _leaveLanding(next) {
+    const landing = document.querySelector(".landing");
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (this.view !== "landing" || !landing || reduced || landing.classList.contains("landing-exit")) {
+      next();
+      return;
+    }
+    landing.classList.add("landing-exit");
+    setTimeout(next, 300);
   },
   showMore() {
-    showToast({ message: "更多介绍即将上线", type: "info" });
+    showToast({ message: "把聊天记录粘过来，就能认出 TA。", type: "info" });
   },
   importBackup() {
     const input = document.createElement("input");
@@ -256,39 +388,32 @@ const App = {
     };
     input.click();
   },
-  selectTemplate(name) {
-    const all = getSystemTemplates();
-    const tpl = all.find((t) => t.name === name);
-    if (tpl) {
-      createFromTemplate(tpl);
+  async selectTemplate(name) {
+    const tpl = getSystemTemplates().find((t) => t.name === name);
+    if (!tpl) return;
+    try {
+      const chat = await createFromTemplate(tpl);
+      document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
       storage.setRaw(KEYS.ONBOARD_DONE, "1");
       this.view = "app";
+      if (chat?.id) {
+        store.selectChat(chat.id);
+        store.setActiveTab("companion");
+      }
       this.render();
+      showToast({ message: `「${tpl.name}」已加入，可以开始聊了`, type: "success" });
+    } catch (err) {
+      showToast({ message: "创建失败", type: "error" });
     }
   },
 
-  // Onboarding
-  setOnboardGender(gender) {
-    setOnboardGender(gender);
-  },
-  selectOnboardTemplate(name) {
-    selectOnboardTemplate(name);
-  },
+  setOnboardGender() {},
+  selectOnboardTemplate() {},
   skipOnboarding() {
-    const all = getSystemTemplates("female");
-    if (all[0]) createFromTemplate(all[0]);
-    storage.setRaw(KEYS.ONBOARD_DONE, "1");
-    this.view = "app";
-    this.render();
+    this.enterAppEmpty();
   },
   finishOnboarding() {
-    const tpl = getOnboardSelection();
-    if (tpl) {
-      createFromTemplate(tpl);
-      storage.setRaw(KEYS.ONBOARD_DONE, "1");
-      this.view = "app";
-      this.render();
-    }
+    this.openReconstruction();
   },
   resetOnboarding() {
     resetOnboarding();
@@ -300,6 +425,8 @@ const App = {
 
   // App 导航
   switchTab(tab) {
+    if (store.getState().ui.activeTab !== tab) this._tabAnim = true;
+    if (tab !== "me") this._meScrollTop = 0;
     store.setActiveTab(tab);
     if (window.innerWidth < 768) {
       store.setProfileOpen(false);
@@ -307,7 +434,7 @@ const App = {
   },
   selectCharacter(id) {
     store.setSelectedCharacter(id);
-    store.setActiveTab("characters");
+    this.continueCharacter(id);
   },
   backToCharacterList() {
     store.setSelectedCharacter(null);
@@ -350,9 +477,10 @@ const App = {
           return;
         }
         store.setSelectedCharacter(result.characterId);
-        store.setActiveTab("characters");
+        store.setActiveTab("companion");
         this.view = "app";
         this.render();
+        this.continueCharacter(result.characterId);
         showToast({ message: "角色已导入", type: "success" });
       } catch (err) {
         showToast({ message: "导入失败", type: "error" });
@@ -370,45 +498,105 @@ const App = {
     downloadFile(`${chat.name || "character"}.json`, JSON.stringify(card, null, 2));
     showToast({ message: "角色卡已导出", type: "success" });
   },
+  _charDraftAvatar: null,
   editCharacter(characterId) {
+    this._charDraftAvatar = null;
+    this._paintCharacterEdit(characterId);
+  },
+  editCharacterFromChat() {
+    const chat = store.getCurrentChat();
+    const roleId = chat ? getRoleId(chat) : null;
+    if (roleId) this.editCharacter(roleId);
+  },
+  _paintCharacterEdit(characterId) {
     const chat = store.getState().chats.find((c) => c.roleId === characterId);
-    const name = chat?.name || "";
+    const name = document.getElementById("edit-char-name")?.value ?? chat?.name ?? "";
     const persona = chat?.config?.persona || "";
-    const personaStr = typeof persona === "string" ? persona : (persona.persona || "");
+    const personaStr =
+      document.getElementById("edit-char-identity")?.value ??
+      (typeof persona === "string" ? persona : persona.persona || "");
+    const avatar = this._charDraftAvatar || chat?.avatar;
+    document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
     openModal({
       title: "编辑角色",
+      width: "440px",
       content: `
-        <div style="display:flex;flex-direction:column;gap:12px;">
-          <label style="font-size:13px;font-weight:600;">名字</label>
-          <input class="input" id="edit-char-name" value="${esc(name)}" />
-          <label style="font-size:13px;font-weight:600;">她是谁</label>
-          <textarea class="input" id="edit-char-identity" rows="6" style="min-height:120px;">${esc(personaStr)}</textarea>
-        </div>
+        ${this._avatarPickerMarkup(`char:${characterId}`, avatar, name)}
+        <label class="field-label">名字</label>
+        <input class="input" id="edit-char-name" value="${esc(name)}" />
+        <label class="field-label">TA 是谁</label>
+        <textarea class="input" id="edit-char-identity" rows="6" style="min-height:120px;">${esc(personaStr)}</textarea>
       `,
       footer: `
         <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">取消</button>
         <button class="btn btn-primary" onclick="window.EchoApp.saveCharacterEdit('${characterId}')">保存</button>
       `,
     });
+    this.bindRippleButtons();
   },
   saveCharacterEdit(characterId) {
     const name = document.getElementById("edit-char-name")?.value?.trim();
     const identity = document.getElementById("edit-char-identity")?.value || "";
+    const avatar = this._charDraftAvatar;
+    this._charDraftAvatar = null;
     Character.updateCharacter(characterId, {
       name: name || undefined,
       identity,
       personality: { description: identity },
+      ...(avatar ? { avatar } : {}),
     }).then(() => {
       const chats = store.getState().chats.filter((c) => c.roleId === characterId);
       chats.forEach((c) => {
         store.updateChat(c.id, {
           name: name || c.name,
+          ...(avatar ? { avatar } : {}),
           config: { ...c.config, persona: identity },
         });
       });
       document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+      this.render();
       showToast({ message: "角色已更新", type: "success" });
     });
+  },
+
+  _userDraftAvatar: null,
+  openUserProfile() {
+    this._userDraftAvatar = null;
+    this._paintUserProfile();
+  },
+  _paintUserProfile() {
+    const s = store.getState().settings;
+    const name = document.getElementById("user-name")?.value ?? s.myName ?? "我";
+    const avatar = this._userDraftAvatar || s.myAvatar || "assets/avatars/user-default.svg";
+    document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+    openModal({
+      title: "编辑资料",
+      width: "420px",
+      content: `
+        ${this._avatarPickerMarkup("user", avatar, name)}
+        <label class="field-label">昵称</label>
+        <input class="input" id="user-name" value="${esc(name)}" placeholder="你的名字" maxlength="24" />
+      `,
+      footer: `
+        <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">取消</button>
+        <button class="btn btn-primary" onclick="window.EchoApp.saveUserProfile()">保存</button>
+      `,
+    });
+    this.bindRippleButtons();
+  },
+  saveUserProfile() {
+    const name = document.getElementById("user-name")?.value?.trim();
+    if (!name) {
+      showToast({ message: "名字不能为空", type: "warning" });
+      return;
+    }
+    const patch = { myName: name };
+    if (this._userDraftAvatar) patch.myAvatar = this._userDraftAvatar;
+    this._userDraftAvatar = null;
+    store.updateSettings(patch);
+    document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+    this.render();
+    showToast({ message: "资料已保存", type: "success" });
   },
   addCharacterMemory(characterId) {
     const input = document.getElementById("hub-memory-input");
@@ -422,11 +610,201 @@ const App = {
     deleteMemory(characterId, memoryId);
   },
   newChat() {
-    this.startOnboarding();
+    this.openBring();
+  },
+  openBring() {
+    if (this.view === "landing") {
+      this._leaveLanding(() => {
+        storage.setRaw(KEYS.ONBOARD_DONE, "1");
+        this.view = "app";
+        this.render();
+        this._paintBringModal();
+      });
+      return;
+    }
+    this._paintBringModal();
+  },
+  _paintBringModal() {
+    const card = (icon, title, desc, onClick, featured) => `
+      <button type="button" class="create-card ${featured ? "create-card-featured" : ""}" onclick="this.closest('.modal-overlay').remove();${onClick}">
+        <span class="create-card-ic">${icon}</span>
+        <span>
+          <span class="create-card-title">${title}</span>
+          <span class="create-card-desc">${desc}</span>
+        </span>
+      </button>`;
+    openModal({
+      title: "创建角色",
+      width: "480px",
+      content: `
+        <p class="create-sub">从聊天记录、角色卡或一句话，把 TA 带进来。</p>
+        <div class="create-cards">
+          ${card(Icons.message, "导入聊天记录", "微信 / QQ 等导出的记录，或粘贴纯文本", "window.EchoApp.openReconstruction()", true)}
+          ${card(Icons.upload, "导入角色卡", "SillyTavern 角色卡 JSON", "window.EchoApp.importCharacterCard()")}
+          ${card(Icons.sparkles, "创建新人设", "填写名字与头像，可用一句话补全人设", "window.EchoApp.openCreateBlank()")}
+          ${card(Icons.users, "从内置角色开始", "挑一个现成的性格，直接体验对话", "window.EchoApp.openTemplatePicker()")}
+        </div>
+        ${this._apiHintMarkup()}
+      `,
+      footer: `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">取消</button>`,
+    });
+  },
+  // 创建角色不再要求先配 API，只在这里留一条可跳过的提示
+  _apiHintMarkup() {
+    if (!needsApiSetup()) return "";
+    return `<div class="api-hint">
+      <span>模型未配置 · 可先创建角色，发送消息前再连接</span>
+      <button type="button" class="link-btn" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openSettings('api')">去配置</button>
+    </div>`;
+  },
+  openTemplatePicker() {
+    const templates = getSystemTemplates();
+    openModal({
+      title: "内置角色",
+      width: "480px",
+      content: `
+        <p class="create-sub">挑一个现成的性格开始。之后随时可以改人设、换头像。</p>
+        <div class="create-cards">
+          ${templates
+            .slice(0, 10)
+            .map(
+              (t) => `
+            <button type="button" class="create-card" onclick="this.closest('.modal-overlay').remove();window.EchoApp.selectTemplate('${esc(t.name)}')">
+              <span class="create-card-ic">${t.emoji || Icons.users}</span>
+              <span>
+                <span class="create-card-title">${esc(t.name)}</span>
+                <span class="create-card-desc">${esc(t.tag || "")}${t.firstMessage ? ` · ${esc(t.firstMessage.slice(0, 24))}` : ""}</span>
+              </span>
+            </button>`
+            )
+            .join("")}
+        </div>
+      `,
+      footer: `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openBring()">返回</button>`,
+    });
+  },
+  _blankAvatar: null,
+  openCreateBlank() {
+    this._blankAvatar = null;
+    this._paintCreateBlank();
+  },
+  _paintCreateBlank() {
+    const name = document.getElementById("blank-char-name")?.value || "";
+    const desc = document.getElementById("blank-char-desc")?.value || "";
+    document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+    openModal({
+      title: "创建新人设",
+      width: "440px",
+      content: `
+        <p class="create-sub">先填写 TA 的名字和头像；再用一句话描述性格与关系。</p>
+        ${this._avatarPickerMarkup("blank", this._blankAvatar, name || "新角色")}
+        <label class="field-label">名字</label>
+        <input class="input" id="blank-char-name" placeholder="给 TA 起个名字" maxlength="32" value="${esc(name)}" />
+        <label class="field-label">一句话描述（可选）</label>
+        <textarea class="input" id="blank-char-desc" rows="3" placeholder="例如：她是咖啡店店员，不爱说话但会记得我的喜好。" style="min-height:88px;">${esc(desc)}</textarea>
+      `,
+      footer: `
+        <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openBring()">返回</button>
+        <button class="btn btn-primary" onclick="window.EchoApp.createBlankCharacter()">创建角色</button>
+      `,
+    });
+    this.bindRippleButtons();
+  },
+  _avatarPickerMarkup(target, src, name) {
+    const id = `avatar-pick-${target}`;
+    return `<div class="avatar-picker">
+      <label class="avatar-picker-btn" for="${id}">
+        ${Avatar({ src, size: "lg", circle: true, alt: name || "头像", name })}
+      </label>
+      <span class="avatar-picker-hint">点击上传头像</span>
+      <span class="avatar-picker-sub">支持 JPG、PNG，仅保存在本机</span>
+      <input type="file" id="${id}" accept="image/jpeg,image/png,image/webp,image/gif" hidden onchange="window.EchoApp.pickAvatar(event,'${target}')" />
+    </div>`;
+  },
+  pickAvatar(ev, target) {
+    const file = ev.target.files?.[0];
+    ev.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      showToast({ message: "请选择图片文件", type: "warning" });
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      showToast({ message: "图片请小于 4MB", type: "warning" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const url = reader.result;
+      if (target === "blank") {
+        this._blankAvatar = url;
+        this._paintCreateBlank();
+      } else if (target === "user") {
+        this._userDraftAvatar = url;
+        this._paintUserProfile();
+      } else if (target.startsWith("char:")) {
+        this._charDraftAvatar = url;
+        this._paintCharacterEdit(target.slice(5));
+      }
+    };
+    reader.readAsDataURL(file);
+  },
+  async createBlankCharacter() {
+    const name = document.getElementById("blank-char-name")?.value?.trim();
+    const desc = document.getElementById("blank-char-desc")?.value?.trim() || "";
+    if (!name) {
+      showToast({ message: "先写个名字", type: "warning" });
+      return;
+    }
+    try {
+      const chat = await createFromTemplate({
+        name,
+        persona: desc || `${name}。`,
+        firstMessage: "",
+        avatar: this._blankAvatar || "assets/avatars/default.svg",
+      });
+      this._blankAvatar = null;
+      document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+      storage.setRaw(KEYS.ONBOARD_DONE, "1");
+      this.view = "app";
+      if (chat?.id) {
+        store.selectChat(chat.id);
+        store.setActiveTab("companion");
+      }
+      this.render();
+      showToast({ message: `「${name}」已创建，可以开始聊了`, type: "success" });
+    } catch (err) {
+      showToast({ message: "创建失败", type: "error" });
+    }
+  },
+  openConversationSwitcher() {
+    const chat = store.getCurrentChat();
+    const roleId = chat?.roleId;
+    if (!roleId) return;
+    import("./domain/character-hub.js").then(({ listActiveConversations }) => {
+      const convos = listActiveConversations(roleId);
+      openModal({
+        title: "相处线",
+        width: "420px",
+        content: `
+          <p class="recon-lead">同一位 ${esc(chat.name || "TA")} 的不同聊天主题。记忆和关系共享。</p>
+          ${convos.map((c) => `
+            <button type="button" class="bring-opt ${c.id === chat.id ? "bring-opt-on" : ""}" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openConversation('${c.id}')">
+              <span class="bring-opt-title">${esc(c.name || "日常相处")}</span>
+              <span class="bring-opt-desc">${esc((c.lastPreview || "还没有聊过").slice(0, 48))}</span>
+            </button>
+          `).join("")}
+        `,
+        footer: `
+          <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">关闭</button>
+          <button class="btn btn-primary" onclick="this.closest('.modal-overlay').remove();window.EchoApp.startNewConversation('${roleId}')">新的相处线</button>
+        `,
+      });
+    });
   },
   selectChat(id) {
     store.selectChat(id);
-    store.setProfileOpen(false);
+    store.setProfileOpen(window.innerWidth >= 1024);
     import("./domain/message-store.js")
       .then(({ messageStore }) => messageStore.hydrateChat(id))
       .then(() => this.render())
@@ -470,6 +848,13 @@ const App = {
     if (!text) return;
     input.value = "";
     this.autoGrowInput(input);
+    // 模型未配置时不报错，先收下这句话，连接完成后自动发出去
+    if (needsApiSetup(store.getCurrentChat())) {
+      this._pendingSend = text;
+      this.openApiConnect();
+      return;
+    }
+    this._sendPulse = true;
     sendMessage(text);
   },
   stopSend() {
@@ -566,97 +951,336 @@ const App = {
   setMomentsFilter(value) {
     store.setMomentsFilter(value);
   },
-  toggleMomentLike(id) {
+  toggleMomentLike(id, btn) {
+    // 心跳动画依赖当前 DOM 节点，先播再让 store 触发重渲染
+    const heart = btn?.querySelector("svg");
+    if (heart) {
+      heart.classList.remove("like-pop");
+      void heart.offsetWidth;
+      heart.classList.add("like-pop");
+    }
     toggleLike(id, "我");
   },
   commentMoment(id) {
-    const text = prompt("写评论…");
-    if (text?.trim()) {
-      addComment(id, "me", text);
-      showToast({ message: "评论已发布", type: "success" });
+    const input = document.getElementById(`cmt-${id}`);
+    const text = input?.value?.trim();
+    if (!text) {
+      showToast({ message: "写一句评论", type: "info" });
+      input?.focus();
+      return;
     }
+    if (input) input.value = "";
+    addComment(id, "me", text);
+    showToast({ message: "评论已发布", type: "success" });
   },
 
-  // 设置
+  // ============================================================
+  //  设置：按分区打开，每层都能返回「我的」
+  // ============================================================
+  _apiMoreOpen: false,
+
   openSettings(section) {
+    const sec = section || "api";
+    if (sec === "api") {
+      const presetId = store.getState().settings.apiPresetId;
+      if (presetId && presetId !== "siliconflow") this._apiMoreOpen = true;
+    }
+    this._paintSettings(sec);
+  },
+
+  _paintSettings(section) {
+    if (section === "api") this._apiSurface = "settings";
+    document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+    const titles = {
+      api: "API 与模型",
+      memory: "记忆",
+      appearance: "外观",
+      backup: "备份",
+      worldbook: "世界书",
+      voice: "语音",
+    };
     const s = store.getState();
+    let content = "";
+    let footer = `
+      <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">返回</button>
+      <button class="btn btn-primary" onclick="this.closest('.modal-overlay').remove()">完成</button>`;
+    let width = "520px";
+
+    if (section === "api") {
+      content = this._apiSetupMarkup();
+      footer = `
+        <button class="btn btn-ghost" onclick="window.EchoApp.testApiConnection()">测试连接</button>
+        <button class="btn btn-primary" onclick="window.EchoApp.saveSettings()">保存</button>`;
+    } else if (section === "memory") {
+      content = `
+        <label class="field-label">每位角色最多记忆条数 · <span id="mem-max-val">${s.memoryCfg.maxPerRole}</span></label>
+        <input type="range" class="slider" id="set-mem-max" min="10" max="100" step="5" value="${s.memoryCfg.maxPerRole}"
+          oninput="document.getElementById('mem-max-val').textContent=this.value" />
+        <p class="create-sub" style="margin-top:12px">超出后最旧的记忆会被归档，注入对话时优先取重要度高的。</p>
+        <label class="field-label">每次对话最多注入 · <span id="mem-inject-val">${s.memoryCfg.injectMax}</span> 条</label>
+        <input type="range" class="slider" id="set-mem-inject" min="3" max="30" step="1" value="${s.memoryCfg.injectMax}"
+          oninput="document.getElementById('mem-inject-val').textContent=this.value" />`;
+      footer = `
+        <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">返回</button>
+        <button class="btn btn-primary" onclick="window.EchoApp.saveMemorySettings()">保存</button>`;
+    } else if (section === "appearance") {
+      content = this._appearanceMarkup();
+      footer = `<button class="btn btn-primary" onclick="this.closest('.modal-overlay').remove()">完成</button>`;
+    } else if (section === "backup") {
+      content = `
+        <div class="settings-group-body">
+          ${SettingRow({ icon: Icons.download, title: "导出全部数据", desc: "JSON 全量备份，含对话、记忆、设置", onClick: "window.EchoApp.exportAll()" })}
+          ${SettingRow({ icon: Icons.upload, title: "导入备份", desc: "从 JSON 备份文件恢复", onClick: "window.EchoApp.importAll()" })}
+          ${SettingRow({ icon: Icons.trash, title: "清空所有对话", desc: "删除全部聊天记录，保留设置与记忆", onClick: "window.EchoApp.clearAllChats()" })}
+          ${SettingRow({ icon: Icons.warning, title: "重置应用", desc: "清除所有数据并恢复初始状态", onClick: "window.EchoApp.resetApp()" })}
+        </div>`;
+      footer = `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">返回</button>`;
+    } else if (section === "worldbook") {
+      content = `<p class="create-sub">世界书条目会在对话时按关键词注入设定，让角色记得共同的背景。</p>
+        <div class="api-hint"><span>当前版本从角色人设与记忆里自动组装上下文，独立条目管理即将开放。</span></div>`;
+      footer = `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">返回</button>`;
+    } else if (section === "voice") {
+      content = `
+        <div class="settings-group-body">
+          ${SettingRow({
+            icon: Icons.volume,
+            title: "朗读回复",
+            desc: s.settings.ttsEnabled ? "已开启" : "已关闭",
+            onClick: "window.EchoApp.toggleTTS();window.EchoApp.openSettings('voice')",
+          })}
+          ${SettingRow({ icon: Icons.mic, title: "语音输入", desc: "开发中", onClick: "window.EchoApp.toggleSTT()" })}
+        </div>`;
+      footer = `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">返回</button>`;
+    }
+
+    openModal({ title: titles[section] || "设置", content, footer, width });
+    this.bindRippleButtons();
+  },
+
+  // API 配置块：默认只露出推荐服务商 + Key + 模型，其余收在「更多配置」里
+  _apiSetupMarkup() {
+    const s = store.getState().settings;
     const presets = getApiPresets();
-    const content = `
-      <div class="settings-modal">
-        <div class="settings-group">
-          <div class="settings-group-title">API 与模型</div>
-          <div class="settings-group-body">
-            <div class="setting-row" style="cursor:default;flex-direction:column;align-items:stretch;gap:8px;">
-              <div style="font-size:13px;font-weight:600;color:var(--color-text-secondary);">API 预设</div>
-              <div style="display:flex;flex-wrap:wrap;gap:6px;">
-                ${presets.map((p) => `
-                  <button class="chip ${s.settings.apiPresetId === p.id ? "chip-active" : ""}" onclick="window.EchoApp.applyPreset('${p.id}')">${esc(p.name)}</button>
-                `).join("")}
-              </div>
-            </div>
-            <div class="setting-row" style="cursor:default;flex-direction:column;align-items:stretch;gap:8px;">
-              <label style="font-size:13px;font-weight:600;color:var(--color-text-secondary);">接口地址</label>
-              <input class="input" id="set-baseurl" value="${esc(s.settings.baseUrl)}" placeholder="https://api.example.com/v1" />
-            </div>
-            <div class="setting-row" style="cursor:default;flex-direction:column;align-items:stretch;gap:8px;">
-              <label style="font-size:13px;font-weight:600;color:var(--color-text-secondary);">API Key</label>
-              <input class="input" id="set-apikey" type="password" value="${esc(s.settings.apiKey)}" placeholder="sk-..." autocomplete="off" />
-            </div>
-            <div class="setting-row" style="cursor:default;flex-direction:column;align-items:stretch;gap:8px;">
-              <label style="font-size:13px;font-weight:600;color:var(--color-text-secondary);">模型</label>
-              <input class="input" id="set-model" value="${esc(s.settings.model)}" placeholder="model-name" />
-            </div>
-            <div class="setting-row" style="cursor:default;flex-direction:column;align-items:stretch;gap:8px;">
-              <div style="display:flex;justify-content:space-between;align-items:center;">
-                <label style="font-size:13px;font-weight:600;color:var(--color-text-secondary);">温度</label>
-                <span id="temp-val" style="font-size:13px;font-weight:600;color:var(--color-primary);">${s.settings.temperature}</span>
-              </div>
-              <input type="range" class="slider" id="set-temp" min="0" max="2" step="0.1" value="${s.settings.temperature}" oninput="document.getElementById('temp-val').textContent=this.value" />
-            </div>
-          </div>
-        </div>
+    const ready = !needsApiSetup();
+    const recommended = presets.find((p) => p.id === "siliconflow");
+    const others = presets.filter((p) => p.id !== "siliconflow");
+    const active = presets.find((p) => p.id === s.apiPresetId) || recommended;
+    const stepsMarkup = (p) =>
+      p?.keySteps?.length
+        ? `<div class="key-steps">
+            <strong>如何获取 API Key · ${esc(p.name)}</strong>
+            <ol>${p.keySteps.map((st) => `<li>${esc(st)}</li>`).join("")}</ol>
+            ${p.keyUrl ? `<a class="link-btn" href="${esc(p.keyUrl)}" target="_blank" rel="noreferrer noopener">前往获取</a>` : ""}
+          </div>`
+        : "";
 
-        <div class="settings-group">
-          <div class="settings-group-title">外观</div>
-          <div class="settings-group-body">
-            <div class="setting-row" style="cursor:default;">
-              <div class="setting-row-icon">${Icons.palette}</div>
-              <div class="setting-row-content">
-                <div class="setting-row-title">主题模式</div>
-                <div class="setting-row-desc">选择亮色或暗色界面</div>
-              </div>
-              <div class="setting-row-right">
-                <div style="display:flex;gap:6px;">
-                  <button class="chip ${s.settings.theme === "light" ? "chip-active" : ""}" onclick="window.EchoApp.setTheme('light')">亮色</button>
-                  <button class="chip ${s.settings.theme === "dark" ? "chip-active" : ""}" onclick="window.EchoApp.setTheme('dark')">暗色</button>
-                </div>
+    return `
+      <div class="api-block ${ready ? "api-block-ready" : ""}">
+        <div class="api-block-head">
+          <h4>${esc(active?.name || "模型配置")}</h4>
+          <span class="api-status">${ready ? "已就绪" : "未配置"}</span>
+        </div>
+        ${recommended && s.apiPresetId === "siliconflow"
+          ? `<div class="api-hero">
+              <div class="preset-card on">
+                <span class="pn">${esc(recommended.name)}</span>
+                <span class="pt">${esc(recommended.tag || "")}</span>
+                <span class="pnote">${esc(recommended.note || "")}</span>
               </div>
             </div>
+            ${stepsMarkup(recommended)}`
+          : stepsMarkup(active)}
+        <label class="field-label">API Key</label>
+        <input class="input" id="set-apikey" type="password" value="${esc(s.apiKey)}" placeholder="sk-..." autocomplete="off" />
+        <label class="field-label">模型</label>
+        <input class="input" id="set-model" value="${esc(s.model)}" placeholder="例如 Qwen/Qwen2.5-7B-Instruct" />
+        <button type="button" class="api-more-toggle" onclick="window.EchoApp.toggleApiMore()" aria-expanded="${this._apiMoreOpen}">
+          <span>更多配置</span>
+          <span class="sub">其他服务商 · 接口地址 · 温度</span>
+        </button>
+        <div class="api-more ${this._apiMoreOpen ? "open" : ""}">
+          <label class="field-label">其他服务商</label>
+          <div class="preset-grid">
+            ${others
+              .map(
+                (p) => `<button type="button" class="preset-card ${s.apiPresetId === p.id ? "on" : ""}" onclick="window.EchoApp.applyPreset('${p.id}')">
+                  <span class="pn">${esc(p.name)}</span>
+                  <span class="pt">${esc(p.tag || "")}</span>
+                  <span class="pnote">${esc(p.note || "")}</span>
+                </button>`
+              )
+              .join("")}
           </div>
+          <label class="field-label">接口地址</label>
+          <input class="input" id="set-baseurl" value="${esc(s.baseUrl)}" placeholder="https://api.example.com/v1" />
+          <label class="field-label">温度 · <span id="temp-val">${s.temperature}</span></label>
+          <input type="range" class="slider" id="set-temp" min="0" max="2" step="0.1" value="${s.temperature}"
+            oninput="document.getElementById('temp-val').textContent=this.value" />
         </div>
+      </div>`;
+  },
 
-        <div class="settings-group">
-          <div class="settings-group-title">数据管理</div>
-          <div class="settings-group-body">
-            ${SettingRow({ icon: Icons.download, title: "导出全部数据", desc: "JSON 格式全量备份，包含对话、记忆、设置", onClick: "window.EchoApp.exportAll()" })}
-            ${SettingRow({ icon: Icons.upload, title: "导入备份", desc: "从 JSON 备份文件恢复数据", onClick: "window.EchoApp.importAll()" })}
-          </div>
-        </div>
-
-        <div class="settings-group">
-          <div class="settings-group-title" style="color:var(--color-error);">危险操作</div>
-          <div class="settings-group-body">
-            ${SettingRow({ icon: Icons.trash, title: "清空所有对话", desc: "删除全部聊天记录，保留设置与记忆", onClick: "window.EchoApp.clearAllChats()" })}
-            ${SettingRow({ icon: Icons.warning, title: "重置应用", desc: "清除所有数据并恢复初始状态", onClick: "window.EchoApp.resetApp()" })}
-          </div>
-        </div>
+  _appearanceMarkup() {
+    const s = store.getState().settings;
+    const colors = activeThemeColors(s);
+    const custom = isCustomTheme(s);
+    const modes = [
+      ["light", "亮色"],
+      ["dark", "暗色"],
+      ["auto", "跟随系统"],
+    ];
+    return `
+      <label class="field-label">明暗模式</label>
+      <div class="theme-chip-row">
+        ${modes
+          .map(([v, label]) => `<button type="button" class="chip ${s.theme === v ? "chip-active" : ""}" onclick="window.EchoApp.setTheme('${v}')">${label}</button>`)
+          .join("")}
       </div>
-    `;
-    const footer = `
-      <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">取消</button>
-      <button class="btn btn-primary" onclick="window.EchoApp.saveSettings()">保存设置</button>
-    `;
-    openModal({ title: "设置", content, footer, width: "520px" });
+      <label class="field-label">颜色预设</label>
+      <div class="theme-grid">
+        ${THEME_PRESETS.map(
+          (p) => `<button type="button" class="theme-swatch ${!custom && s.themePreset === p.id ? "on" : ""}" onclick="window.EchoApp.setThemePreset('${p.id}')">
+            <div class="theme-swatch-head">
+              <span class="theme-dot" style="background:${p.primary}"></span>
+              <span class="tn">${esc(p.name)}${p.id === "mint" ? "（默认）" : ""}</span>
+            </div>
+            <div class="theme-bubbles"><span style="background:${p.primarySoft}"></span><span style="background:${p.mintSoft}"></span></div>
+          </button>`
+        ).join("")}
+      </div>
+      <label class="field-label">自定义配色</label>
+      <div class="color-row"><label>主色</label><input type="color" value="${colors.primary}" oninput="window.EchoApp.setCustomColor('primary',this.value)" /></div>
+      <div class="color-row"><label>气泡「我」</label><input type="color" value="${colors.bubbleMe}" oninput="window.EchoApp.setCustomColor('bubbleMe',this.value)" /></div>
+      <div class="color-row"><label>气泡「TA」</label><input type="color" value="${colors.bubbleHer}" oninput="window.EchoApp.setCustomColor('bubbleHer',this.value)" /></div>
+      <div class="color-row"><label>辅助色</label><input type="color" value="${colors.mint}" oninput="window.EchoApp.setCustomColor('mint',this.value)" /></div>
+      <label class="field-label">背景氛围强度</label>
+      <div class="theme-chip-row">
+        ${PARTICLE_LEVELS.map(
+          (lv) => `<button type="button" class="chip ${s.particleIntensity === lv.id ? "chip-active" : ""}" onclick="window.EchoApp.setParticleIntensity('${lv.id}')">${lv.label}</button>`
+        ).join("")}
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="window.EchoApp.resetTheme()">重置为薄荷回响</button>
+      <div class="theme-preview">
+        <div class="tp-row"><span class="tp-b" style="background:${colors.bubbleHer}">你好呀</span></div>
+        <div class="tp-row" style="justify-content:flex-end"><span class="tp-b" style="background:${colors.bubbleMe}">在的</span></div>
+        <span class="tp-btn" style="background:${colors.primary}">发送</span>
+      </div>`;
+  },
+
+  toggleApiMore() {
+    this._apiMoreOpen = !this._apiMoreOpen;
+    this._captureApiFields();
+    this._paintSettings("api");
+  },
+  _captureApiFields() {
+    const baseUrl = document.getElementById("set-baseurl")?.value;
+    const apiKey = document.getElementById("set-apikey")?.value;
+    const model = document.getElementById("set-model")?.value;
+    const temp = document.getElementById("set-temp")?.value;
+    const patch = {};
+    if (baseUrl != null) patch.baseUrl = baseUrl;
+    if (apiKey != null) patch.apiKey = apiKey;
+    if (model != null) patch.model = model;
+    if (temp != null) patch.temperature = parseFloat(temp);
+    if (Object.keys(patch).length) store.updateSettings(patch);
+  },
+  async testApiConnection() {
+    this._captureApiFields();
+    const s = store.getState().settings;
+    if (!s.apiKey?.trim()) {
+      showToast({ message: "请先填写 API Key", type: "warning" });
+      return;
+    }
+    showToast({ message: "正在测试连接…", type: "info", duration: 1500 });
+    try {
+      const resp = await fetch(s.baseUrl.replace(/\/+$/, "") + "/models", {
+        headers: { Authorization: `Bearer ${s.apiKey}` },
+      });
+      showToast({
+        message: resp.ok ? "连接成功" : `连接失败（${resp.status}）`,
+        type: resp.ok ? "success" : "error",
+      });
+    } catch (e) {
+      showToast({ message: "连接失败，请检查接口地址与网络", type: "error" });
+    }
+  },
+  saveMemorySettings() {
+    const maxPerRole = parseInt(document.getElementById("set-mem-max")?.value || "20", 10);
+    const injectMax = parseInt(document.getElementById("set-mem-inject")?.value || "10", 10);
+    store.set((s) => ({ ...s, memoryCfg: { ...s.memoryCfg, maxPerRole, injectMax } }));
+    document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+    showToast({ message: "记忆设置已保存", type: "success" });
+  },
+  setThemePreset(id) {
+    store.updateSettings({ themePreset: id, customColors: { primary: "", mint: "", bubbleMe: "", bubbleHer: "" } });
+    this.applyTheme();
+    this._paintSettings("appearance");
+    showToast({ message: `已切换至「${findThemePreset(id).name}」`, type: "success" });
+  },
+  setCustomColor(key, value) {
+    const current = store.getState().settings.customColors || {};
+    store.updateSettings({ customColors: { ...current, [key]: value } });
+    this.applyTheme();
+  },
+  setParticleIntensity(level) {
+    store.updateSettings({ particleIntensity: level });
+    this.applyTheme();
+    this._paintSettings("appearance");
+  },
+  resetTheme() {
+    store.updateSettings({
+      themePreset: "mint",
+      customColors: { primary: "", mint: "", bubbleMe: "", bubbleHer: "" },
+    });
+    this.applyTheme();
+    this._paintSettings("appearance");
+    showToast({ message: "已重置为薄荷回响", type: "success" });
+  },
+
+  // 发送前引导连接模型：保存后自动把刚才那句话发出去
+  openApiConnect() {
+    this._apiSurface = "connect";
+    document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+    const chat = store.getCurrentChat();
+    const name = chat?.name || "TA";
+    openModal({
+      title: "连接模型",
+      width: "520px",
+      content: `<p class="create-sub">配置好后即可和 ${esc(name)} 对话。密钥只存在这台设备上。</p>${this._apiSetupMarkup()}`,
+      footer: `
+        <button class="btn btn-ghost" onclick="window.EchoApp.cancelApiConnect()">稍后</button>
+        <button class="btn btn-primary" onclick="window.EchoApp.confirmApiConnect()">保存并发送</button>`,
+    });
+    this.bindRippleButtons();
+  },
+  cancelApiConnect() {
+    const pending = this._pendingSend;
+    this._pendingSend = "";
+    document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+    if (pending) {
+      const input = document.getElementById("chat-input");
+      if (input) {
+        input.value = pending;
+        this.autoGrowInput(input);
+      }
+    }
+  },
+  confirmApiConnect() {
+    this._captureApiFields();
+    if (needsApiSetup(store.getCurrentChat())) {
+      showToast({ message: "请填写接口地址、API Key 和模型", type: "warning" });
+      return;
+    }
+    document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+    const pending = this._pendingSend;
+    this._pendingSend = "";
+    this.render();
+    if (pending) {
+      this._sendPulse = true;
+      sendMessage(pending);
+    } else {
+      showToast({ message: "模型已连接", type: "success" });
+    }
   },
   clearAllChats() {
     openConfirm({
@@ -697,32 +1321,29 @@ const App = {
   },
   applyPreset(id) {
     const preset = findPreset(id);
-    if (preset) {
-      store.updateSettings({
-        apiPresetId: id,
-        baseUrl: preset.baseUrl,
-        model: preset.model,
-        apiKey: preset.apiKey || store.getState().settings.apiKey,
-      });
-      this.applyTheme();
-      showToast({ message: `已切换到 ${preset.name}`, type: "success" });
-      // 重新渲染弹窗
-      document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
-      this.openSettings();
-    }
+    if (!preset) return;
+    const keepKey = document.getElementById("set-apikey")?.value ?? store.getState().settings.apiKey;
+    store.updateSettings({
+      apiPresetId: id,
+      baseUrl: preset.baseUrl,
+      model: preset.model,
+      apiKey: preset.apiKey || keepKey,
+    });
+    this._apiMoreOpen = true;
+    showToast({ message: `已切换到 ${preset.name}`, type: "success" });
+    if (this._apiSurface === "connect") this.openApiConnect();
+    else this._paintSettings("api");
   },
   saveSettings() {
-    const baseUrl = document.getElementById("set-baseurl")?.value;
-    const apiKey = document.getElementById("set-apikey")?.value;
-    const model = document.getElementById("set-model")?.value;
-    const temperature = parseFloat(document.getElementById("set-temp")?.value || "1");
-    store.updateSettings({ baseUrl, apiKey, model, temperature });
+    this._captureApiFields();
     document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+    this.render();
     showToast({ message: "设置已保存", type: "success" });
   },
   setTheme(theme) {
     store.updateSettings({ theme });
     this.applyTheme();
+    if (document.querySelector(".theme-grid")) this._paintSettings("appearance");
   },
   openChatSettings() {
     showToast({ message: "聊天设置开发中", type: "info" });
@@ -791,12 +1412,49 @@ const App = {
     input.click();
   },
 
-  _recon: { overlay: null, step: "paste", pasteText: "", draft: null, error: "", sourceChatId: null },
+  _recon: { overlay: null, step: "paste", pasteText: "", draft: null, error: "", sourceChatId: null, importMode: "file" },
+
+  _newReconState(patch) {
+    return {
+      overlay: null,
+      step: "paste",
+      pasteText: "",
+      draft: null,
+      error: "",
+      sourceChatId: null,
+      importMode: "file",
+      ...patch,
+    };
+  },
 
   openReconstruction() {
     closeModal(this._recon?.overlay);
-    this._recon = { overlay: null, step: "paste", pasteText: "", draft: null, error: "", sourceChatId: null };
+    this._recon = this._newReconState();
     this._paintReconstruction();
+  },
+  reconstructionSetMode(mode) {
+    this._captureReconstructionPaste();
+    this._recon.importMode = mode;
+    this._recon.error = "";
+    this._paintReconstruction();
+  },
+  _captureReconstructionPaste() {
+    const el = document.getElementById("recon-paste");
+    if (el) this._recon.pasteText = el.value;
+  },
+  reconstructionPickFile(ev) {
+    const file = ev.target.files?.[0];
+    ev.target.value = "";
+    if (!file) return;
+    readFileAsText(file)
+      .then((text) => {
+        this._recon.pasteText = text;
+        this._recon.importMode = "text";
+        this._recon.error = "";
+        this._paintReconstruction();
+        showToast({ message: "聊天记录已导入", type: "success" });
+      })
+      .catch(() => showToast({ message: "无法读取文件", type: "error" }));
   },
   openReconstructionFromChat(chatId) {
     closeModal(this._recon?.overlay);
@@ -808,14 +1466,7 @@ const App = {
       });
       return;
     }
-    this._recon = {
-      overlay: null,
-      step: "review",
-      pasteText: "",
-      draft: built.draft,
-      error: "",
-      sourceChatId: chatId,
-    };
+    this._recon = this._newReconState({ step: "review", draft: built.draft, sourceChatId: chatId });
     this._paintReconstruction();
   },
   _paintReconstruction() {
@@ -835,7 +1486,7 @@ const App = {
   },
   _closeReconstruction() {
     closeModal(this._recon.overlay);
-    this._recon = { overlay: null, step: "paste", pasteText: "", draft: null, error: "", sourceChatId: null };
+    this._recon = this._newReconState();
   },
   _captureReconstructionEdits() {
     if (!this._recon.draft) return;
@@ -847,21 +1498,27 @@ const App = {
     }
   },
   reconstructionParse() {
-    const el = document.getElementById("recon-paste");
-    const text = el ? el.value : this._recon.pasteText;
-    this._recon.pasteText = text;
+    this._captureReconstructionPaste();
+    const text = this._recon.pasteText;
     const built = buildReconstructionDraft(text);
     if (!built.ok) {
       this._recon.error =
-        built.error === "empty" ? "请先粘贴聊天记录。" : "没有识别到「名字: 内容」格式的对话。角色卡 JSON 请走导入角色卡。";
+        built.error === "empty"
+          ? "请先选择文件或粘贴聊天记录。"
+          : "没有识别到「名字: 内容」格式的对话。角色卡 JSON 请走导入角色卡。";
       this._recon.step = "paste";
       this._paintReconstruction();
       return;
     }
-    this._recon.draft = built.draft;
+    // 先亮一帧「解析中」，让这一步有过程感而不是瞬间跳转
+    this._recon.step = "parsing";
     this._recon.error = "";
-    this._recon.step = "review";
     this._paintReconstruction();
+    setTimeout(() => {
+      this._recon.draft = built.draft;
+      this._recon.step = "review";
+      this._paintReconstruction();
+    }, 620);
   },
   reconstructionLoadFile() {
     const input = document.createElement("input");
@@ -873,6 +1530,7 @@ const App = {
       try {
         this._recon.pasteText = await readFileAsText(file);
         this._recon.step = "paste";
+        this._recon.importMode = "text";
         this._recon.error = "";
         this._paintReconstruction();
       } catch (err) {
@@ -898,6 +1556,7 @@ const App = {
   reconstructionBack() {
     this._captureReconstructionEdits();
     this._recon.step = "paste";
+    this._recon.importMode = "text";
     this._recon.error = "";
     this._paintReconstruction();
   },
@@ -911,16 +1570,32 @@ const App = {
         this._paintReconstruction();
         return;
       }
-      this._closeReconstruction();
+      const charName = this._recon.draft?.name || "TA";
+      const insufficient = result.insufficient;
+      // 成功页停留一下再进对话，让「认出了谁」这件事被看见
+      const wizardOverlay = this._recon.overlay;
+      this._recon.overlay = openModal({
+        title: "",
+        width: "380px",
+        content: `<div class="success-ripple">
+          <div class="sr-logo" aria-hidden="true"></div>
+          <h4>从对话里认出了 ${esc(charName)}</h4>
+          <p>正在进入聊天…</p>
+        </div>`,
+      });
+      closeModal(wizardOverlay);
       storage.setRaw(KEYS.ONBOARD_DONE, "1");
       this.view = "app";
       store.setSelectedCharacter(result.characterId);
-      store.setActiveTab("characters");
+      this.continueCharacter(result.characterId);
       this.render();
-      showToast({
-        message: result.insufficient ? "角色已创建。部分设定仍需你补充。" : "角色已从聊天记录重建",
-        type: "success",
-      });
+      setTimeout(() => {
+        this._closeReconstruction();
+        showToast({
+          message: insufficient ? `${charName} 已创建，部分设定仍需补充` : `从对话里认出了 ${charName}`,
+          type: "success",
+        });
+      }, 1100);
     } catch (err) {
       showToast({ message: "创建失败", type: "error" });
     }

@@ -4,29 +4,33 @@
    ============================================================ */
 
 :root {
-  /* ---- 颜色：亮色主题（默认）---- */
-  --color-bg: #f7faf9;
+  --font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+
+  /* ---- 颜色：Morning Mint / Brand Identity ---- */
+  --color-bg: #FAFCFB;
   --color-surface: #ffffff;
-  --color-surface-2: #f0f4f3;
-  --color-surface-3: #e8eeed;
-  --color-border: #e2e8e7;
-  --color-border-strong: #cdd6d4;
-  --color-text: #1a2332;
-  --color-text-secondary: #5a6a7a;
-  --color-text-tertiary: #8b9aa8;
-  --color-primary: #5fb8a0;
-  --color-primary-hover: #4da88f;
-  --color-primary-soft: #e6f4ef;
-  --color-accent: #6b8afd;
-  --color-online: #34d399;
-  --color-danger: #f87171;
-  --color-warning: #fbbf24;
-  --color-success: #34d399;
-  --color-bubble-me: #5fb8a0;
+  --color-surface-2: #F3F7F6;
+  --color-surface-3: #E8EEED;
+  --color-border: #E3ECE9;
+  --color-border-strong: #CDD9D5;
+  --color-text: #243238;
+  --color-text-secondary: #5A6C72;
+  --color-text-tertiary: #6B7C82;
+  --color-primary: #7CB8E8;
+  --color-primary-hover: #6AABE0;
+  --color-primary-soft: #EEF7FD;
+  --color-mint: #9DD9C2;
+  --color-mint-soft: #EDF9F4;
+  --color-accent: #7CB8E8;
+  --color-online: #9DD9C2;
+  --color-danger: #E57373;
+  --color-warning: #E8C96A;
+  --color-success: #6BB89A;
+  --color-bubble-me: #EDF9F4;
   --color-bubble-her: #ffffff;
-  --color-bubble-me-text: #ffffff;
-  --color-bubble-her-text: #1a2332;
-  --color-glass: rgba(255, 255, 255, 0.85);
+  --color-bubble-me-text: #243238;
+  --color-bubble-her-text: #243238;
+  --color-glass: rgba(250, 252, 251, 0.88);
 
   /* ---- 字号 ---- */
   --font-display: 28px;
@@ -80,12 +84,12 @@
   --motion: 220ms var(--ease-out);
 
   /* ---- 布局 ---- */
-  --sidebar-width: 64px;
-  --list-width: 280px;
-  --profile-width: 300px;
-  --topbar-height: 56px;
-  --input-height: 52px;
-  --bottom-nav-height: 60px;
+  --sidebar-width: 72px;
+  --list-width: 320px;
+  --profile-width: 340px;
+  --topbar-height: 52px;
+  --input-height: 48px;
+  --bottom-nav-height: 56px;
 
   /* ---- 安全区 ---- */
   --safe-top: env(safe-area-inset-top, 0px);
@@ -111,9 +115,13 @@
   --color-text: #e8eef4;
   --color-text-secondary: #9aa8b8;
   --color-text-tertiary: #6b7a8a;
-  --color-primary: #5fb8a0;
-  --color-primary-hover: #6fc8b0;
-  --color-primary-soft: rgba(95, 184, 160, 0.15);
+  --color-primary: #7CB8E8;
+  --color-primary-hover: #8EC4EE;
+  --color-primary-soft: rgba(124, 184, 232, 0.16);
+  --color-mint: #9DD9C2;
+  --color-mint-soft: rgba(157, 217, 194, 0.14);
+  --color-bubble-me: rgba(157, 217, 194, 0.22);
+  --color-bubble-me-text: #e8eef4;
   --color-bubble-her: #232b35;
   --color-bubble-her-text: #e8eef4;
   --color-glass: rgba(26, 32, 40, 0.85);
@@ -124,38 +132,44 @@
 
 /* ---- 主题预设 ---- */
 [data-theme-preset="mint"] {
-  --color-primary: #5fb8a0;
-  --color-primary-hover: #4da88f;
-  --color-primary-soft: #e6f4ef;
-  --color-bubble-me: #5fb8a0;
+  --color-primary: #7CB8E8;
+  --color-primary-hover: #6AABE0;
+  --color-primary-soft: #EEF7FD;
+  --color-bubble-me: #EDF9F4;
+  --color-bubble-me-text: #243238;
 }
 [data-theme-preset="sky"] {
   --color-primary: #5b9cf6;
   --color-primary-hover: #4a8be5;
   --color-primary-soft: #e8f1fd;
   --color-bubble-me: #5b9cf6;
+  --color-bubble-me-text: #fff;
 }
 [data-theme-preset="lavender"] {
   --color-primary: #8b7cf6;
   --color-primary-hover: #7a6be5;
   --color-primary-soft: #f0edfd;
   --color-bubble-me: #8b7cf6;
+  --color-bubble-me-text: #fff;
 }
 [data-theme-preset="rose"] {
   --color-primary: #f472b6;
   --color-primary-hover: #e561a5;
   --color-primary-soft: #fde8f3;
   --color-bubble-me: #f472b6;
+  --color-bubble-me-text: #fff;
 }
 [data-theme-preset="sage"] {
   --color-primary: #84cc84;
   --color-primary-hover: #73bb73;
   --color-primary-soft: #eef7ee;
   --color-bubble-me: #84cc84;
+  --color-bubble-me-text: #fff;
 }
 [data-theme-preset="cloud"] {
   --color-primary: #94a3b8;
   --color-primary-hover: #8392a7;
   --color-primary-soft: #f1f3f6;
   --color-bubble-me: #94a3b8;
+  --color-bubble-me-text: #fff;
 }

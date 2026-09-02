@@ -21,6 +21,16 @@ function defaultApiSeed() {
   };
 }
 
+function normalizeUiTab(tab) {
+  if (tab === "messages" || tab === "characters" || tab === "chats") return "companion";
+  if (tab === "companion" || tab === "moments" || tab === "me") return tab;
+  return "companion";
+}
+
+function normalizeUi(ui) {
+  return { ...ui, activeTab: normalizeUiTab(ui?.activeTab) };
+}
+
 function defaultState() {
   const api = defaultApiSeed();
   return {
@@ -31,9 +41,13 @@ function defaultState() {
       model: api.model,
       apiPresetId: api.apiPresetId,
       temperature: 1.0,
+      myName: "我",
       myAvatar: "",
       bg: "",
       theme: "light", // light | dark | auto
+      themePreset: "mint", // mint | sky | lavender | rose | sage | cloud
+      customColors: { primary: "", mint: "", bubbleMe: "", bubbleHer: "" },
+      particleIntensity: "medium", // off | weak | medium | strong
       accentColor: "",
       bubbleStyle: "rounded", // rounded | square | minimal
       fontSize: "medium", // small | medium | large
@@ -60,7 +74,7 @@ function defaultState() {
     chats: [], // [{id, roleId, name, avatar, createdAt, config:{persona,myAvatar,model,temperature}, messages:[{id,role,text,time,status}]}]
     currentChatId: null,
     ui: {
-      activeTab: "messages", // messages | characters | moments | me
+      activeTab: "companion", // companion | moments | me  (messages/characters → companion)
       sidebarOpen: true,
       profileOpen: false,
       searchQuery: "",
@@ -87,10 +101,14 @@ class Store {
       return {
         ...def,
         ...saved,
-        settings: { ...def.settings, ...(saved.settings || {}) },
+        settings: {
+          ...def.settings,
+          ...(saved.settings || {}),
+          customColors: { ...def.settings.customColors, ...((saved.settings || {}).customColors || {}) },
+        },
         global: { ...def.global, ...(saved.global || {}) },
         memoryCfg: { ...def.memoryCfg, ...(saved.memoryCfg || {}), autoSummary: { ...def.memoryCfg.autoSummary, ...((saved.memoryCfg || {}).autoSummary || {}) } },
-        ui: { ...def.ui, ...(saved.ui || {}) },
+        ui: normalizeUi( { ...def.ui, ...(saved.ui || {}) } ),
         chats: Array.isArray(saved.chats) ? saved.chats : [],
         longTermMemory: saved.longTermMemory && typeof saved.longTermMemory === "object" ? saved.longTermMemory : {},
         userPersonaPresets: Array.isArray(saved.userPersonaPresets) ? saved.userPersonaPresets : [],
@@ -266,8 +284,9 @@ class Store {
 
   // 便捷方法：UI
   setActiveTab(tab) {
-    this.set((s) => ({ ...s, ui: { ...s.ui, activeTab: tab } }));
-    events.emit(EVT.TAB_CHANGE, tab);
+    const activeTab = normalizeUiTab(tab);
+    this.set((s) => ({ ...s, ui: { ...s.ui, activeTab } }));
+    events.emit(EVT.TAB_CHANGE, activeTab);
   }
 
   setProfileOpen(open) {

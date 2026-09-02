@@ -143,9 +143,25 @@ async function main() {
     await waitEchoApp(session.send);
     await sleep(1000);
 
-    await evalExpr(session.send, `window.EchoApp.skipOnboarding(); true`);
+    await evalExpr(
+      session.send,
+      `(async () => {
+        const { createFromTemplate } = await import('/src/domain/persona.js');
+        const { storage, KEYS } = await import('/src/core/storage.js');
+        await createFromTemplate({
+          name: '橘小喵',
+          persona: '傲娇，毒舌但心软。',
+          firstMessage: '……你怎么突然找我。有事就说，没事我还要补觉。',
+          avatar: 'assets/avatars/juzi.svg'
+        });
+        storage.setRaw(KEYS.ONBOARD_DONE, '1');
+        window.EchoApp.view = 'app';
+        window.EchoApp.render();
+        return true;
+      })()`
+    );
     await sleep(900);
-    await evalExpr(session.send, `window.EchoApp.switchTab('characters'); true`);
+    await evalExpr(session.send, `window.EchoApp.switchTab('companion'); true`);
     await sleep(400);
 
     const emptyRel = JSON.parse(
@@ -278,7 +294,7 @@ async function main() {
       await evalExpr(
         session.send,
         `(async () => {
-          window.EchoApp.switchTab('characters');
+          window.EchoApp.switchTab('companion');
           const { store } = await import('/src/core/store.js');
           const id = store.getState().chats[0]?.roleId;
           if (id) window.EchoApp.selectCharacter(id);

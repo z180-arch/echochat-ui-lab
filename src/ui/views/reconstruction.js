@@ -1,28 +1,66 @@
 /**
- * Character Reconstruction review modal — Morning Mint, no new visual system.
+ * Character Reconstruction wizard — 导入方式选择 → 解析 → 核对。
+ * Morning Mint 视觉，不引入新的设计系统。
  */
 
 import { esc } from "../../core/utils.js";
+import { Icons } from "../components/index.js";
 import { DIMENSION_LABELS } from "../../domain/reconstruction/extract.js";
 
-export function reconstructionModalMarkup({ step = "paste", pasteText = "", draft = null, error = "" } = {}) {
+export function reconstructionModalMarkup({
+  step = "paste",
+  pasteText = "",
+  draft = null,
+  error = "",
+  importMode = "file",
+} = {}) {
+  if (step === "parsing") return parsingMarkup();
   if (step === "review" && draft) return reviewMarkup(draft, error);
-  return pasteMarkup(pasteText, error);
+  return pasteMarkup(pasteText, error, importMode);
 }
 
-function pasteMarkup(pasteText, error) {
+function parsingMarkup() {
   return {
-    title: "从聊天记录重建",
+    title: "正在解析",
     width: "640px",
     content: `
-      <p class="recon-lead">粘贴纯文本对话。每行格式：<code>名字: 内容</code>。不会读取微信/WhatsApp 导出文件，也不会把角色卡 JSON 当成聊天记录。</p>
-      <textarea class="input recon-paste" id="recon-paste" rows="12" placeholder="林晚: 我是咖啡店的店员。&#10;我: 今天想吃火锅吗？&#10;林晚: 讨厌香菜。">${esc(pasteText)}</textarea>
+      <div class="wizard-loading">
+        <div class="spinner" aria-hidden="true"></div>
+        <h4>正在从对话里认人…</h4>
+        <p>分析语气与人设，马上就好</p>
+      </div>
+    `,
+    footer: "",
+  };
+}
+
+function pasteMarkup(pasteText, error, importMode) {
+  const fileMode = importMode !== "text";
+  const loaded = (pasteText || "").trim();
+  return {
+    title: "导入聊天记录",
+    width: "640px",
+    content: `
+      <p class="create-sub">从对话记录里认出 TA 是谁。每行写成 <code>名字: 内容</code>（中英冒号均可）；角色卡 JSON 请走「导入角色卡」。</p>
+      <div class="mode-tabs">
+        <button type="button" class="mode-tab ${fileMode ? "on" : ""}" onclick="window.EchoApp.reconstructionSetMode('file')">从文件导入</button>
+        <button type="button" class="mode-tab ${fileMode ? "" : "on"}" onclick="window.EchoApp.reconstructionSetMode('text')">粘贴纯文本</button>
+      </div>
       ${error ? `<div class="recon-notice recon-notice-warn">${esc(error)}</div>` : ""}
-      <div class="recon-hint">样本太少时只会确定能追溯到原句的部分，其余留给你补。</div>
+      ${fileMode
+        ? `<label class="import-file-zone" for="recon-file">
+            <div class="if-icon">${Icons.upload}</div>
+            <div class="if-title">选择聊天记录文件</div>
+            <div class="if-desc">支持 .txt，微信 / QQ 导出后选择文件</div>
+            <input type="file" id="recon-file" accept=".txt,text/plain" hidden onchange="window.EchoApp.reconstructionPickFile(event)" />
+          </label>
+          ${loaded ? `<div class="recon-hint">已加载 ${loaded.length} 字，可切到「粘贴纯文本」查看或编辑。</div>` : ""}`
+        : `<textarea class="input recon-paste" id="recon-paste" rows="12" placeholder="林晚: 我是咖啡店的店员。&#10;我: 今天想吃火锅吗？&#10;林晚: 讨厌香菜。">${esc(pasteText)}</textarea>`}
+      <div class="recon-hint">样本太少时只保留能对上原句的部分，其余你再补。确认后会生成人设并进入对话。</div>
     `,
     footer: `
-      <button type="button" class="btn btn-ghost" onclick="window.EchoApp.reconstructionLoadFile()">从文本文件读取</button>
-      <button type="button" class="btn btn-primary" onclick="window.EchoApp.reconstructionParse()">解析</button>
+      <button type="button" class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">取消</button>
+      <button type="button" class="btn btn-primary" onclick="window.EchoApp.reconstructionParse()">下一步：解析</button>
     `,
   };
 }
@@ -42,7 +80,7 @@ function reviewMarkup(draft, error) {
   }
 
   return {
-    title: "核对重建结果",
+    title: "核对人设",
     width: "680px",
     content: `
       <label class="recon-label">角色名</label>
@@ -83,7 +121,7 @@ function reviewMarkup(draft, error) {
         .join("")}
     `,
     footer: `
-      <button type="button" class="btn btn-ghost" onclick="window.EchoApp.reconstructionBack()">返回</button>
+      <button type="button" class="btn btn-ghost" onclick="window.EchoApp.reconstructionBack()">返回修改</button>
       <button type="button" class="btn btn-primary" onclick="window.EchoApp.reconstructionConfirm()">${draft.sufficiency?.sufficient ? "创建角色" : "仍要创建"}</button>
     `,
   };

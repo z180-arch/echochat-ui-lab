@@ -6,16 +6,15 @@
 
 import { store } from "../core/store.js";
 import { events, EVT } from "../core/events.js";
-import { uid, sleep, rand } from "../core/utils.js";
+import { sleep, rand } from "../core/utils.js";
 import { getRoleId, getPersona, getRoleName } from "./persona.js";
 import { buildMessages, streamChat, needsApiSetup } from "./provider.js";
-import { getMemoryList } from "./memory.js";
+import { retrieveMemoriesForTurn, noteRetrieveChat, maybeAutoSummary } from "./memory.js";
 import { buildWorldbookBlock } from "./worldbook.js";
 import { recordChatTurn, getAffinity } from "./relations.js";
-import { maybeAutoSummary } from "./memory.js";
 import { messageStore } from "./message-store.js";
 import { listMoments } from "./moments.js";
-import { buildBehaviorContext } from "./behavior.js";
+import { assembleBehaviorContext } from "./context-builder.js";
 import { cleanAssistantReply, MAX_USER_MESSAGE_CHARS } from "./reply-clean.js";
 
 let abortCtrl = null;
@@ -58,13 +57,15 @@ function endSend(chatId) {
   events.emit("rerender");
 }
 
-// 构建系统提示词（人设 + 记忆 + 关系语气 + 世界书）
-export function buildSystemPrompt(chat) {
+// 构建系统提示词（slots + 本轮相关记忆 + 关系 brief + 世界书）
+export function buildSystemPrompt(chat, opts = {}) {
   const roleId = getRoleId(chat);
   const persona = getPersona(chat);
-  const memories = roleId ? getMemoryList(roleId, store.getState().memoryCfg?.injectMax || 10) : [];
+  const query = opts.query != null ? String(opts.query) : "";
+  noteRetrieveChat(chat?.id);
+  const memories = roleId ? retrieveMemoriesForTurn(roleId, query) : [];
   const affinity = roleId ? getAffinity(roleId, { moments: listMoments(roleId) }) : null;
-  const behavior = buildBehaviorContext({ persona, memories, affinity });
+  const { behavior } = assembleBehaviorContext({ chat, memories, affinity });
 
   const parts = [];
   if (behavior) parts.push(behavior);
@@ -120,7 +121,7 @@ export async function sendMessage(text) {
     }
     throwIfAborted();
 
-    const systemPrompt = buildSystemPrompt(chat);
+    const systemPrompt = buildSystemPrompt(chat, { query: trimmed });
     const messages = buildMessages(chat, systemPrompt, messageStore.peekMessages(chat.id));
     throwIfAborted();
 

@@ -71,6 +71,74 @@ export function searchMemories(roleId, query) {
   return list.filter((m) => String(m.content || "").toLowerCase().includes(q));
 }
 
+const DAY_MS = 86400000;
+
+export function tokenizeForRetrieve(text) {
+  const s = String(text || "").toLowerCase();
+  const tokens = new Set();
+  const words = s.match(/[a-z0-9]{2,}/g) || [];
+  words.forEach((w) => tokens.add(w));
+  const cjk = s.replace(/[^\u4e00-\u9fff]/g, "");
+  for (let i = 0; i < cjk.length; i += 1) {
+    tokens.add(cjk[i]);
+    if (i + 1 < cjk.length) tokens.add(cjk.slice(i, i + 2));
+  }
+  return [...tokens];
+}
+
+function overlapScore(content, tokens) {
+  if (!tokens.length) return 0;
+  const hay = String(content || "").toLowerCase();
+  let hits = 0;
+  for (const t of tokens) {
+    if (t && hay.includes(t)) hits += t.length > 1 ? 2 : 1;
+  }
+  return hits;
+}
+
+let lastRetrieve = { roleId: null, chatId: null, items: [], hadHit: false, preview: "" };
+
+export function getLastMemoryRetrieve() {
+  return lastRetrieve;
+}
+
+export function retrieveMemoriesForTurn(roleId, query, limit) {
+  const injectMax = limit || store.getState().memoryCfg?.injectMax || 10;
+  const all = getMemory(roleId).memories || [];
+  if (!roleId || !all.length) {
+    lastRetrieve = { roleId: roleId || null, chatId: lastRetrieve.chatId, items: [], hadHit: false, preview: "" };
+    return [];
+  }
+  const q = String(query || "").trim();
+  const tokens = tokenizeForRetrieve(q);
+  const now = Date.now();
+  const ranked = all.map((m) => {
+    const overlap = q ? overlapScore(m.content, tokens) : 0;
+    const recency = 1 / (1 + Math.max(0, now - (m.createdAt || 0)) / (14 * DAY_MS));
+    const importance = Number(m.importance) || 0;
+    const score = q ? overlap * 5 + importance * 0.35 + recency : importance + recency * 0.2;
+    return { mem: m, overlap, score };
+  });
+  ranked.sort(
+    (a, b) => b.score - a.score || (b.mem.importance || 0) - (a.mem.importance || 0) || (b.mem.createdAt || 0) - (a.mem.createdAt || 0)
+  );
+  const items = ranked.slice(0, injectMax).map((r) => r.mem);
+  const hit = q ? ranked.find((r) => r.overlap > 0) : null;
+  const hadHit = !!(hit && items.some((m) => m.id === hit.mem.id));
+  lastRetrieve = {
+    roleId,
+    chatId: lastRetrieve.chatId,
+    items,
+    hadHit,
+    preview: hadHit ? String(hit.mem.content || "").slice(0, 28) : "",
+  };
+  return items;
+}
+
+export function noteRetrieveChat(chatId) {
+  lastRetrieve = { ...lastRetrieve, chatId: chatId || null };
+}
+
 export function updateMemoryImportance(roleId, memoryId, importance) {
   store.set((s) => {
     const existing = s.longTermMemory[roleId];
@@ -150,15 +218,9 @@ ${conversation}
 
     const { summary, moment } = parseSummaryAndMoment(result);
 
-    if (summary) {
-      const lines = summary.split("\n").filter((l) => l.trim());
-      lines.forEach((line) => {
-        const clean = line.replace(/^[-•*\d.]+\s*/, "").trim();
-        if (clean && clean.length > 2) {
-          addMemory(roleId, clean, 5, "auto_summary");
-        }
-      });
-    }
+    // Conservative write: confirm-candidates remain the memory path.
+    // Auto-summary no longer dumps extracted lines into long-term memory.
+    void summary;
 
     if (moment) {
       addMoment({
@@ -184,6 +246,8 @@ export const Memory = {
   clearMemory,
   searchMemories,
   updateMemoryImportance,
+  retrieveMemoriesForTurn,
+  getLastMemoryRetrieve,
   buildMemoryBlock,
   rememberMessage,
   maybeAutoSummary,

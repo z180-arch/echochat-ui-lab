@@ -42,6 +42,7 @@ function defaultState() {
       apiPresetId: api.apiPresetId,
       temperature: 1.0,
       myName: "我",
+      userPersona: "",
       myAvatar: "",
       bg: "",
       theme: "light", // light | dark | auto
@@ -193,6 +194,9 @@ class Store {
         myAvatar: template.myAvatar || "",
         model: template.model || "",
         temperature: template.temperature != null ? template.temperature : 1.0,
+        scenario: template.scenario || "",
+        mesExample: template.mesExample || "",
+        speakingStyle: template.speakingStyle || "",
       },
       messages: template.firstMessage
         ? [{ id: uid(), role: "her", text: template.firstMessage, time: Date.now(), status: "sent" }]

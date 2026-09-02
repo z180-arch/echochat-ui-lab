@@ -45,11 +45,36 @@ function ensureRole(st, roleId, roleName) {
       streakDays: 0,
       chatTurns: 0,
       lastProactiveAt: 0,
+      brief: "",
+      events: [],
+      lastStage: "none",
     };
   } else if (roleName) {
     st.roles[roleId].roleName = roleName;
   }
-  return st.roles[roleId];
+  const role = st.roles[roleId];
+  if (!Array.isArray(role.events)) role.events = [];
+  if (typeof role.brief !== "string") role.brief = role.brief ? String(role.brief) : "";
+  if (!role.lastStage) role.lastStage = "none";
+  return role;
+}
+
+function pushEvent(role, type, text, ts) {
+  if (!role || !text) return;
+  if (!Array.isArray(role.events)) role.events = [];
+  role.events.push({ type, text, at: ts != null ? ts : Date.now() });
+  if (role.events.length > 12) role.events = role.events.slice(-12);
+  role.brief = text;
+}
+
+export function recordRelationshipEvent(roleId, { type = "note", text, at, roleName } = {}) {
+  if (!roleId || !String(text || "").trim()) return null;
+  const st = loadRelations();
+  const role = ensureRole(st, roleId, roleName);
+  if (!role) return null;
+  pushEvent(role, type, String(text).trim(), at != null ? at : Date.now());
+  saveRelations(st);
+  return role;
 }
 
 export function recordCheckIn(now) {
@@ -71,7 +96,9 @@ export function recordChatTurn(roleId, roleName, now) {
   const role = ensureRole(st, roleId, roleName);
   const ts = now != null ? now : Date.now();
   const today = todayStr(ts);
-  role.chatTurns = (Number(role.chatTurns) || 0) + 1;
+  const wasTurns = Number(role.chatTurns) || 0;
+  const prevStage = role.lastStage || "none";
+  role.chatTurns = wasTurns + 1;
   role.lastChatAt = ts;
   if (role.lastChatDay === today) {
     /* same day */
@@ -82,8 +109,21 @@ export function recordChatTurn(roleId, roleName, now) {
   }
   role.lastChatDay = today;
   if (!role.firstSeenAt) role.firstSeenAt = ts;
+  if (wasTurns === 0) {
+    pushEvent(role, "first_meeting", "第一次开口", ts);
+  }
   saveRelations(st);
-  return role;
+  const next = getAffinity(roleId);
+  const saved = loadRelations();
+  const updated = saved.roles[roleId];
+  if (updated) {
+    if (prevStage !== "none" && next.stage !== prevStage && next.stage !== "none") {
+      pushEvent(updated, "stage", `关系变成「${next.stageLabel}」`, ts);
+    }
+    updated.lastStage = next.stage;
+    saveRelations(saved);
+  }
+  return updated || role;
 }
 
 function momentEngagement(roleId, momentsList) {
@@ -127,6 +167,8 @@ export function getAffinity(roleId, opts) {
       stageLabel = "刚刚认识";
     }
   }
+  const events = role && Array.isArray(role.events) ? role.events : [];
+  const last = events.length ? events[events.length - 1] : null;
   return {
     score,
     turns,
@@ -143,6 +185,9 @@ export function getAffinity(roleId, opts) {
     hasHistory,
     stage,
     stageLabel,
+    brief: role && role.brief ? String(role.brief) : "",
+    lastEvent: last ? String(last.text || "") : "",
+    events: events.slice(-5),
   };
 }
 
@@ -208,6 +253,7 @@ export const EchoRelations = {
   defaultStore,
   recordCheckIn,
   recordChatTurn,
+  recordRelationshipEvent,
   getAffinity,
   shouldConsiderProactive,
   rollProactive,

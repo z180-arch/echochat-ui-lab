@@ -64,6 +64,9 @@ export async function createFromTemplate(tpl) {
     avatar: tpl.avatar,
     persona: tpl.persona,
     firstMessage: tpl.firstMessage,
+    scenario: tpl.scenario || "",
+    mesExample: tpl.mesExample || "",
+    speakingStyle: tpl.speakingStyle || "",
   });
   try {
     await Character.createCharacter({
@@ -74,9 +77,11 @@ export async function createFromTemplate(tpl) {
       personality: {
         description: tpl.persona,
         firstMessage: tpl.firstMessage,
+        scenario: tpl.scenario || "",
+        mesExample: tpl.mesExample || "",
       },
       appearance: { avatar: tpl.avatar || null },
-      speakingStyle: tpl.speakingStyle || {},
+      speakingStyle: typeof tpl.speakingStyle === "string" ? { notes: tpl.speakingStyle } : tpl.speakingStyle || {},
       preferences: tpl.preferences || {},
       source: tpl.source || "user_created",
     });
@@ -148,6 +153,11 @@ export function parseCharacterCard(json) {
         avatar: String(d.extensions?.echochat?.avatar || d.avatar || "").trim(),
         worldbook: d.character_book || null,
         sourceRoleId: d.extensions?.echochat?.roleId || null,
+        scenario: String(d.scenario || "").trim(),
+        mesExample: String(d.mes_example || "").trim(),
+        speakingStyle: String(
+          d.personality && d.description && String(d.personality) !== String(d.description) ? d.personality : ""
+        ).trim(),
       };
     }
     return {
@@ -157,6 +167,9 @@ export function parseCharacterCard(json) {
       avatar: String(obj.avatar || "").trim(),
       worldbook: obj.character_book || null,
       sourceRoleId: obj.roleId || null,
+      scenario: String(obj.scenario || "").trim(),
+      mesExample: String(obj.mes_example || obj.mesExample || "").trim(),
+      speakingStyle: String(obj.personality || obj.speakingStyle || "").trim(),
     };
   } catch (e) {
     return null;
@@ -176,6 +189,9 @@ export async function importCharacter(input) {
     firstMessage: parsed.firstMessage,
     avatar: parsed.avatar || "assets/avatars/default.svg",
     source: "imported",
+    scenario: parsed.scenario || "",
+    mesExample: parsed.mesExample || "",
+    speakingStyle: parsed.speakingStyle || "",
   });
   const characterId = getRoleId(chat);
   try {

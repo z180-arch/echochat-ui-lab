@@ -224,6 +224,27 @@ test("duplicate filtering vs existing memories", () => {
   assert.equal(list[0].accepted, false);
 });
 
+test("duplicate-only summary does not park pending or emit ready", () => {
+  resetAll();
+  addMemory("role_dup_only", "用户在上海工作", 6, "manual");
+  let hits = 0;
+  const off = events.on(EVT.MEMORY_CANDIDATES_READY, () => {
+    hits += 1;
+  });
+  const { count } = applyAutoSummaryResult("role_dup_only", "【摘要】\n用户在上海工作", { chatId: "c1" });
+  off();
+  assert.equal(count, 0);
+  assert.equal(hits, 0);
+  assert.equal(getPendingCandidates("role_dup_only"), null);
+});
+
+test("不可能 is not treated as speculation", () => {
+  resetAll();
+  const list = candidatesFromSummary("用户说不可能再吃香菜\n用户可能住在北京", "role_x");
+  assert.equal(list.length, 1);
+  assert.ok(list[0].text.includes("不可能"));
+});
+
 test("pending replace overwrites previous batch", () => {
   resetAll();
   setPendingCandidates("role_p", [{ id: "s1", text: "旧", accepted: false, duplicate: false, evidence: [] }], "c1");

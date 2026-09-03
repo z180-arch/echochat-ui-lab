@@ -15,7 +15,8 @@ const FACT_RE = /我(喜欢|讨厌|爱吃|爱|是|在|住|有|想|会|要|叫)|�
 const ABOUT_USER_RE = /你(喜欢|讨厌|是|在|住|有)/;
 const SKIP_RE = /^(嗨|哈喽|你好|在吗|嗯+|哦+|好的|ok|hi|hey|我在)[。.!！？?\s]*$/i;
 const EMOTION_ONLY_RE = /^(好烦|好累|哈哈哈+|呵呵+|开心|难过|生气|嗯嗯+|哦哦+|唉+)[。.!！？?\s]*$/;
-const SPECULATION_RE = /可能|也许|似乎|大概|应该是|说不定|用户可能/;
+// `(?<![不])可能` keeps lines like「不可能…」; bare 可能 / 也许 / … still drop.
+const SPECULATION_RE = /也许|似乎|大概|应该是|说不定|(?<![不])可能/;
 const PLOT_START_RE = /^(她|他|角色)/;
 const USER_HANDLE_RE = /用户|你|我/;
 
@@ -124,10 +125,16 @@ export function applyAutoSummaryResult(roleId, raw, { chatId } = {}) {
   if (!roleId) return { count: 0 };
   const { summary } = parseSummaryAndMoment(raw);
   const candidates = candidatesFromSummary(summary, roleId);
-  if (!candidates.length) return { count: 0 };
+  const actionable = candidates.filter((c) => !c.duplicate);
+  // Duplicate-only batches must not toast or block heuristic「从对话提取」.
+  if (!actionable.length) return { count: 0 };
   setPendingCandidates(roleId, candidates, chatId);
-  events.emit(EVT.MEMORY_CANDIDATES_READY, { roleId, chatId: chatId || null, count: candidates.length });
-  return { count: candidates.length };
+  events.emit(EVT.MEMORY_CANDIDATES_READY, {
+    roleId,
+    chatId: chatId || null,
+    count: actionable.length,
+  });
+  return { count: actionable.length };
 }
 
 export function extractMemoryCandidates(characterId, options = {}) {

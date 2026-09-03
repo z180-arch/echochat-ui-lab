@@ -252,6 +252,48 @@ await testAsync("cancel: sending false, no streaming leftover", async () => {
   assert.equal(leftoverStreaming(chat.id).length, 0);
 });
 
+await testAsync("does not persist partial assistant text while generating", async () => {
+  resetAll();
+  store.updateSettings({ apiKey: "sk-test-key", baseUrl: "https://api.example.com/v1" });
+  const chat = await createFromTemplate({ name: "林晚", persona: "p", firstMessage: "hi" });
+  let step = 0;
+  global.fetch = async () => ({
+    ok: true,
+    status: 200,
+    body: {
+      getReader() {
+        return {
+          async read() {
+            step += 1;
+            if (step === 1) {
+              const payload = JSON.stringify({ choices: [{ delta: { content: "第一" } }] });
+              return { done: false, value: new TextEncoder().encode(`data: ${payload}\n\n`) };
+            }
+            if (step === 2) {
+              await new Promise((r) => setTimeout(r, 80));
+              return { done: false, value: sseBytes("段") };
+            }
+            return { done: true, value: undefined };
+          },
+        };
+      },
+    },
+  });
+  const pending = sendMessage("嗨");
+  for (let i = 0; i < 40 && !isSending(); i++) {
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  assert.equal(isSending(), true);
+  await new Promise((r) => setTimeout(r, 20));
+  const mid = messageStore.peekMessages(chat.id).filter((m) => m.role === "her");
+  assert.ok(!mid.some((m) => (m.text || "").includes("第一")));
+  await pending;
+  assert.equal(isSending(), false);
+  const last = messageStore.peekMessages(chat.id).filter((m) => m.role === "her").pop();
+  assert.equal(last.text, "第一段");
+  assert.notEqual(last.status, "streaming");
+});
+
 await testAsync("over-length: does not persist or truncate", async () => {
   resetAll();
   store.updateSettings({ apiKey: "sk-test-key", baseUrl: "https://api.example.com/v1" });

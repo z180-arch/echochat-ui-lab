@@ -6,7 +6,6 @@
 
 import { store } from "../core/store.js";
 import { events, EVT } from "../core/events.js";
-import { sleep, rand } from "../core/utils.js";
 import { getRoleId, getPersona, getRoleName } from "./persona.js";
 import { buildMessages, streamChat, needsApiSetup } from "./provider.js";
 import { retrieveMemoriesForTurn, noteRetrieveChat, maybeAutoSummary } from "./memory.js";
@@ -113,12 +112,10 @@ export async function sendMessage(text) {
     text: "",
     status: "streaming",
   });
+  events.emit("rerender");
 
+  let streamed = "";
   try {
-    if (isIntimate(trimmed)) {
-      await sleep(rand(1200, 2600));
-      await sleep(1000);
-    }
     throwIfAborted();
 
     const systemPrompt = buildSystemPrompt(chat, { query: trimmed });
@@ -126,13 +123,10 @@ export async function sendMessage(text) {
     throwIfAborted();
 
     const reply = await streamChat(chat, messages, abortCtrl.signal, (full) => {
-      messageStore.updateMessage(chat.id, tempMsg.id, {
-        text: cleanAssistantReply(full),
-        status: "streaming",
-      });
+      streamed = full;
     });
 
-    const cleaned = cleanAssistantReply(reply || "");
+    const cleaned = cleanAssistantReply(reply || streamed || "");
     if (cleaned) {
       messageStore.updateMessage(chat.id, tempMsg.id, {
         text: cleaned,
@@ -167,7 +161,7 @@ export async function sendMessage(text) {
     const msgs = messageStore.peekMessages(id);
     const lastMsg = msgs[msgs.length - 1];
     if (lastMsg?.status === "streaming") {
-      const cleaned = cleanAssistantReply(lastMsg.text || "");
+      const cleaned = cleanAssistantReply(streamed || lastMsg.text || "");
       if (!cleaned) {
         messageStore.deleteMessage(id, lastMsg.id);
       } else {
@@ -265,11 +259,6 @@ export async function copyMessage(text) {
   } catch (e) {
     events.emit(EVT.TOAST, { message: "复制失败", type: "error" });
   }
-}
-
-const INTIMATE_WORDS = ["我爱你", "想你了", "抱抱", "亲亲", "喜欢你", "想念你", "爱你", "么么"];
-function isIntimate(text) {
-  return INTIMATE_WORDS.some((w) => text.includes(w));
 }
 
 export const Chat = {

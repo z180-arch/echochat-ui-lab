@@ -15,7 +15,6 @@ import {
   RelationshipBrief,
   EmptyState,
   IconButton,
-  TypingIndicator,
   LogoMark,
 } from "../components/index.js";
 import { getRoleId, getRoleAvatar } from "../../domain/persona.js";
@@ -245,7 +244,11 @@ function renderChatPane(chat, hideChatMobile) {
         ${CharacterAvatar({ src: getRoleAvatar(chat), size: "sm", alt: chat.name || "角色", name: chat.name || "角色" })}
         <div class="chat-header-copy">
           <div class="chat-header-name">${esc(chat.name || "角色")}</div>
-          <div class="chat-header-status">${StageChip({ label: stage, stage: affinity?.stage || "none" })}</div>
+          <div class="chat-header-status" ${sending ? `aria-live="polite"` : ""}>${
+            sending
+              ? `<span class="chat-composing">正在输入…</span>`
+              : StageChip({ label: stage, stage: affinity?.stage || "none" })
+          }</div>
         </div>
       </div>
       <div class="chat-header-actions">
@@ -290,8 +293,8 @@ function renderMessage(m, index, chat) {
   const isStreaming = m.status === "streaming";
   const isError = m.status === "error";
   const raw = m.text || "";
-  const showTyping = isStreaming && !raw.trim();
-  const text = showTyping ? "" : renderMarkdown(raw);
+  if (isStreaming && !raw.trim()) return "";
+  const text = renderMarkdown(raw);
   const settings = store.getState().settings;
   const myName = settings.myName || "我";
   const avatar = isMe
@@ -307,7 +310,7 @@ function renderMessage(m, index, chat) {
     <button type="button" class="msg-more-btn" aria-label="消息操作" onclick="window.EchoApp.toggleMessageActions(this)">${Icons.more}</button>
     <div class="msg-col">
       <div class="msg-name">${esc(isMe ? myName : chat.name || "TA")}</div>
-      <div class="msg-bubble">${showTyping ? TypingIndicator() : text || ""}</div>
+      <div class="msg-bubble">${text || ""}</div>
       <div class="msg-time">${formatDateTime(m.time)}</div>
       ${isError ? `<div class="msg-status">没发出去<button type="button" onclick="window.EchoApp.regenerateMessage(${index})">重试</button></div>` : ""}
       <div class="msg-actions">

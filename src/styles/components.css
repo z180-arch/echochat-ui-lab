@@ -345,16 +345,6 @@
   gap: 8px;
   padding: 0 4px;
 }
-.msg-streaming .msg-bubble::after {
-  content: "▋";
-  animation: blink 1s infinite;
-  margin-left: 2px;
-  opacity: 0.5;
-}
-@keyframes blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0; }
-}
 .msg-error .msg-bubble {
   border-color: var(--color-danger);
   background: color-mix(in srgb, var(--color-danger) 12%, var(--color-surface));

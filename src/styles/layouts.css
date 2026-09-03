@@ -205,6 +205,10 @@
   text-overflow: ellipsis;
   line-height: 1.35;
 }
+.chat-composing {
+  color: var(--color-text-secondary);
+  font-weight: var(--weight-regular);
+}
 .chat-header-actions {
   display: flex;
   align-items: center;

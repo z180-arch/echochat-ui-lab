@@ -659,9 +659,9 @@
 /* ---- 外观设置 ---- */
 .theme-chip-row {
   display: flex;
-  gap: 6px;
+  gap: var(--space-2);
   flex-wrap: wrap;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 .theme-grid {
   display: grid;

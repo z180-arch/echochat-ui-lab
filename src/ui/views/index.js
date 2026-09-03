@@ -363,7 +363,7 @@ function renderProfilePane(chat) {
       <button class="icon-btn profile-close" onclick="window.EchoApp.toggleProfile()" aria-label="关闭">${Icons.close}</button>
       ${CharacterAvatar({ src: getRoleAvatar(chat), size: "lg", className: "profile-avatar", alt: chat.name || "角色", name: chat.name || "角色" })}
       <div class="profile-name">${esc(chat.name || "角色")}</div>
-      <div class="profile-status">${StageChip({ label: presented.label, stage: presented.stage })}${presented.hasHistory && presented.knownDays ? `<span>相处 ${presented.knownDays} 天</span>` : ""}</div>
+      <div class="profile-status">${StageChip({ label: presented.label, stage: presented.stage })}</div>
     </div>
     <div class="profile-section">
       <div class="profile-section-title">关于 TA</div>
@@ -375,7 +375,7 @@ function renderProfilePane(chat) {
               ${roleId ? `<button class="btn btn-secondary btn-sm" onclick="window.EchoApp.editCharacter('${roleId}')">去编辑</button>` : ""}
             </div>`}
       </div>
-      ${roleId ? `
+      ${roleId && slots.identity ? `
         <div class="profile-tools">
           <button class="btn btn-secondary btn-sm" onclick="window.EchoApp.editCharacter('${roleId}')">编辑</button>
         </div>

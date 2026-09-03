@@ -33,6 +33,8 @@ global.URL = { createObjectURL: () => "blob:mock" };
 
 const { storage, KEYS, runMigrations } = await import("../src/core/storage.js");
 const { store } = await import("../src/core/store.js");
+const { formatDateTime, todayStr } = await import("../src/core/utils.js");
+const { saveChatDraft, loadChatDraft, clearChatDraft } = await import("../src/domain/chat-draft.js");
 // ============================================================
 //  测试工具
 // ============================================================
@@ -380,6 +382,30 @@ test("Delete conversation removes messages (no orphan)", () => {
   const state = store.getState();
   const found = state.chats.find((c) => c.id === chat.id);
   assert.equal(found, undefined);
+});
+
+console.log("\n=== Datetime + composer drafts ===");
+
+test("formatDateTime: today is HH:MM only", () => {
+  const s = formatDateTime(Date.now());
+  assert.ok(/^\d{2}:\d{2}$/.test(s), s);
+});
+
+test("formatDateTime: yesterday is prefixed", () => {
+  const [y, mo, d] = todayStr().split("-").map(Number);
+  const ts = new Date(y, mo - 1, d - 1, 19, 54).getTime();
+  const s = formatDateTime(ts);
+  assert.equal(s, "昨天 19:54");
+});
+
+test("chat draft is keyed by conversation id", () => {
+  resetState();
+  saveChatDraft("c1", "hello");
+  saveChatDraft("c2", "other");
+  assert.equal(loadChatDraft("c1"), "hello");
+  clearChatDraft("c1");
+  assert.equal(loadChatDraft("c1"), "");
+  assert.equal(loadChatDraft("c2"), "other");
 });
 
 // ============================================================

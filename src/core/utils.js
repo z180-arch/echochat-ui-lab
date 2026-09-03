@@ -54,16 +54,18 @@ export const formatTime = (ts) => {
 };
 
 export const formatDateTime = (ts) => {
-  const d = new Date(ts || Date.now());
-  const now = new Date();
-  const sameDay = d.toDateString() === now.toDateString();
-  const yesterday = new Date(now - 86400000);
-  const isYesterday = d.toDateString() === yesterday.toDateString();
   const time = formatTime(ts);
-  if (sameDay) return time;
-  if (isYesterday) return `昨天 ${time}`;
+  const msgDay = todayStr(ts);
+  const today = todayStr();
+  const diff = dayDiff(msgDay, today);
+  if (diff === 0) return time;
+  if (diff === 1) return `昨天 ${time}`;
+  const d = new Date(ts || Date.now());
   const mo = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
+  if (d.getFullYear() !== new Date().getFullYear()) {
+    return `${d.getFullYear()}-${mo}-${day} ${time}`;
+  }
   return `${mo}-${day} ${time}`;
 };
 

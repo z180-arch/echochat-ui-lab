@@ -105,7 +105,8 @@ export function StageChip({ label = "", stage = "none" }) {
 export function CharacterCard({
   name = "",
   avatar = "",
-  preview = "",
+  presence = "",
+  lastLine = "",
   time = "",
   stage = "none",
   stageLabel = "",
@@ -121,8 +122,9 @@ export function CharacterCard({
         <span class="list-item-title">${esc(name)}</span>
         <span class="list-item-time">${esc(time || "")}</span>
       </div>
-      <div class="list-item-subtitle">${esc(preview || "还没有聊过")}</div>
+      <div class="list-item-subtitle">${esc(presence || "还没有聊过")}</div>
       <div class="list-item-meta">${StageChip({ label: stageLabel, stage })}</div>
+      ${lastLine ? `<div class="list-item-last">${esc(lastLine)}</div>` : ""}
     </div>
   </button>`;
 }
@@ -169,7 +171,7 @@ export function Skeleton({ width = "100%", height = "16px", className = "" }) {
 
 // Typing 指示器
 export function TypingIndicator() {
-  return `<div class="typing-indicator"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>`;
+  return `<span class="chat-composing">正在整理思绪</span>`;
 }
 
 // Toast

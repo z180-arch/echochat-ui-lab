@@ -18,6 +18,7 @@ export const KEYS = {
   MIGRATION_STAGING: "echodownload_migration_staging_v2", // 两阶段提交 staging
   ONBOARD_DONE: "echodownload_onboard_done",
   IOS_HINT: "echodownload_ios_hint",
+  CHAT_DRAFTS: "echodownload_chat_drafts_v1",
 };
 
 // 迁移注册表：每个迁移函数接收旧数据，返回新数据

@@ -42,6 +42,7 @@ import {
   setReplyPaceForCharacter,
   REPLY_PACE_OPTIONS,
 } from "./domain/reply-pace.js";
+import { loadChatDraft, saveChatDraft, clearChatDraft } from "./domain/chat-draft.js";
 import { reconstructionModalMarkup } from "./ui/views/reconstruction.js";
 import { memoryReviewMarkup } from "./ui/views/memory-review.js";
 import {
@@ -70,6 +71,7 @@ const App = {
   _lastRenderedView: null,
   _sendPulse: false,
   _chatDraft: "",
+  _draftChatId: null,
 
   // 初始化
   async init() {
@@ -197,8 +199,12 @@ const App = {
     // 保存「我的」页滚动位置：innerHTML 替换会把它清零
     const meScroll = document.getElementById("me-scroll");
     if (meScroll) this._meScrollTop = meScroll.scrollTop;
+    this._openProfileFolds = [...document.querySelectorAll("details.profile-fold[open]")].map(
+      (d) => d.querySelector("summary")?.textContent.trim()
+    );
     const chatInput = document.getElementById("chat-input");
-    if (chatInput) this._chatDraft = chatInput.value;
+    const draftId = this._draftChatId || store.getCurrentChat()?.id;
+    if (chatInput && draftId) saveChatDraft(draftId, chatInput.value);
 
     let html = "";
     switch (this.view) {
@@ -271,9 +277,17 @@ const App = {
 
     this.bindMessageGestures();
 
+    document.querySelectorAll("details.profile-fold").forEach((d) => {
+      const t = d.querySelector("summary")?.textContent.trim();
+      if (t && this._openProfileFolds?.includes(t)) d.open = true;
+    });
+
     const input = document.getElementById("chat-input");
     if (input) {
-      if (this._chatDraft) input.value = this._chatDraft;
+      const chat = store.getCurrentChat();
+      this._draftChatId = chat?.id || null;
+      input.value = chat ? loadChatDraft(chat.id) : "";
+      this._chatDraft = input.value;
       this.autoGrowInput(input);
       this.updateChatCount(input);
     }
@@ -295,7 +309,6 @@ const App = {
 
   // 移动端长按气泡呼出操作条（桌面端用 hover）
   bindMessageGestures() {
-    if (window.innerWidth >= 768) return;
     document.querySelectorAll(".msg").forEach((msg) => {
       if (msg.dataset.gestureBound) return;
       msg.dataset.gestureBound = "1";
@@ -361,7 +374,12 @@ const App = {
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
         document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+        document.querySelectorAll(".msg.show-actions").forEach((m) => m.classList.remove("show-actions"));
       }
+    });
+    document.addEventListener("click", (e) => {
+      if (e.target.closest(".msg")) return;
+      document.querySelectorAll(".msg.show-actions").forEach((m) => m.classList.remove("show-actions"));
     });
     let wide = typeof window !== "undefined" && window.innerWidth >= 1024;
     let compact = typeof window !== "undefined" && window.innerWidth < 768;
@@ -960,6 +978,8 @@ const App = {
     }
     input.value = "";
     this._chatDraft = "";
+    const chat = store.getCurrentChat();
+    if (chat?.id) clearChatDraft(chat.id);
     this.autoGrowInput(input);
     this.updateChatCount(input);
     // 模型未配置时不报错，先收下这句话，连接完成后自动发出去
@@ -997,6 +1017,8 @@ const App = {
   onChatInput(el) {
     this.autoGrowInput(el);
     this._chatDraft = el?.value || "";
+    const chat = store.getCurrentChat();
+    if (chat?.id) saveChatDraft(chat.id, this._chatDraft);
     this.updateChatCount(el);
   },
   copyMessage(index) {

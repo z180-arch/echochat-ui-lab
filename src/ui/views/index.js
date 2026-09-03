@@ -197,14 +197,20 @@ function renderCompanionInbox(searchQuery, currentChat, hideListMobile) {
           })
         : hub.map((h) => {
             const affinity = getAffinity(h.id, { moments: listMoments(h.id) });
-            const preview = h.lastPreview || "";
+            const hasTalk = !!h.lastPreview || (affinity?.hasHistory);
+            const presence = affinity?.hasHistory
+              ? `相处 ${affinity.knownDays} 天`
+              : hasTalk
+                ? "刚刚认识"
+                : "还没有聊过";
             return CharacterCard({
               name: h.name,
               avatar: resolveAvatarSrc(h.avatar),
-              preview,
+              presence,
+              lastLine: h.lastPreview || "",
               time: h.lastAt ? relativeTime(h.lastAt) : "",
               stage: affinity?.stage || "none",
-              stageLabel: companionStage(affinity, !!preview),
+              stageLabel: companionStage(affinity, hasTalk),
               active: currentRole === h.id,
               onClick: `window.EchoApp.selectCharacter('${h.id}')`,
             });
@@ -248,7 +254,7 @@ function renderChatPane(chat, hideChatMobile) {
           <div class="chat-header-name">${esc(chat.name || "角色")}</div>
           <div class="chat-header-status" ${sending ? `aria-live="polite"` : ""}>${
             sending
-              ? `<span class="chat-composing">正在输入…</span>`
+              ? `<span class="chat-composing">正在整理思绪</span>`
               : StageChip({ label: stage, stage: affinity?.stage || "none" })
           }</div>
         </div>
@@ -314,7 +320,7 @@ function renderMessage(m, index, chat) {
       <div class="msg-name">${esc(isMe ? myName : chat.name || "TA")}</div>
       <div class="msg-bubble">${text || ""}</div>
       <div class="msg-time">${formatDateTime(m.time)}</div>
-      ${isError ? `<div class="msg-status">没发出去<button type="button" onclick="window.EchoApp.regenerateMessage(${index})">重试</button></div>` : ""}
+      ${isError ? `<div class="msg-status">没发出去<button type="button" class="msg-retry-btn" onclick="window.EchoApp.regenerateMessage(${index})">重试</button></div>` : ""}
       <div class="msg-actions">
         <button class="msg-action-btn" onclick="window.EchoApp.copyMessage(${index})">复制</button>
         <button class="msg-action-btn" onclick="window.EchoApp.rememberMessage(${index})">记住</button>
@@ -363,11 +369,11 @@ function renderProfilePane(chat) {
       <div class="profile-section-title">关于 TA</div>
       <div class="profile-section-content">
         ${slots.identity
-          ? `<div class="persona-clip">${esc(slots.identity.slice(0, 220))}${slots.identity.length > 220 ? "…" : ""}</div>`
-          : `<div class="profile-muted">暂无设定</div>`}
-        ${slots.scenario ? `<p class="profile-slot"><span>情景</span>${esc(slots.scenario.slice(0, 160))}</p>` : ""}
-        ${slots.speakingStyle ? `<p class="profile-slot"><span>语气</span>${esc(slots.speakingStyle.slice(0, 120))}</p>` : ""}
-        ${slots.examples ? `<p class="profile-slot"><span>示例</span>${esc(slots.examples.slice(0, 120))}</p>` : ""}
+          ? `<div class="persona-clip">${esc(slots.identity.slice(0, 120))}${slots.identity.length > 120 ? "…" : ""}</div>`
+          : `<div class="profile-empty">
+              <p class="profile-muted">暂无设定</p>
+              ${roleId ? `<button class="btn btn-secondary btn-sm" onclick="window.EchoApp.editCharacter('${roleId}')">去编辑</button>` : ""}
+            </div>`}
       </div>
       ${roleId ? `
         <div class="profile-tools">
@@ -377,8 +383,8 @@ function renderProfilePane(chat) {
       ` : ""}
     </div>
     ${roleId ? `
-    <div class="profile-section">
-      <div class="profile-section-title">回复速度</div>
+    <details class="profile-fold">
+      <summary class="profile-section-title">回复速度</summary>
       <div class="profile-section-content">
         <p class="profile-muted">控制这个角色回复消息时的呈现节奏</p>
         <div class="reply-pace-field" data-reply-pace-for="${esc(roleId)}">
@@ -389,7 +395,7 @@ function renderProfilePane(chat) {
           })}
         </div>
       </div>
-    </div>
+    </details>
     ` : ""}
     <div class="profile-section">
       <div class="profile-section-title">关系</div>
@@ -397,37 +403,46 @@ function renderProfilePane(chat) {
         ${RelationshipBrief({ affinity })}
       </div>
     </div>
-    <div class="profile-section">
-      <div class="profile-section-title">记忆</div>
+    <details class="profile-fold">
+      <summary class="profile-section-title">记忆</summary>
       <div class="profile-section-content">
         ${memories.length === 0
-          ? `<div class="profile-muted">还没有已确认的记忆。聊天里点「记住」，或从对话提取。</div>`
+          ? `<div class="profile-empty">
+              <p class="profile-muted">还没有已确认的记忆。</p>
+              ${roleId ? `<button class="btn btn-secondary btn-sm" onclick="window.EchoApp.openMemoryCandidates('${roleId}','${chat.id}')">从对话提取</button>` : ""}
+            </div>`
           : memories.map((m) => MemoryRow({
               content: m.content,
               onDelete: roleId ? `window.EchoApp.deleteCharacterMemory('${roleId}','${m.id}')` : "",
             })).join("")}
-        ${roleId ? `<button class="btn btn-ghost btn-sm profile-extract" onclick="window.EchoApp.openMemoryCandidates('${roleId}','${chat.id}')">从对话提取</button>` : ""}
+        ${roleId && memories.length ? `<button class="btn btn-ghost btn-sm profile-extract" onclick="window.EchoApp.openMemoryCandidates('${roleId}','${chat.id}')">从对话提取</button>` : ""}
       </div>
-    </div>
-    <div class="profile-section">
-      <div class="profile-section-title">世界书</div>
+    </details>
+    <details class="profile-fold">
+      <summary class="profile-section-title">世界书</summary>
       <div class="profile-section-content">
         ${worldPeek.length === 0
-          ? `<div class="profile-muted">还没有会注入对话的设定条目。</div>`
-          : worldPeek.map((w) => `<div class="mem-line">${esc(w.label)}${w.keys.length ? `<span class="profile-muted"> · ${esc(w.keys.slice(0, 3).join("、"))}</span>` : ""}</div>`).join("")}
-        <button class="btn btn-ghost btn-sm profile-extract" onclick="window.EchoApp.openSettings('worldbook')">管理条目</button>
+          ? `<div class="profile-empty">
+              <p class="profile-muted">还没有会注入对话的设定条目。</p>
+              <button class="btn btn-secondary btn-sm" onclick="window.EchoApp.openSettings('worldbook')">添加条目</button>
+            </div>`
+          : `${worldPeek.map((w) => `<div class="mem-line">${esc(w.label)}${w.keys.length ? `<span class="profile-muted"> · ${esc(w.keys.slice(0, 3).join("、"))}</span>` : ""}</div>`).join("")}
+             <button class="btn btn-ghost btn-sm profile-extract" onclick="window.EchoApp.openSettings('worldbook')">管理条目</button>`}
       </div>
-    </div>
-    <div class="profile-section">
-      <div class="profile-section-title">瞬间</div>
+    </details>
+    <details class="profile-fold">
+      <summary class="profile-section-title">瞬间</summary>
       <div class="profile-section-content">
         ${moments.length === 0
-          ? `<div class="profile-muted">还没有瞬间。确认记忆后会出现在这里。</div>`
+          ? `<div class="profile-empty">
+              <p class="profile-muted">还没有瞬间。确认记忆后会出现在这里。</p>
+              ${roleId ? `<button class="btn btn-secondary btn-sm" onclick="window.EchoApp.openMemoryCandidates('${roleId}','${chat.id}')">从对话提取</button>` : ""}
+            </div>`
           : moments.map((m) => `<div class="mom-line">${esc(m.content)}<span>${relativeTime(m.createdAt)}</span></div>`).join("")}
       </div>
-    </div>
-    <div class="profile-section">
-      <div class="profile-section-title">相处线</div>
+    </details>
+    <details class="profile-fold">
+      <summary class="profile-section-title">相处线</summary>
       <div class="profile-section-content">
         <p class="profile-muted">同一位 ${esc(chat.name || "TA")} 的不同聊天主题。记忆与关系共享。</p>
         ${convos.map((c) => `
@@ -436,9 +451,9 @@ function renderProfilePane(chat) {
             <div class="d">${esc((c.lastPreview || "还没有聊过").slice(0, 42))}</div>
           </button>
         `).join("")}
-        ${roleId ? `<button class="btn btn-ghost btn-sm" onclick="window.EchoApp.startNewConversation('${roleId}')">开一条新的相处线</button>` : ""}
+        ${roleId ? `<button class="btn btn-secondary btn-sm" onclick="window.EchoApp.startNewConversation('${roleId}')">开一条新的相处线</button>` : ""}
       </div>
-    </div>
+    </details>
   </aside>`;
 }
 

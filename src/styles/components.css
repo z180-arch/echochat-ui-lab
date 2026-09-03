@@ -46,7 +46,7 @@
 }
 .btn-danger {
   background: var(--color-danger);
-  color: #fff;
+  color: var(--color-primary-fg);
 }
 .btn-danger:hover:not(:disabled) {
   opacity: 0.9;
@@ -61,7 +61,7 @@
 }
 .btn-stop {
   background: var(--color-danger);
-  color: #fff;
+  color: var(--color-primary-fg);
   border-radius: var(--radius-pill);
   width: 36px;
   height: 36px;
@@ -176,7 +176,7 @@
   display: grid;
   place-items: center;
   background: linear-gradient(135deg, var(--color-primary), var(--color-mint));
-  color: #fff;
+  color: var(--color-primary-fg);
   font-weight: var(--weight-semibold);
   line-height: 1;
   user-select: none;
@@ -320,13 +320,11 @@
   background: var(--color-bubble-me);
   color: var(--color-bubble-me-text);
   border: 1px solid color-mix(in srgb, var(--color-mint) 45%, transparent);
-  border-bottom-right-radius: 6px;
 }
 .msg-her .msg-bubble {
   background: var(--color-bubble-her);
   color: var(--color-bubble-her-text);
   border: 1px solid var(--color-border);
-  border-bottom-left-radius: 6px;
 }
 .msg-time {
   font-size: 12px;
@@ -343,29 +341,33 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 4px;
+  padding: 4px 4px 0;
+}
+.msg-retry-btn {
+  color: var(--color-primary);
+  font-weight: var(--weight-medium);
+  min-height: 32px;
+  padding: 0 8px;
 }
 .msg-error .msg-bubble {
   border-color: var(--color-danger);
   background: color-mix(in srgb, var(--color-danger) 12%, var(--color-surface));
 }
 .msg-actions {
-  display: flex;
+  display: none;
   flex-wrap: wrap;
   gap: 2px;
   margin-top: 2px;
-  opacity: 0;
-  transition: opacity var(--dur-fast) var(--ease-out);
 }
-.msg:hover .msg-actions,
+.msg.show-actions .msg-actions,
 .msg:focus-within .msg-actions {
-  opacity: 1;
+  display: flex;
 }
 .msg-action-btn {
   font-size: 12px;
   color: var(--color-text-tertiary);
   padding: 4px 8px;
-  min-height: 32px;
+  min-height: 36px;
   border-radius: var(--radius-sm);
 }
 .msg-action-btn:hover {
@@ -374,6 +376,11 @@
 }
 .msg-action-danger:hover {
   color: var(--color-danger);
+}
+@media (hover: hover) and (pointer: fine) {
+  .msg:hover .msg-actions {
+    display: flex;
+  }
 }
 
 /* ---- Markdown 渲染 ---- */
@@ -694,22 +701,10 @@
   to { transform: rotate(360deg); }
 }
 .typing-indicator {
-  display: flex;
-  gap: 4px;
-  padding: var(--space-3) var(--space-4);
+  display: none;
 }
 .typing-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-text-tertiary);
-  animation: typing 1.4s infinite;
-}
-.typing-dot:nth-child(2) { animation-delay: 0.2s; }
-.typing-dot:nth-child(3) { animation-delay: 0.4s; }
-@keyframes typing {
-  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-  30% { transform: translateY(-6px); opacity: 1; }
+  display: none;
 }
 
 /* ---- Badge / Chip ---- */
@@ -742,7 +737,7 @@
 }
 .chip-active {
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-primary-fg);
 }
 
 /* ---- 列表项 ---- */
@@ -822,6 +817,21 @@
 .list-item-meta {
   margin-top: 2px;
   min-height: 16px;
+}
+.list-item-last {
+  display: none;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.35;
+}
+@media (hover: hover) and (pointer: fine) {
+  .list-item:hover .list-item-last,
+  .list-item-active .list-item-last {
+    display: block;
+  }
 }
 .stage-tag {
   font-size: 12px;
@@ -920,7 +930,7 @@
   left: 2px;
   width: 20px;
   height: 20px;
-  background: #fff;
+  background: var(--color-primary-fg);
   border-radius: 50%;
   transition: transform var(--motion);
   box-shadow: var(--shadow-sm);

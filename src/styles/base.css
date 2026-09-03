@@ -186,6 +186,7 @@ ol {
   .nav-rail-indicator,
   .bottom-nav-indicator,
   .typing-dot,
+  .chat-composing::before,
   .skeleton {
     animation: none !important;
     transition: none !important;
@@ -203,7 +204,7 @@ ol {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #FAFCFB;
+  background: var(--color-bg, #FAFCFB);
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.35s ease, visibility 0.35s ease;
@@ -247,14 +248,14 @@ ol {
   font-size: 24px;
   font-weight: 600;
   letter-spacing: 0;
-  color: #243238;
+  color: var(--color-text, #243238);
   opacity: 0;
   transform: translateY(6px);
   animation: splashText 0.45s ease 0.28s forwards;
 }
 .splash-tagline {
   font-size: 14px;
-  color: #5A6C72;
+  color: var(--color-text-secondary, #5A6C72);
   opacity: 0;
   transform: translateY(6px);
   animation: splashText 0.45s ease 0.4s forwards;

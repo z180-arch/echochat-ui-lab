@@ -208,6 +208,22 @@
 .chat-composing {
   color: var(--color-text-secondary);
   font-weight: var(--weight-regular);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.chat-composing::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 55%, transparent);
+  animation: composing-glow 1.8s var(--ease-out) infinite;
+}
+@keyframes composing-glow {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 50%, transparent); opacity: 0.85; }
+  50% { box-shadow: 0 0 0 6px transparent; opacity: 1; }
 }
 .chat-header-actions {
   display: flex;
@@ -303,7 +319,7 @@
   height: 44px;
   border-radius: 50%;
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-primary-fg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -428,6 +444,46 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+.profile-fold {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+.profile-fold > summary {
+  list-style: none;
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 0;
+}
+.profile-fold > summary::-webkit-details-marker {
+  display: none;
+}
+.profile-fold > summary::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid var(--color-text-tertiary);
+  border-bottom: 1.5px solid var(--color-text-tertiary);
+  transform: rotate(45deg);
+  transition: transform var(--dur-fast) var(--ease-out);
+  flex-shrink: 0;
+}
+.profile-fold[open] > summary::after {
+  transform: rotate(225deg);
+  margin-top: 4px;
+}
+.profile-fold .profile-section-content {
+  padding-top: 8px;
+}
+.profile-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
 }
 .reply-pace-field {
   margin-top: 8px;

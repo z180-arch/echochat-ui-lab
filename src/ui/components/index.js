@@ -139,15 +139,29 @@ export function MemoryRow({ content = "", onDelete = "" }) {
   </div>`;
 }
 
-export function RelationshipBrief({ affinity = null, lastEvent = "", hasTalk = false }) {
+export function RelationshipBrief({ affinity = null, lastEvent = "", hasTalk = false, compact = false }) {
   if (!affinity?.hasHistory) {
     const presented = presentCompanionStage(affinity, hasTalk);
+    const copy = compact
+      ? presented.label === "还没有聊过"
+        ? "开口第一句，关系从这里开始。"
+        : "多聊几句，关系会自然靠近。"
+      : relationshipEmptyCopy(presented);
     return `<div class="relationship-brief">
-      <p class="profile-muted">${esc(relationshipEmptyCopy(presented))}</p>
+      <p class="profile-muted">${esc(copy)}</p>
     </div>`;
   }
   const event = String(lastEvent || affinity.lastEvent || "").trim();
   const brief = String(affinity.brief || "").trim();
+  if (compact) {
+    const line = brief || String(affinity.toneHint || "").trim();
+    const days = affinity.knownDays ? `相处 ${affinity.knownDays} 天` : "";
+    return `<div class="relationship-brief">
+      ${line ? `<p class="relationship-brief-copy">${esc(line)}</p>` : ""}
+      ${days ? `<p class="profile-muted relationship-brief-meta">${esc(days)}</p>` : ""}
+      ${event ? `<p class="profile-muted relationship-brief-meta">最近 · ${esc(event)}</p>` : ""}
+    </div>`;
+  }
   const days = affinity.knownDays ? ` · 相处 ${affinity.knownDays} 天` : "";
   return `<div class="relationship-brief">
     <div class="relationship-brief-head">${StageChip({ label: affinity.stageLabel, stage: affinity.stage })}</div>
@@ -221,6 +235,17 @@ export function openModal({ title, content, footer = "", width = "560px" }) {
 
 export function closeModal(overlay) {
   overlay?.remove();
+}
+
+// Profile chevron row (character detail navigation)
+export function ProfileRow({ title = "", meta = "", onClick = "" }) {
+  return `<button type="button" class="profile-row" ${onClick ? `onclick="${onClick}"` : ""}>
+    <span class="profile-row-copy">
+      <span class="profile-row-title">${esc(title)}</span>
+      ${meta ? `<span class="profile-row-meta">${esc(meta)}</span>` : ""}
+    </span>
+    <span class="profile-row-arrow">${Icons.chevronRight}</span>
+  </button>`;
 }
 
 // 设置行

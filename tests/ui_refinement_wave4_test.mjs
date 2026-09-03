@@ -85,11 +85,10 @@ function sliceFn(src, name) {
   throw new Error(`unclosed ${name}`);
 }
 
-test("Import character card keeps the create modal until success", () => {
+test("Import character card opens file picker from create flow", () => {
   const bring = sliceFn(mainSrc, "_paintBringModal");
-  assert.ok(bring.includes("keepOpen"));
-  assert.ok(bring.includes('importCharacterCard()", false, true)'));
-  assert.ok(!/remove\(\);window\.EchoApp\.importCharacterCard/.test(bring));
+  assert.ok(bring.includes("importCharacterCard()"));
+  assert.ok(bring.includes("create-secondary-btn"));
   const importFn = sliceFn(mainSrc, "importCharacterCard");
   assert.ok(importFn.includes('querySelectorAll(".modal-overlay")'));
 });
@@ -107,9 +106,10 @@ test("Character edit validates name and reports save failure", () => {
   assert.ok(save.includes("保存失败"));
 });
 
-test("Worldbook settings copy is shared, not a character admin", () => {
-  assert.ok(mainSrc.includes("对所有角色共用"));
-  assert.ok(mainSrc.includes("写好关键词和设定后点添加"));
+test("Worldbook settings has entry form without admin intro", () => {
+  assert.ok(mainSrc.includes('section === "worldbook"'));
+  assert.ok(mainSrc.includes("addWorldbookEntry"));
+  assert.ok(mainSrc.includes("wb-keys"));
 });
 
 test("Voice input is not a fake tappable setting", () => {

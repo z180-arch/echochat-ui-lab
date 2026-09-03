@@ -1,6 +1,15 @@
 // ============================================================
 //  EchoChat · Views
 //  陪伴优先：角色 Inbox → 聊天 → 相处中
+//
+//  IA entry points (vNext):
+//  Chat → Hub row | Moment author
+//  Profile → Chat header
+//  Memory → Continuity sheet | message「记住」| memory confirm modal
+//  Moments → Continuity sheet (no top-nav tab)
+//  Worldbook → Me 高级 | Continuity sheet link
+//  Create → openBring() only (Landing / Hub + / empty states)
+//  Settings → Me chevron rows
 // ============================================================
 
 import { store } from "../../core/store.js";
@@ -17,6 +26,7 @@ import {
   IconButton,
   LogoMark,
   Segmented,
+  ProfileRow,
 } from "../components/index.js";
 import { getReplyPace, REPLY_PACE_OPTIONS } from "../../domain/reply-pace.js";
 import { getRoleId, getRoleAvatar } from "../../domain/persona.js";
@@ -111,7 +121,6 @@ export function renderAppShell() {
   <div class="app-shell ${hideBottom ? "app-shell-chat" : ""}">
     ${renderNavRail(activeTab)}
     ${activeTab === "companion" ? renderCompanionInbox(searchQuery, currentChat, hideListMobile) : ""}
-    ${activeTab === "moments" ? renderMomentsPane() : ""}
     ${activeTab === "me" ? renderMePane() : ""}
     ${activeTab === "companion" && currentChat ? renderChatPane(currentChat, false) : ""}
     ${activeTab === "companion" && !currentChat ? renderEmptyChat() : ""}
@@ -121,7 +130,7 @@ export function renderAppShell() {
   </div>`;
 }
 
-const TAB_ORDER = ["companion", "moments", "me"];
+const TAB_ORDER = ["companion", "me"];
 
 function renderNavRail(activeTab) {
   return `
@@ -130,9 +139,6 @@ function renderNavRail(activeTab) {
     <span class="nav-rail-indicator" aria-hidden="true"></span>
     <button class="nav-item ${activeTab === "companion" ? "nav-item-active" : ""}" onclick="window.EchoApp.switchTab('companion')" title="陪伴">
       ${Icons.message}<span class="nav-item-label">陪伴</span>
-    </button>
-    <button class="nav-item ${activeTab === "moments" ? "nav-item-active" : ""}" onclick="window.EchoApp.switchTab('moments')" title="瞬间">
-      ${Icons.moments}<span class="nav-item-label">瞬间</span>
     </button>
     <div class="nav-spacer"></div>
     <button class="nav-item ${activeTab === "me" ? "nav-item-active" : ""}" onclick="window.EchoApp.switchTab('me')" title="我的">
@@ -149,9 +155,6 @@ function renderBottomNav(activeTab) {
     <span class="bottom-nav-indicator" aria-hidden="true"></span>
     <button class="bottom-nav-item ${activeTab === "companion" ? "bottom-nav-item-active" : ""}" onclick="window.EchoApp.switchTab('companion')">
       ${Icons.message}<span>陪伴</span>
-    </button>
-    <button class="bottom-nav-item ${activeTab === "moments" ? "bottom-nav-item-active" : ""}" onclick="window.EchoApp.switchTab('moments')">
-      ${Icons.moments}<span>瞬间</span>
     </button>
     <button class="bottom-nav-item ${activeTab === "me" ? "bottom-nav-item-active" : ""}" onclick="window.EchoApp.switchTab('me')">
       ${Icons.me}<span>我的</span>
@@ -171,7 +174,6 @@ function renderCompanionInbox(searchQuery, currentChat, hideListMobile) {
     <div class="inbox-head">
       <div>
         <h1 class="list-title">陪伴</h1>
-        <p class="inbox-lead">和你长期相处的人</p>
       </div>
         ${IconButton({ icon: Icons.plus, title: "创建角色", onClick: "window.EchoApp.openBring()" })}
     </div>
@@ -346,16 +348,34 @@ function peekWorldbook(roleId) {
   return rows;
 }
 
+function replyPaceLabel(chat) {
+  const pace = getReplyPace(chat);
+  const opt = REPLY_PACE_OPTIONS.find((o) => o.value === pace);
+  return opt ? opt.label : "自然";
+}
+
 function renderProfilePane(chat) {
   const roleId = getRoleId(chat);
   const memories = roleId ? getMemoryList(roleId, 8) : [];
-  const moments = roleId ? listMoments(roleId).slice(0, 4) : [];
-  const affinity = roleId ? getAffinity(roleId, { moments: listMoments(roleId) }) : null;
+  const roleMoments = roleId ? listMoments(roleId) : [];
+  const latestMoment = roleMoments[0] || null;
+  const latestMemory = memories[0] || null;
+  const affinity = roleId ? getAffinity(roleId, { moments: roleMoments }) : null;
   const slots = getCharacterSlots(chat);
-  const convos = roleId ? listActiveConversations(roleId) : [];
   const hasTalk = (peekMessages(chat.id) || []).length > 0;
   const worldPeek = roleId ? peekWorldbook(roleId) : [];
   const presented = presentCompanionStage(affinity, hasTalk);
+  const mobile = typeof window !== "undefined" && window.innerWidth < 768;
+
+  const tracePeek = latestMoment || latestMemory
+    ? `<button type="button" class="profile-peek" onclick="window.EchoApp.openContinuitySheet('${esc(roleId)}','${chat.id}')">
+        ${latestMoment ? `<div class="profile-peek-line"><span class="profile-peek-tag">瞬间</span>${esc(latestMoment.content.slice(0, 48))}${latestMoment.content.length > 48 ? "…" : ""}</div>` : ""}
+        ${latestMemory ? `<div class="profile-peek-line"><span class="profile-peek-tag">记忆</span>${esc(latestMemory.content.slice(0, 48))}${latestMemory.content.length > 48 ? "…" : ""}</div>` : ""}
+      </button>`
+    : `<p class="profile-muted profile-peek-empty">多聊几句，痕迹会在这里出现。</p>`;
+
+  const memoryMeta = memories.length ? `${memories.length} 条记忆` : worldPeek.length ? `${worldPeek.length} 条设定` : "";
+  const prefMeta = `${replyPaceLabel(chat)} · ${listActiveConversations(roleId).length} 条相处线`;
 
   return `
   <aside class="profile-pane open">
@@ -370,128 +390,65 @@ function renderProfilePane(chat) {
       <div class="profile-section-content">
         ${slots.identity
           ? `<div class="persona-clip">${esc(slots.identity.slice(0, 120))}${slots.identity.length > 120 ? "…" : ""}</div>`
-          : `<div class="profile-empty">
-              <p class="profile-muted">暂无设定</p>
-              ${roleId ? `<button class="btn btn-secondary btn-sm" onclick="window.EchoApp.editCharacter('${roleId}')">去编辑</button>` : ""}
-            </div>`}
+          : `<p class="profile-muted">暂无设定</p>`}
       </div>
-      ${roleId && slots.identity ? `
-        <div class="profile-tools">
-          <button class="btn btn-secondary btn-sm" onclick="window.EchoApp.editCharacter('${roleId}')">编辑</button>
-        </div>
-      ` : ""}
     </div>
-    ${roleId ? `
-    <details class="profile-fold">
-      <summary class="profile-section-title">回复速度</summary>
-      <div class="profile-section-content">
-        <p class="profile-muted">控制这个角色回复消息时的呈现节奏</p>
-        <div class="reply-pace-field" data-reply-pace-for="${esc(roleId)}">
-          ${Segmented({
-            options: REPLY_PACE_OPTIONS,
-            value: getReplyPace(chat),
-            onChange: `window.EchoApp.setCharacterReplyPace.bind(null, '${esc(roleId)}')`,
-          })}
-        </div>
-      </div>
-    </details>
-    ` : ""}
     <div class="profile-section">
       <div class="profile-section-title">关系</div>
       <div class="profile-section-content">
-        ${RelationshipBrief({ affinity, hasTalk })}
+        ${RelationshipBrief({ affinity, hasTalk, compact: true })}
       </div>
     </div>
-    <details class="profile-fold">
-      <summary class="profile-section-title">记忆</summary>
-      <div class="profile-section-content">
-        ${memories.length === 0
-          ? `<div class="profile-empty">
-              <p class="profile-muted">还没有已确认的记忆。</p>
-              ${roleId ? `<button class="btn btn-secondary btn-sm" onclick="window.EchoApp.openMemoryCandidates('${roleId}','${chat.id}')">从对话提取</button>` : ""}
-            </div>`
-          : memories.map((m) => MemoryRow({
-              content: m.content,
-              onDelete: roleId ? `window.EchoApp.deleteCharacterMemory('${roleId}','${m.id}')` : "",
-            })).join("")}
-        ${roleId && memories.length ? `<button class="btn btn-ghost btn-sm profile-extract" onclick="window.EchoApp.openMemoryCandidates('${roleId}','${chat.id}')">从对话提取</button>` : ""}
-      </div>
-    </details>
-    <details class="profile-fold">
-      <summary class="profile-section-title">世界书</summary>
-      <div class="profile-section-content">
-        ${worldPeek.length === 0
-          ? `<div class="profile-empty">
-              <p class="profile-muted">还没有会注入对话的设定条目。</p>
-              <button class="btn btn-secondary btn-sm" onclick="window.EchoApp.openSettings('worldbook')">添加条目</button>
-            </div>`
-          : `${worldPeek.map((w) => `<div class="mem-line">${esc(w.label)}${w.keys.length ? `<span class="profile-muted"> · ${esc(w.keys.slice(0, 3).join("、"))}</span>` : ""}</div>`).join("")}
-             <button class="btn btn-ghost btn-sm profile-extract" onclick="window.EchoApp.openSettings('worldbook')">管理条目</button>`}
-      </div>
-    </details>
-    <details class="profile-fold">
-      <summary class="profile-section-title">瞬间</summary>
-      <div class="profile-section-content">
-        ${moments.length === 0
-          ? `<div class="profile-empty">
-              <p class="profile-muted">还没有瞬间。确认记忆后会出现在这里。</p>
-              ${roleId ? `<button class="btn btn-secondary btn-sm" onclick="window.EchoApp.openMemoryCandidates('${roleId}','${chat.id}')">从对话提取</button>` : ""}
-            </div>`
-          : moments.map((m) => `<div class="mom-line">${esc(m.content)}<span>${relativeTime(m.createdAt)}</span></div>`).join("")}
-      </div>
-    </details>
-    <details class="profile-fold">
-      <summary class="profile-section-title">相处线</summary>
-      <div class="profile-section-content">
-        <p class="profile-muted">同一位 ${esc(chat.name || "TA")} 的不同聊天主题。记忆与关系共享。</p>
-        ${convos.map((c) => `
-          <button type="button" class="conv-item ${c.id === chat.id ? "on" : ""}" onclick="window.EchoApp.openConversation('${c.id}')">
-            <div class="n">${esc(c.name || "日常相处")}</div>
-            <div class="d">${esc((c.lastPreview || "还没有聊过").slice(0, 42))}</div>
-          </button>
-        `).join("")}
-        ${roleId ? `<button class="btn btn-secondary btn-sm" onclick="window.EchoApp.startNewConversation('${roleId}')">开一条新的相处线</button>` : ""}
-      </div>
-    </details>
+    <div class="profile-actions">
+      ${mobile ? `<button type="button" class="btn btn-primary btn-block" onclick="window.EchoApp.toggleProfile()">继续聊天</button>` : ""}
+      ${roleId ? `<button type="button" class="btn btn-ghost btn-sm" onclick="window.EchoApp.editCharacter('${roleId}')">编辑人设</button>` : ""}
+    </div>
+    <div class="profile-section profile-section-peek">
+      <div class="profile-section-title">相处痕迹</div>
+      <div class="profile-section-content">${tracePeek}</div>
+    </div>
     ${roleId ? `
-    <details class="profile-fold">
-      <summary class="profile-section-title">更多</summary>
-      <div class="profile-section-content">
-        <button class="btn btn-ghost btn-sm" onclick="window.EchoApp.exportCharacterCard('${roleId}')">导出角色卡</button>
-      </div>
-    </details>
+    <div class="profile-rows">
+      ${ProfileRow({
+        title: "记忆与世界",
+        meta: memoryMeta,
+        onClick: `window.EchoApp.openContinuitySheet('${esc(roleId)}','${chat.id}')`,
+      })}
+      ${ProfileRow({
+        title: "相处偏好",
+        meta: prefMeta,
+        onClick: `window.EchoApp.openPreferencesSheet('${esc(roleId)}')`,
+      })}
+      ${ProfileRow({
+        title: "更多",
+        meta: "导出角色卡",
+        onClick: `window.EchoApp.openProfileMoreSheet('${esc(roleId)}')`,
+      })}
+    </div>
     ` : ""}
   </aside>`;
 }
 
-function renderMomentsPane() {
-  const filter = store.getState().ui.momentsFilter || "all";
+export function renderMomentsFeedHtml({ filterRoleId = "all", emptyAction = "" } = {}) {
+  const filter = filterRoleId || store.getState().ui.momentsFilter || "all";
   const all = listMoments("all");
   const moments = filter === "all" ? all : all.filter((m) => m.roleId === filter || m.roleName === filter);
   const hub = listCharactersForHub();
   const avatarByRole = Object.fromEntries(hub.map((h) => [h.id, h.avatar]));
-  return `
-  <div class="moments-pane">
-    <div class="inbox-head">
-      <div>
-        <h1 class="list-title">瞬间</h1>
-        <p class="inbox-lead">从相处里留下来的痕迹</p>
-      </div>
-      <select class="select moments-filter" onchange="window.EchoApp.setMomentsFilter(this.value)">
-        <option value="all" ${filter === "all" ? "selected" : ""}>全部</option>
-        ${hub.map((h) => `<option value="${esc(h.id)}" ${filter === h.id ? "selected" : ""}>${esc(h.name)}</option>`).join("")}
-      </select>
-    </div>
-    <div class="moments-feed">
-      ${moments.length === 0
-        ? EmptyState({
-            icon: Icons.moments,
-            title: "还没有瞬间",
-            desc: "和角色多聊一会儿，确认记忆后会出现在这里。",
-            actionText: "去相处",
-            actionOnClick: "window.EchoApp.switchTab('companion')",
-          })
-        : moments.map((m) => `
+
+  if (moments.length === 0) {
+    return EmptyState({
+      icon: Icons.moments,
+      title: "还没有瞬间",
+      desc: "和角色多聊一会儿，确认记忆后会出现在这里。",
+      actionText: emptyAction ? "去相处" : "",
+      actionOnClick: emptyAction || "",
+    });
+  }
+
+  return `<div class="moments-feed">${moments
+    .map(
+      (m) => `
           <article class="moment-entry">
             <div class="moment-header">
               ${CharacterAvatar({ src: resolveAvatarSrc(avatarByRole[m.roleId] || m.avatar), size: "sm", alt: m.roleName, name: m.roleName })}
@@ -520,9 +477,109 @@ function renderMomentsPane() {
               <button type="button" class="btn btn-secondary btn-sm" onclick="window.EchoApp.commentMoment('${m.id}')">发送</button>
             </div>
           </article>
-        `).join("")}
+        `
+    )
+    .join("")}</div>`;
+}
+
+function renderContinuityJournal(roleId, chatId) {
+  const memories = roleId ? getMemoryList(roleId, 20) : [];
+  const moments = roleId ? listMoments(roleId) : [];
+  const items = [
+    ...memories.map((m) => ({
+      kind: "memory",
+      content: m.content,
+      time: Number(m.createdAt) || 0,
+      id: m.id,
+    })),
+    ...moments.map((m) => ({
+      kind: "moment",
+      content: m.content,
+      time: Number(m.createdAt) || 0,
+      id: m.id,
+    })),
+  ].sort((a, b) => b.time - a.time);
+
+  if (items.length === 0) {
+    return `<p class="profile-muted continuity-empty">多聊几句，确认记忆后，痕迹会在这里出现。</p>`;
+  }
+
+  return `<div class="continuity-journal">${items
+    .map((item) => {
+      if (item.kind === "memory") {
+        return MemoryRow({
+          content: item.content,
+          onDelete: roleId
+            ? `window.EchoApp.deleteCharacterMemory('${roleId}','${item.id}');window.EchoApp.openContinuitySheet('${esc(roleId)}','${chatId}')`
+            : "",
+        });
+      }
+      return `<div class="trace-line">
+        <span class="trace-tag">瞬间</span>
+        <span class="trace-body">${esc(item.content)}</span>
+        <span class="trace-when">${relativeTime(item.time)}</span>
+      </div>`;
+    })
+    .join("")}</div>`;
+}
+
+export function renderContinuitySheetContent(roleId, chatId) {
+  const worldPeek = roleId ? peekWorldbook(roleId) : [];
+  const journal = renderContinuityJournal(roleId, chatId);
+
+  return `
+    ${journal}
+    ${roleId ? `<button type="button" class="btn btn-secondary btn-sm sheet-action" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openMemoryCandidates('${esc(roleId)}','${chatId}')">从对话提取</button>` : ""}
+    ${worldPeek.length
+      ? `<div class="continuity-context">
+          <div class="continuity-context-label">会注入对话的设定</div>
+          ${worldPeek
+            .slice(0, 4)
+            .map(
+              (w) =>
+                `<div class="trace-line trace-line-context"><span class="trace-body">${esc(w.label)}${w.keys.length ? `<span class="profile-muted"> · ${esc(w.keys.slice(0, 3).join("、"))}</span>` : ""}</span></div>`
+            )
+            .join("")}
+          <button type="button" class="btn btn-ghost btn-sm sheet-action" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openSettings('worldbook')">管理设定</button>
+        </div>`
+      : ""}`;
+}
+
+export function renderPreferencesSheetContent(chat) {
+  const roleId = getRoleId(chat);
+  const convos = roleId ? listActiveConversations(roleId) : [];
+  return `
+    <div class="sheet-section">
+      <div class="sheet-section-title">回复速度</div>
+      <div class="reply-pace-field" data-reply-pace-for="${esc(roleId)}">
+        ${Segmented({
+          options: REPLY_PACE_OPTIONS,
+          value: getReplyPace(chat),
+          onChange: `window.EchoApp.setCharacterReplyPace.bind(null, '${esc(roleId)}')`,
+        })}
+      </div>
     </div>
-  </div>`;
+    <div class="sheet-section">
+      <div class="sheet-section-title">相处线</div>
+      ${convos
+        .map(
+          (c) => `
+          <button type="button" class="conv-item ${c.id === chat.id ? "on" : ""}" onclick="window.EchoApp.openConversation('${c.id}');this.closest('.modal-overlay').remove()">
+            <div class="n">${esc(c.name || "日常相处")}</div>
+            <div class="d">${esc((c.lastPreview || "还没有聊过").slice(0, 42))}</div>
+          </button>
+        `
+        )
+        .join("")}
+      ${roleId ? `<button type="button" class="btn btn-secondary btn-sm sheet-action" onclick="window.EchoApp.startNewConversation('${esc(roleId)}');this.closest('.modal-overlay').remove()">开一条新的相处线</button>` : ""}
+    </div>`;
+}
+
+export function renderProfileMoreContent(roleId) {
+  return `
+    <div class="sheet-section">
+      <button type="button" class="btn btn-secondary btn-block" onclick="window.EchoApp.exportCharacterCard('${esc(roleId)}');this.closest('.modal-overlay').remove()">导出角色卡</button>
+    </div>`;
 }
 
 function apiSummary(settings) {
@@ -543,12 +600,21 @@ function renderMePane() {
   const state = store.getState();
   const characterCount = listCharactersForHub().length;
   const myName = state.settings.myName || "我";
+
+  function meRow({ icon, title, value, action }) {
+    return `<button type="button" class="me-settings-item" onclick="window.EchoApp.${action}">
+      <div class="me-settings-item-icon">${icon}</div>
+      <div class="me-settings-item-title">${title}</div>
+      <div class="me-settings-item-value">${esc(value)}</div>
+      <span class="me-settings-item-arrow">${Icons.chevronRight}</span>
+    </button>`;
+  }
+
   return `
   <div class="me-pane" id="me-scroll">
     <div class="inbox-head">
       <div>
         <h1 class="list-title">我的</h1>
-        <p class="inbox-lead">都留在这台设备上</p>
       </div>
     </div>
     <div class="me-content">
@@ -562,44 +628,34 @@ function renderMePane() {
       </button>
 
       <div class="me-settings-group">
-        <div class="me-settings-group-title">这台设备</div>
+        <div class="me-settings-group-title">连接</div>
         <div class="me-settings-list">
-          ${[
-            { icon: Icons.database, title: "API 与模型", desc: apiSummary(state.settings), action: "openSettings('api')" },
-            { icon: Icons.brain, title: "记忆", desc: `每位最多 ${state.memoryCfg.maxPerRole} 条`, action: "openSettings('memory')" },
-            { icon: Icons.palette, title: "外观", desc: appearanceSummary(state.settings), action: "openSettings('appearance')" },
-            { icon: Icons.download, title: "备份", desc: "导出或导入全部数据", action: "openSettings('backup')" },
-          ].map((item) => `
-            <button type="button" class="me-settings-item" onclick="window.EchoApp.${item.action}">
-              <div class="me-settings-item-icon">${item.icon}</div>
-              <div class="me-settings-item-content">
-                <div class="me-settings-item-title">${item.title}</div>
-                <div class="me-settings-item-desc">${item.desc}</div>
-              </div>
-              <span class="me-settings-item-arrow">${Icons.chevronRight}</span>
-            </button>
-          `).join("")}
+          ${meRow({ icon: Icons.database, title: "API 与模型", value: apiSummary(state.settings), action: "openSettings('api')" })}
+          ${meRow({ icon: Icons.brain, title: "记忆", value: `每位 ${state.memoryCfg.maxPerRole} 条`, action: "openSettings('memory')" })}
         </div>
       </div>
 
       <div class="me-settings-group">
-        <div class="me-settings-group-title">更多</div>
+        <div class="me-settings-group-title">体验</div>
         <div class="me-settings-list">
-          ${[
-            { icon: Icons.book, title: "世界书", desc: "关键词设定注入", action: "openSettings('worldbook')" },
-            { icon: Icons.volume, title: "语音", desc: state.settings.ttsEnabled ? "朗读已开" : "朗读与麦克风", action: "openSettings('voice')" },
-            { icon: Icons.sparkles, title: "Prompt 预览", desc: "查看当前组装", action: "openPromptPreview()" },
-            { icon: Icons.refresh, title: "重新看引导", desc: "回到欢迎页", action: "resetOnboarding()" },
-          ].map((item) => `
-            <button type="button" class="me-settings-item" onclick="window.EchoApp.${item.action}">
-              <div class="me-settings-item-icon">${item.icon}</div>
-              <div class="me-settings-item-content">
-                <div class="me-settings-item-title">${item.title}</div>
-                <div class="me-settings-item-desc">${item.desc}</div>
-              </div>
-              <span class="me-settings-item-arrow">${Icons.chevronRight}</span>
-            </button>
-          `).join("")}
+          ${meRow({ icon: Icons.palette, title: "外观", value: appearanceSummary(state.settings), action: "openSettings('appearance')" })}
+          ${meRow({ icon: Icons.volume, title: "语音", value: state.settings.ttsEnabled ? "朗读已开" : "朗读关", action: "openSettings('voice')" })}
+        </div>
+      </div>
+
+      <div class="me-settings-group">
+        <div class="me-settings-group-title">数据</div>
+        <div class="me-settings-list">
+          ${meRow({ icon: Icons.download, title: "备份", value: "导出或导入", action: "openSettings('backup')" })}
+        </div>
+      </div>
+
+      <div class="me-settings-group">
+        <div class="me-settings-group-title">高级</div>
+        <div class="me-settings-list">
+          ${meRow({ icon: Icons.book, title: "世界书", value: "关键词设定", action: "openSettings('worldbook')" })}
+          ${meRow({ icon: Icons.sparkles, title: "Prompt 预览", value: "当前组装", action: "openPromptPreview()" })}
+          ${meRow({ icon: Icons.refresh, title: "重新看引导", value: "", action: "resetOnboarding()" })}
         </div>
       </div>
     </div>

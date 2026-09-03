@@ -22,6 +22,9 @@ import {
   renderAppShell,
   resetOnboarding,
   animateLanding,
+  renderContinuitySheetContent,
+  renderPreferencesSheetContent,
+  renderProfileMoreContent,
 } from "./ui/views/index.js";
 import { showToast, openModal, closeModal, openConfirm, Icons, SettingRow, Segmented, Avatar } from "./ui/components/index.js";
 import { Ambient } from "./ui/ambient.js";
@@ -760,28 +763,50 @@ const App = {
     this._paintBringModal();
   },
   _paintBringModal() {
-    const card = (icon, title, desc, onClick, featured, keepOpen) => `
-      <button type="button" class="create-card ${featured ? "create-card-featured" : ""}" onclick="${keepOpen ? onClick : `this.closest('.modal-overlay').remove();${onClick}`}">
+    const secondaryRow = (icon, title, onClick, keepOpen) => `
+      <button type="button" class="create-secondary-btn" onclick="${keepOpen ? onClick : `this.closest('.modal-overlay').remove();${onClick}`}">
         <span class="create-card-ic">${icon}</span>
-        <span>
-          <span class="create-card-title">${title}</span>
-          <span class="create-card-desc">${desc}</span>
-        </span>
+        <span class="create-card-title">${title}</span>
       </button>`;
     openModal({
       title: "创建角色",
-      width: "480px",
+      width: "440px",
       content: `
-        <p class="create-sub">从聊天记录、角色卡或一句话，把 TA 带进来。</p>
-        <div class="create-cards">
-          ${card(Icons.message, "导入聊天记录", "微信 / QQ 等导出的记录，或粘贴纯文本", "window.EchoApp.openReconstruction()", true)}
-          ${card(Icons.upload, "导入角色卡", "SillyTavern 角色卡 JSON", "window.EchoApp.importCharacterCard()", false, true)}
-          ${card(Icons.sparkles, "创建新人设", "填写名字与头像，可用一句话补全人设", "window.EchoApp.openCreateBlank()")}
-          ${card(Icons.users, "从内置角色开始", "挑一个现成的性格，直接体验对话", "window.EchoApp.openTemplatePicker()")}
+        <p class="create-sub">给 TA 一个名字，开始相处。</p>
+        <button type="button" class="create-primary-btn" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openCreateQuickStart()">
+          <span class="create-card-ic">${Icons.sparkles}</span>
+          <span class="create-card-title">从模板或空白开始</span>
+        </button>
+        <div class="create-group-label">已有资料</div>
+        <div class="create-secondary-group">
+          ${secondaryRow(Icons.message, "导入聊天记录", "window.EchoApp.openReconstruction()")}
+          ${secondaryRow(Icons.upload, "导入角色卡", "window.EchoApp.importCharacterCard()", true)}
         </div>
         ${this._apiHintMarkup()}
       `,
       footer: `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">取消</button>`,
+    });
+  },
+  openCreateQuickStart() {
+    const pick = (icon, title, desc, onClick) => `
+      <button type="button" class="create-secondary-btn" onclick="this.closest('.modal-overlay').remove();${onClick}">
+        <span class="create-card-ic">${icon}</span>
+        <span>
+          <span class="create-card-title">${title}</span>
+          ${desc ? `<span class="create-card-desc">${desc}</span>` : ""}
+        </span>
+      </button>`;
+    document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+    openModal({
+      title: "从模板或空白开始",
+      width: "440px",
+      content: `
+        <div class="create-secondary-group">
+          ${pick(Icons.users, "选内置角色", "挑一个性格，直接开聊", "window.EchoApp.openTemplatePicker()")}
+          ${pick(Icons.sparkles, "空白创建", "名字、头像和一句话描述", "window.EchoApp.openCreateBlank()")}
+        </div>
+      `,
+      footer: `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openBring()">返回</button>`,
     });
   },
   // 创建角色不再要求先配 API，只在这里留一条可跳过的提示
@@ -796,26 +821,25 @@ const App = {
     const templates = getSystemTemplates();
     openModal({
       title: "内置角色",
-      width: "480px",
+      width: "440px",
       content: `
-        <p class="create-sub">挑一个现成的性格开始。之后随时可以改人设、换头像。</p>
-        <div class="create-cards">
+        <div class="create-secondary-group">
           ${templates
             .slice(0, 10)
             .map(
               (t) => `
-            <button type="button" class="create-card" onclick="this.closest('.modal-overlay').remove();window.EchoApp.selectTemplate('${esc(t.name)}')">
+            <button type="button" class="create-secondary-btn" onclick="this.closest('.modal-overlay').remove();window.EchoApp.selectTemplate('${esc(t.name)}')">
               <span class="create-card-ic">${Icons.users}</span>
               <span>
                 <span class="create-card-title">${esc(t.name)}</span>
-                <span class="create-card-desc">${esc(t.tag || "")}${t.firstMessage ? ` · ${esc(t.firstMessage.slice(0, 24))}` : ""}</span>
+                ${t.tag ? `<span class="create-card-desc">${esc(t.tag)}</span>` : ""}
               </span>
             </button>`
             )
             .join("")}
         </div>
       `,
-      footer: `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openBring()">返回</button>`,
+      footer: `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openCreateQuickStart()">返回</button>`,
     });
   },
   _blankAvatar: null,
@@ -831,17 +855,14 @@ const App = {
       title: "创建新人设",
       width: "440px",
       content: `
-        <p class="create-sub">先填写 TA 的名字和头像；再用一句话描述性格与关系。</p>
         ${this._avatarPickerMarkup("blank", this._blankAvatar, name || "新角色")}
         <label class="field-label">名字</label>
         <input class="input" id="blank-char-name" placeholder="给 TA 起个名字" maxlength="32" value="${esc(name)}" />
         <label class="field-label">一句话描述（可选）</label>
         <textarea class="input" id="blank-char-desc" rows="3" placeholder="例如：她是咖啡店店员，不爱说话但会记得我的喜好。" style="min-height:88px;">${esc(desc)}</textarea>
       `,
-      footer: `
-        <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openBring()">返回</button>
-        <button class="btn btn-primary" onclick="window.EchoApp.createBlankCharacter()">创建角色</button>
-      `,
+      footer: `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openCreateQuickStart()">返回</button>
+        <button class="btn btn-primary" onclick="window.EchoApp.createBlankCharacter()">创建角色</button>`,
     });
     this.bindRippleButtons();
   },
@@ -1113,9 +1134,47 @@ const App = {
     });
   },
 
-  // 动态
+  // 动态 / 相处痕迹
   setMomentsFilter(value) {
     store.setMomentsFilter(value);
+  },
+  setMomentsFilterAndRefresh(value, roleId, chatId) {
+    store.setMomentsFilter(value);
+    this._paintContinuitySheet(roleId, chatId);
+  },
+  openContinuitySheet(roleId, chatId) {
+    store.setMomentsFilter(roleId || "all");
+    this._paintContinuitySheet(roleId, chatId);
+  },
+  _paintContinuitySheet(roleId, chatId) {
+    document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+    openModal({
+      title: "相处痕迹",
+      width: "520px",
+      content: renderContinuitySheetContent(roleId, chatId),
+      footer: `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">关闭</button>`,
+    });
+  },
+  openPreferencesSheet(roleId) {
+    const chat =
+      store.getState().chats.find((c) => c.roleId === roleId) || store.getCurrentChat();
+    if (!chat) return;
+    document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+    openModal({
+      title: "相处偏好",
+      width: "480px",
+      content: renderPreferencesSheetContent(chat),
+      footer: `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">关闭</button>`,
+    });
+  },
+  openProfileMoreSheet(roleId) {
+    document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+    openModal({
+      title: "更多",
+      width: "400px",
+      content: renderProfileMoreContent(roleId),
+      footer: `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">关闭</button>`,
+    });
   },
   toggleMomentLike(id, btn) {
     // 心跳动画依赖当前 DOM 节点，先播再让 store 触发重渲染
@@ -1202,8 +1261,7 @@ const App = {
         <label class="field-label">每位角色最多记忆条数 · <span id="mem-max-val">${s.memoryCfg.maxPerRole}</span></label>
         <input type="range" class="slider" id="set-mem-max" min="10" max="100" step="5" value="${s.memoryCfg.maxPerRole}"
           oninput="document.getElementById('mem-max-val').textContent=this.value" />
-        <p class="create-sub" style="margin-top:12px">超出后最旧的记忆会被归档，注入对话时优先取重要度高的。</p>
-        <label class="field-label">每次对话最多注入 · <span id="mem-inject-val">${s.memoryCfg.injectMax}</span> 条</label>
+        <label class="field-label" style="margin-top:16px">每次对话最多注入 · <span id="mem-inject-val">${s.memoryCfg.injectMax}</span> 条</label>
         <input type="range" class="slider" id="set-mem-inject" min="3" max="30" step="1" value="${s.memoryCfg.injectMax}"
           oninput="document.getElementById('mem-inject-val').textContent=this.value" />`;
       footer = `
@@ -1226,7 +1284,6 @@ const App = {
       const global = books.find((b) => b.id === "global") || books[0];
       const entries = (global?.entries || []).slice(0, 24);
       content = `
-        <p class="create-sub">提到关键词时会注入当前对话。对所有角色共用。每条最多 1200 字。</p>
         <label class="field-label">关键词（逗号分隔）</label>
         <input class="input" id="wb-keys" placeholder="雨天, 咖啡馆" />
         <label class="field-label">设定</label>

@@ -22,8 +22,8 @@ function defaultApiSeed() {
 }
 
 function normalizeUiTab(tab) {
-  if (tab === "messages" || tab === "characters" || tab === "chats") return "companion";
-  if (tab === "companion" || tab === "moments" || tab === "me") return tab;
+  if (tab === "messages" || tab === "characters" || tab === "chats" || tab === "moments") return "companion";
+  if (tab === "companion" || tab === "me") return tab;
   return "companion";
 }
 
@@ -75,7 +75,7 @@ function defaultState() {
     chats: [], // [{id, roleId, name, avatar, createdAt, config:{persona,myAvatar,model,temperature}, messages:[{id,role,text,time,status}]}]
     currentChatId: null,
     ui: {
-      activeTab: "companion", // companion | moments | me  (messages/characters → companion)
+      activeTab: "companion", // companion | me  (messages/characters/moments → companion)
       sidebarOpen: true,
       profileOpen: false,
       searchQuery: "",

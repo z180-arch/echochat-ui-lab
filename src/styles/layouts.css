@@ -448,6 +448,187 @@
   gap: var(--space-2);
   flex-wrap: wrap;
 }
+.profile-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4) var(--space-4);
+}
+.profile-actions .btn-block {
+  width: 100%;
+}
+.profile-section-peek .profile-section-content {
+  padding-top: 0;
+}
+.profile-peek {
+  width: 100%;
+  text-align: left;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .profile-peek:hover {
+    background: var(--color-primary-soft);
+  }
+}
+.profile-peek-line {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--color-text);
+}
+.profile-peek-line + .profile-peek-line {
+  margin-top: var(--space-2);
+}
+.profile-peek-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-right: var(--space-2);
+}
+.profile-peek-empty {
+  margin: 0;
+}
+.profile-rows {
+  border-top: 1px solid var(--color-border);
+}
+.profile-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  text-align: left;
+  padding: var(--space-4);
+  min-height: 44px;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.profile-row:last-child {
+  border-bottom: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .profile-row:hover {
+    background: var(--color-surface-2);
+  }
+}
+.profile-row-copy {
+  flex: 1;
+  min-width: 0;
+}
+.profile-row-title {
+  display: block;
+  font-size: var(--font-body);
+  font-weight: var(--weight-medium);
+  line-height: 1.35;
+  color: var(--color-text);
+}
+.profile-row-meta {
+  display: block;
+  font-size: var(--font-caption);
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+  line-height: 1.45;
+}
+.profile-row-arrow {
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+.sheet-section {
+  padding-bottom: var(--space-5);
+}
+.sheet-section + .sheet-section {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-4);
+}
+.sheet-section-title {
+  font-size: var(--font-label);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-3);
+}
+.sheet-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.sheet-section-head .sheet-section-title {
+  margin-bottom: 0;
+}
+.moments-filter-inline {
+  font-size: 13px;
+  padding: 4px 8px;
+  min-height: 32px;
+}
+.sheet-action {
+  margin-top: var(--space-3);
+}
+.continuity-journal {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.continuity-empty {
+  margin: 0 0 var(--space-3);
+}
+.trace-line {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--space-2) var(--space-3);
+  align-items: start;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.trace-line:last-child {
+  border-bottom: none;
+}
+.trace-line-context {
+  grid-template-columns: 1fr;
+  padding: var(--space-2) 0;
+}
+.trace-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  padding-top: 2px;
+  white-space: nowrap;
+}
+.trace-body {
+  color: var(--color-text);
+  min-width: 0;
+  word-break: break-word;
+}
+.trace-when {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+  padding-top: 2px;
+}
+.continuity-context {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+.continuity-context-label {
+  font-size: var(--font-label);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-tertiary);
+  margin-bottom: var(--space-2);
+}
+.relationship-brief-meta {
+  margin: 0 0 4px;
+}
 .profile-fold {
   padding: var(--space-4);
   border-bottom: 1px solid var(--color-border);
@@ -836,9 +1017,23 @@
   min-width: 0;
 }
 .me-settings-item-title {
+  flex: 1;
+  min-width: 0;
   font-size: var(--font-body);
   font-weight: var(--weight-medium);
   line-height: 1.35;
+  text-align: left;
+}
+.me-settings-item-value {
+  font-size: var(--font-caption);
+  color: var(--color-text-secondary);
+  line-height: 1.35;
+  flex-shrink: 0;
+  max-width: 42%;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .me-settings-item-desc {
   font-size: var(--font-caption);

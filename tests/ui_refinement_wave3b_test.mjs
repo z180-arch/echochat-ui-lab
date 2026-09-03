@@ -103,17 +103,17 @@ test("Profile header is a single stage line", () => {
   assert.ok(!/profile-status`[^`]*相处 \$\{presented\.knownDays\}/.test(viewsSrc));
 });
 
-test("Profile identity CTA is not duplicated", () => {
-  assert.ok(viewsSrc.includes("roleId && slots.identity"));
-  assert.ok(viewsSrc.includes("去编辑"));
-  assert.ok(viewsSrc.includes("profile-tools"));
+test("Profile identity uses edit in actions, not duplicate tools block", () => {
+  assert.ok(viewsSrc.includes("editCharacter("));
+  assert.ok(viewsSrc.includes("profile-actions"));
+  assert.ok(!viewsSrc.includes("profile-tools"));
 });
 
-test("Export stays folded in 更多, not beside 编辑", () => {
-  const more = viewsSrc.slice(viewsSrc.indexOf("更多"));
-  assert.ok(more.includes("导出角色卡"));
-  const tools = viewsSrc.slice(viewsSrc.indexOf("profile-tools"), viewsSrc.indexOf("回复速度"));
-  assert.ok(!tools.includes("导出"));
+test("Export lives in more sheet, not beside identity", () => {
+  assert.ok(viewsSrc.includes("renderProfileMoreContent"));
+  assert.ok(viewsSrc.includes("导出角色卡"));
+  const about = viewsSrc.slice(viewsSrc.indexOf("关于 TA"), viewsSrc.indexOf("profile-actions"));
+  assert.ok(!about.includes("导出"));
 });
 
 test("Profile fold padding matches section 16px", () => {

@@ -50,6 +50,7 @@ export function createConversationForCharacter(characterId, config = {}) {
     model: config.model || existingChat?.config?.model || "",
     temperature: config.temperature ?? existingChat?.config?.temperature ?? 1.0,
     firstMessage: config.firstMessage || "",
+    replyPace: config.replyPace || existingChat?.config?.replyPace,
   });
 
   ConversationRepository.create({

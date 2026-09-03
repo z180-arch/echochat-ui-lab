@@ -48,6 +48,13 @@ const { messageStore } = await import(srcHref("src/domain/message-store.js"));
 const { createFromTemplate } = await import(srcHref("src/domain/persona.js"));
 const { sendMessage, stopGeneration, isSending } = await import(srcHref("src/domain/chat.js"));
 const { MAX_USER_MESSAGE_CHARS } = await import(srcHref("src/domain/reply-clean.js"));
+const {
+  getReplyPace,
+  setReplyPaceForCharacter,
+  presentationDelayMs,
+  DEFAULT_REPLY_PACE,
+} = await import(srcHref("src/domain/reply-pace.js"));
+const { createConversationForCharacter } = await import(srcHref("src/domain/conversation.js"));
 
 let passed = 0;
 let failed = 0;
@@ -185,6 +192,12 @@ function leftoverStreaming(chatId) {
   return messageStore.peekMessages(chatId).filter((m) => m.status === "streaming");
 }
 
+async function makeChat() {
+  const chat = await createFromTemplate({ name: "林晚", persona: "p", firstMessage: "hi" });
+  setReplyPaceForCharacter(chat.roleId, "instant");
+  return chat;
+}
+
 resetAll();
 store.updateSettings({
   apiKey: "sk-test-key",
@@ -197,7 +210,7 @@ console.log("\n=== Chat send / typing / clean ===\n");
 await testAsync("normal complete: sending false, no streaming leftover, stage tags stripped", async () => {
   resetAll();
   store.updateSettings({ apiKey: "sk-test-key", baseUrl: "https://api.example.com/v1" });
-  const chat = await createFromTemplate({ name: "林晚", persona: "p", firstMessage: "hi" });
+  const chat = await makeChat();
   installFetchStream("你好呀（笑眯眯）[Cute(Convincing)/撒娇]");
   await sendMessage("在吗");
   assert.equal(isSending(), false);
@@ -211,7 +224,7 @@ await testAsync("normal complete: sending false, no streaming leftover, stage ta
 await testAsync("does not rewrite the user message", async () => {
   resetAll();
   store.updateSettings({ apiKey: "sk-test-key", baseUrl: "https://api.example.com/v1" });
-  const chat = await createFromTemplate({ name: "林晚", persona: "p", firstMessage: "hi" });
+  const chat = await makeChat();
   installFetchStream("收到");
   await sendMessage("我（笑眯眯）只是打个招呼");
   const me = messageStore.peekMessages(chat.id).find((m) => m.role === "me");
@@ -221,7 +234,7 @@ await testAsync("does not rewrite the user message", async () => {
 await testAsync("empty reply: sending false, streaming placeholder removed", async () => {
   resetAll();
   store.updateSettings({ apiKey: "sk-test-key", baseUrl: "https://api.example.com/v1" });
-  const chat = await createFromTemplate({ name: "林晚", persona: "p", firstMessage: "hi" });
+  const chat = await makeChat();
   installFetchStream("（笑眯眯）");
   await sendMessage("嗨");
   assert.equal(isSending(), false);
@@ -231,7 +244,7 @@ await testAsync("empty reply: sending false, streaming placeholder removed", asy
 await testAsync("error: sending false, no streaming leftover", async () => {
   resetAll();
   store.updateSettings({ apiKey: "sk-test-key", baseUrl: "https://api.example.com/v1" });
-  const chat = await createFromTemplate({ name: "林晚", persona: "p", firstMessage: "hi" });
+  const chat = await makeChat();
   installFetchStream("", { status: 500 });
   await sendMessage("嗨");
   assert.equal(isSending(), false);
@@ -241,7 +254,7 @@ await testAsync("error: sending false, no streaming leftover", async () => {
 await testAsync("cancel: sending false, no streaming leftover", async () => {
   resetAll();
   store.updateSettings({ apiKey: "sk-test-key", baseUrl: "https://api.example.com/v1" });
-  const chat = await createFromTemplate({ name: "林晚", persona: "p", firstMessage: "hi" });
+  const chat = await makeChat();
   installFetchStream("", { hangUntilAbort: true });
   const pending = sendMessage("嗨");
   await new Promise((r) => setTimeout(r, 30));
@@ -255,7 +268,7 @@ await testAsync("cancel: sending false, no streaming leftover", async () => {
 await testAsync("does not persist partial assistant text while generating", async () => {
   resetAll();
   store.updateSettings({ apiKey: "sk-test-key", baseUrl: "https://api.example.com/v1" });
-  const chat = await createFromTemplate({ name: "林晚", persona: "p", firstMessage: "hi" });
+  const chat = await makeChat();
   let step = 0;
   global.fetch = async () => ({
     ok: true,
@@ -297,7 +310,7 @@ await testAsync("does not persist partial assistant text while generating", asyn
 await testAsync("over-length: does not persist or truncate", async () => {
   resetAll();
   store.updateSettings({ apiKey: "sk-test-key", baseUrl: "https://api.example.com/v1" });
-  const chat = await createFromTemplate({ name: "林晚", persona: "p", firstMessage: "hi" });
+  const chat = await makeChat();
   const before = messageStore.peekMessages(chat.id).length;
   const long = "啊".repeat(MAX_USER_MESSAGE_CHARS + 1);
   installFetchStream("不该出现");
@@ -306,6 +319,84 @@ await testAsync("over-length: does not persist or truncate", async () => {
   assert.equal(after.length, before);
   assert.ok(!after.some((m) => m.role === "me" && m.text.length === MAX_USER_MESSAGE_CHARS));
   assert.ok(!after.some((m) => m.text === "不该出现"));
+});
+
+await testAsync("missing replyPace defaults to natural", async () => {
+  resetAll();
+  const chat = await createFromTemplate({ name: "林晚", persona: "p", firstMessage: "hi" });
+  assert.equal(getReplyPace(chat), DEFAULT_REPLY_PACE);
+  assert.equal(getReplyPace({ config: {} }), "natural");
+  assert.equal(getReplyPace({ config: { replyPace: "nope" } }), "natural");
+});
+
+await testAsync("presentation delay is 0 for instant and capped for long replies", async () => {
+  const stable = () => 0.5;
+  assert.equal(presentationDelayMs("instant", "很长的回复内容".repeat(20), stable), 0);
+  const shortNatural = presentationDelayMs("natural", "嗯", stable);
+  const longNatural = presentationDelayMs("natural", "啊".repeat(400), stable);
+  assert.ok(shortNatural >= 160 && shortNatural < 500, `short natural ${shortNatural}`);
+  assert.ok(longNatural <= 1100, `long natural ${longNatural}`);
+  assert.ok(longNatural > shortNatural);
+  const longSlow = presentationDelayMs("slow", "啊".repeat(800), stable);
+  assert.ok(longSlow <= 2600, `long slow ${longSlow}`);
+  assert.ok(longSlow > longNatural);
+});
+
+await testAsync("natural waits until after generation before persisting assistant text", async () => {
+  resetAll();
+  store.updateSettings({ apiKey: "sk-test-key", baseUrl: "https://api.example.com/v1" });
+  const chat = await createFromTemplate({ name: "林晚", persona: "p", firstMessage: "hi" });
+  setReplyPaceForCharacter(chat.roleId, "natural");
+  installFetchStream("完整一句");
+  const pending = sendMessage("嗨");
+  await new Promise((r) => setTimeout(r, 30));
+  const mid = messageStore.peekMessages(chat.id).filter((m) => m.role === "her");
+  assert.ok(!mid.some((m) => (m.text || "").includes("完整一句")));
+  await pending;
+  const last = messageStore.peekMessages(chat.id).filter((m) => m.role === "her").pop();
+  assert.equal(last.text, "完整一句");
+  assert.notEqual(last.status, "streaming");
+});
+
+await testAsync("switching chat during presentation delay still persists on the origin chat", async () => {
+  resetAll();
+  store.updateSettings({ apiKey: "sk-test-key", baseUrl: "https://api.example.com/v1" });
+  const chatA = await createFromTemplate({ name: "林晚", persona: "p", firstMessage: "hi" });
+  setReplyPaceForCharacter(chatA.roleId, "slow");
+  const chatB = await createFromTemplate({ name: "小夏", persona: "q", firstMessage: "hey" });
+  store.selectChat(chatA.id);
+  installFetchStream("给林晚的话");
+  const pending = sendMessage("嗨");
+  await new Promise((r) => setTimeout(r, 40));
+  store.selectChat(chatB.id);
+  await pending;
+  const lastA = messageStore.peekMessages(chatA.id).filter((m) => m.role === "her").pop();
+  assert.equal(lastA.text, "给林晚的话");
+  const bTexts = messageStore.peekMessages(chatB.id).map((m) => m.text);
+  assert.ok(!bTexts.includes("给林晚的话"));
+});
+
+await testAsync("stop during presentation delay still inserts the complete reply", async () => {
+  resetAll();
+  store.updateSettings({ apiKey: "sk-test-key", baseUrl: "https://api.example.com/v1" });
+  const chat = await createFromTemplate({ name: "林晚", persona: "p", firstMessage: "hi" });
+  setReplyPaceForCharacter(chat.roleId, "slow");
+  installFetchStream("已经生成完");
+  const pending = sendMessage("嗨");
+  await new Promise((r) => setTimeout(r, 40));
+  stopGeneration();
+  await pending;
+  const last = messageStore.peekMessages(chat.id).filter((m) => m.role === "her").pop();
+  assert.equal(last.text, "已经生成完");
+  assert.notEqual(last.status, "streaming");
+});
+
+await testAsync("new conversation inherits character replyPace", async () => {
+  resetAll();
+  const chat = await createFromTemplate({ name: "林晚", persona: "p", firstMessage: "hi" });
+  setReplyPaceForCharacter(chat.roleId, "slow");
+  const next = createConversationForCharacter(chat.roleId, { title: "另一条" });
+  assert.equal(getReplyPace(next), "slow");
 });
 
 console.log(`\nChat Send: ${passed} passed, ${failed} failed`);

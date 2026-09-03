@@ -15,6 +15,7 @@ import { messageStore } from "./message-store.js";
 import { listMoments } from "./moments.js";
 import { assembleBehaviorContext } from "./context-builder.js";
 import { cleanAssistantReply, MAX_USER_MESSAGE_CHARS } from "./reply-clean.js";
+import { getReplyPace, presentationDelayMs, waitPresentationDelay } from "./reply-pace.js";
 
 let abortCtrl = null;
 let sending = false;
@@ -128,6 +129,11 @@ export async function sendMessage(text) {
 
     const cleaned = cleanAssistantReply(reply || streamed || "");
     if (cleaned) {
+      const delayMs = presentationDelayMs(getReplyPace(chat), cleaned);
+      await waitPresentationDelay(delayMs, {
+        signal: abortCtrl?.signal,
+        chatId: chat.id,
+      });
       messageStore.updateMessage(chat.id, tempMsg.id, {
         text: cleaned,
         status: "sent",

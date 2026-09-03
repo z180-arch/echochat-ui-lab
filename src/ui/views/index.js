@@ -16,7 +16,9 @@ import {
   EmptyState,
   IconButton,
   LogoMark,
+  Segmented,
 } from "../components/index.js";
+import { getReplyPace, REPLY_PACE_OPTIONS } from "../../domain/reply-pace.js";
 import { getRoleId, getRoleAvatar } from "../../domain/persona.js";
 import { getMemoryList, getLastMemoryRetrieve } from "../../domain/memory.js";
 import { listMoments } from "../../domain/moments.js";
@@ -374,6 +376,21 @@ function renderProfilePane(chat) {
         </div>
       ` : ""}
     </div>
+    ${roleId ? `
+    <div class="profile-section">
+      <div class="profile-section-title">回复速度</div>
+      <div class="profile-section-content">
+        <p class="profile-muted">控制这个角色回复消息时的呈现节奏</p>
+        <div class="reply-pace-field" data-reply-pace-for="${esc(roleId)}">
+          ${Segmented({
+            options: REPLY_PACE_OPTIONS,
+            value: getReplyPace(chat),
+            onChange: `window.EchoApp.setCharacterReplyPace.bind(null, '${esc(roleId)}')`,
+          })}
+        </div>
+      </div>
+    </div>
+    ` : ""}
     <div class="profile-section">
       <div class="profile-section-title">关系</div>
       <div class="profile-section-content">

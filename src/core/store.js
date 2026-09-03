@@ -197,6 +197,7 @@ class Store {
         scenario: template.scenario || "",
         mesExample: template.mesExample || "",
         speakingStyle: template.speakingStyle || "",
+        ...(template.replyPace ? { replyPace: template.replyPace } : {}),
       },
       messages: template.firstMessage
         ? [{ id: uid(), role: "her", text: template.firstMessage, time: Date.now(), status: "sent" }]

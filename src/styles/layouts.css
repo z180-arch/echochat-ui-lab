@@ -429,6 +429,23 @@
   gap: 8px;
   flex-wrap: wrap;
 }
+.reply-pace-field {
+  margin-top: 8px;
+  min-width: 0;
+}
+.reply-pace-field .segmented {
+  width: 100%;
+}
+.reply-pace-field .segmented-btn {
+  min-height: 44px;
+  padding: 10px 8px;
+}
+.field-hint {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}
 .conv-item {
   display: block;
   width: 100%;

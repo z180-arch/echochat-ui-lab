@@ -37,6 +37,11 @@ import {
 } from "./ui/theme.js";
 import { needsApiSetup } from "./domain/provider.js";
 import { MAX_USER_MESSAGE_CHARS } from "./domain/reply-clean.js";
+import {
+  getReplyPace,
+  setReplyPaceForCharacter,
+  REPLY_PACE_OPTIONS,
+} from "./domain/reply-pace.js";
 import { reconstructionModalMarkup } from "./ui/views/reconstruction.js";
 import { memoryReviewMarkup } from "./ui/views/memory-review.js";
 import {
@@ -569,7 +574,10 @@ const App = {
     if (roleId) this.editCharacter(roleId);
   },
   _paintCharacterEdit(characterId) {
-    const chat = store.getState().chats.find((c) => c.roleId === characterId);
+    const current = store.getCurrentChat();
+    const chat =
+      (current && current.roleId === characterId ? current : null) ||
+      store.getState().chats.find((c) => c.roleId === characterId);
     const name = document.getElementById("edit-char-name")?.value ?? chat?.name ?? "";
     const persona = chat?.config?.persona || "";
     const personaStr =
@@ -599,6 +607,15 @@ const App = {
         <textarea class="input" id="edit-char-style" rows="2">${esc(speaking)}</textarea>
         <label class="field-label">对话示例（可选）</label>
         <textarea class="input" id="edit-char-examples" rows="2">${esc(examples)}</textarea>
+        <label class="field-label">回复速度</label>
+        <p class="field-hint">控制这个角色回复消息时的呈现节奏</p>
+        <div class="reply-pace-field" data-reply-pace-for="${esc(characterId)}">
+          ${Segmented({
+            options: REPLY_PACE_OPTIONS,
+            value: getReplyPace(chat),
+            onChange: `window.EchoApp.setCharacterReplyPace.bind(null, '${esc(characterId)}')`,
+          })}
+        </div>
       `,
       footer: `
         <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">取消</button>
@@ -633,6 +650,14 @@ const App = {
       document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
       this.render();
       showToast({ message: "角色已更新", type: "success" });
+    });
+  },
+  setCharacterReplyPace(roleId, pace) {
+    setReplyPaceForCharacter(roleId, pace);
+    const safeId = typeof CSS !== "undefined" && CSS.escape ? CSS.escape(roleId) : String(roleId).replace(/"/g, '\\"');
+    document.querySelectorAll(`[data-reply-pace-for="${safeId}"] .segmented-btn`).forEach((btn) => {
+      const opt = REPLY_PACE_OPTIONS.find((o) => o.label === btn.textContent.trim());
+      btn.classList.toggle("segmented-btn-active", opt?.value === pace);
     });
   },
 

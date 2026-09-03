@@ -60,6 +60,7 @@ export const EVT = {
   STREAM_ERROR: "stream:error",
   STREAM_ABORT: "stream:abort",
   MEMORY_ADDED: "memory:added",
+  MEMORY_CANDIDATES_READY: "memory:candidates-ready",
   MOMENT_ADDED: "moment:added",
   RELATION_UPDATE: "relation:update",
   SETTINGS_CHANGE: "settings:change",

@@ -32,13 +32,13 @@ export function memoryReviewMarkup({ candidates = [], notice = "", error = "" } 
             <span>${c.duplicate ? "已经记过" : "记下这条"}</span>
           </label>
           <textarea class="input recon-finding-text" id="mem-text-${esc(c.id)}" rows="2" oninput="window.EchoApp.memoryCandidateEdit('${esc(c.id)}', this.value)" ${c.duplicate ? "readonly" : ""}>${esc(c.text)}</textarea>
-          <div class="recon-evidence">依据：${(c.evidence || []).map((e) => `#${e.index}「${esc(e.excerpt)}」`).join(" · ") || "无"}</div>
+          <div class="recon-evidence">依据：${(c.evidence || []).map((e) => (e.source === "summary" ? `摘要「${esc(e.excerpt)}」` : `#${e.index}「${esc(e.excerpt)}」`)).join(" · ") || "无"}</div>
         </div>`
         )
         .join("")}
       <label class="recon-finding-head" style="margin-top:12px;">
-        <input type="checkbox" id="mem-post-moment" checked />
-        <span>同时发一条动态</span>
+        <input type="checkbox" id="mem-post-moment" />
+        <span>同时在痕迹里记一笔</span>
       </label>
     `,
     footer: empty

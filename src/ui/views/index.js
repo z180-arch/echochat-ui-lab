@@ -31,6 +31,7 @@ import {
 import { getReplyPace, REPLY_PACE_OPTIONS } from "../../domain/reply-pace.js";
 import { getRoleId, getRoleAvatar } from "../../domain/persona.js";
 import { getMemoryList, getLastMemoryRetrieve } from "../../domain/memory.js";
+import { getPendingCandidates } from "../../domain/memory-candidates.js";
 import { listMoments } from "../../domain/moments.js";
 import { getAffinity } from "../../domain/relations.js";
 import { isSending, getStreamingChatId } from "../../domain/chat.js";
@@ -526,9 +527,11 @@ function renderContinuityJournal(roleId, chatId) {
 export function renderContinuitySheetContent(roleId, chatId) {
   const worldPeek = roleId ? peekWorldbook(roleId) : [];
   const journal = renderContinuityJournal(roleId, chatId);
+  const pendingCount = roleId ? (getPendingCandidates(roleId)?.candidates?.length || 0) : 0;
 
   return `
     ${journal}
+    ${pendingCount ? `<p class="profile-muted">有 ${pendingCount} 条待确认的记忆。</p>` : ""}
     ${roleId ? `<button type="button" class="btn btn-secondary btn-sm sheet-action" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openMemoryCandidates('${esc(roleId)}','${chatId}')">从对话提取</button>` : ""}
     ${worldPeek.length
       ? `<div class="continuity-context">

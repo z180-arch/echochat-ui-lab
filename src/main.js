@@ -54,6 +54,7 @@ import {
   setCandidateAccepted,
   editCandidateText,
   confirmMemoryCandidates,
+  clonePendingForReview,
 } from "./domain/memory-candidates.js";
 import {
   buildReconstructionDraft,
@@ -119,6 +120,18 @@ const App = {
     store.subscribe(() => this.render());
     events.on(EVT.STATE_CHANGE, () => this.render());
     events.on(EVT.TOAST, (payload) => showToast(payload));
+    events.on(EVT.MEMORY_CANDIDATES_READY, ({ roleId, chatId, count }) => {
+      if (!count) return;
+      showToast({
+        message: count === 1 ? "有 1 件事可以记下" : `有 ${count} 件事可以记下`,
+        type: "info",
+        duration: 6000,
+        action: {
+          label: "查看",
+          handler: () => this.openMemoryCandidates(roleId, chatId),
+        },
+      });
+    });
     events.on("rerender", () => this.render());
 
     // 6. 全局事件委托
@@ -1868,15 +1881,27 @@ const App = {
 
   openMemoryCandidates(characterId, chatId) {
     closeModal(this._mem?.overlay);
-    const extracted = extractMemoryCandidates(characterId, chatId ? { chatId } : {});
-    this._mem = {
-      overlay: null,
-      characterId,
-      chatId: chatId || null,
-      candidates: extracted.candidates || [],
-      notice: extracted.notice || "",
-      error: extracted.ok ? "" : "无法提取记忆",
-    };
+    const parked = clonePendingForReview(characterId);
+    if (parked?.candidates?.length) {
+      this._mem = {
+        overlay: null,
+        characterId,
+        chatId: parked.chatId || chatId || null,
+        candidates: parked.candidates,
+        notice: "",
+        error: "",
+      };
+    } else {
+      const extracted = extractMemoryCandidates(characterId, chatId ? { chatId } : {});
+      this._mem = {
+        overlay: null,
+        characterId,
+        chatId: chatId || null,
+        candidates: extracted.candidates || [],
+        notice: extracted.notice || "",
+        error: extracted.ok ? "" : "无法提取记忆",
+      };
+    }
     const spec = memoryReviewMarkup(this._mem);
     this._mem.overlay = openModal(spec);
   },

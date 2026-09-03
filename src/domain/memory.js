@@ -8,7 +8,6 @@ import { events, EVT } from "../core/events.js";
 import { uid } from "../core/utils.js";
 import { getRoleId, getPersona, getRoleName } from "./persona.js";
 import { chatCompletion } from "./provider.js";
-import { parseSummaryAndMoment, addMoment } from "./moments.js";
 import { peekMessages } from "./message-store.js";
 
 let summaryRunning = false;
@@ -179,7 +178,7 @@ export function rememberMessage(chat, message) {
 }
 
 // 自动摘要（每 N 轮触发一次）
-export async function maybeAutoSummary(chat) {
+export async function maybeAutoSummary(chat, opts = {}) {
   const s = store.getState();
   const cfg = s.memoryCfg.autoSummary;
   if (!cfg?.enabled || summaryRunning) return;
@@ -196,7 +195,7 @@ export async function maybeAutoSummary(chat) {
       .map((m) => `${m.role === "me" ? "用户" : getRoleName(chat)}: ${m.text}`)
       .join("\n");
 
-    const prompt = `请从以下对话中提取重要信息，生成摘要和一条角色动态。
+    const prompt = `请从以下对话中提取重要信息，生成摘要。
 
 人设：${persona.slice(0, 200)}
 
@@ -205,32 +204,17 @@ ${conversation}
 
 请按以下格式输出：
 【摘要】
-（提取用户的重要信息、偏好、事件，每条一行，最多5条）
+（提取用户的重要信息、偏好、事件，每条一行，最多5条。只写能确认的事实，不要推测。）`;
 
-【动态】
-（以角色口吻写一条朋友圈动态，20-80字，不带引号）`;
-
-    const result = await chatCompletion(
+    const complete = (opts && opts.complete) || chatCompletion;
+    const result = await complete(
       chat,
       [{ role: "user", content: prompt }],
       { temperature: 0.5, maxTokens: cfg.maxLength || 200 }
     );
 
-    const { summary, moment } = parseSummaryAndMoment(result);
-
-    // Conservative write: confirm-candidates remain the memory path.
-    // Auto-summary no longer dumps extracted lines into long-term memory.
-    void summary;
-
-    if (moment) {
-      addMoment({
-        roleId,
-        roleName: getRoleName(chat),
-        content: moment,
-        source: "auto_summary",
-      });
-      events.emit(EVT.MOMENT_ADDED, { roleId, content: moment });
-    }
+    const { applyAutoSummaryResult } = await import("./memory-candidates.js");
+    applyAutoSummaryResult(roleId, result, { chatId: chat.id });
   } catch (e) {
     console.warn("[Memory] auto summary failed:", e);
   } finally {
@@ -251,4 +235,8 @@ export const Memory = {
   buildMemoryBlock,
   rememberMessage,
   maybeAutoSummary,
+  applyAutoSummaryResult: async (roleId, raw, options) => {
+    const { applyAutoSummaryResult } = await import("./memory-candidates.js");
+    return applyAutoSummaryResult(roleId, raw, options);
+  },
 };

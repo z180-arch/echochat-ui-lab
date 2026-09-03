@@ -320,7 +320,7 @@ function renderMessage(m, index, chat) {
       <div class="msg-name">${esc(isMe ? myName : chat.name || "TA")}</div>
       <div class="msg-bubble">${text || ""}</div>
       <div class="msg-time">${formatDateTime(m.time)}</div>
-      ${isError ? `<div class="msg-status">没发出去<button type="button" class="msg-retry-btn" onclick="window.EchoApp.regenerateMessage(${index})">重试</button></div>` : ""}
+      ${isError ? `<div class="msg-status">没发出去<button type="button" class="msg-retry-btn" onclick="window.EchoApp.retryLastMessage()">重试</button></div>` : ""}
       <div class="msg-actions">
         <button class="msg-action-btn" onclick="window.EchoApp.copyMessage(${index})">复制</button>
         <button class="msg-action-btn" onclick="window.EchoApp.rememberMessage(${index})">记住</button>

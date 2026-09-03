@@ -8,7 +8,7 @@ import { events, EVT } from "./core/events.js";
 import { runMigrations, storage, KEYS } from "./core/storage.js";
 import { uid, esc, downloadFile, readFileAsText } from "./core/utils.js";
 import { APP_VERSION } from "./core/version.js";
-import { sendMessage, stopGeneration, regenerate, editMessage, deleteMessage, copyMessage, isSending, buildSystemPrompt } from "./domain/chat.js";
+import { sendMessage, stopGeneration, retryLastMessage, regenerate, editMessage, deleteMessage, copyMessage, isSending, buildSystemPrompt } from "./domain/chat.js";
 import { createFromTemplate, getSystemTemplates, buildCharacterCard, importCharacter, getRoleId } from "./domain/persona.js";
 import { rememberMessage, addMemory, deleteMemory } from "./domain/memory.js";
 import { listMoments, toggleLike, addComment } from "./domain/moments.js";
@@ -1040,6 +1040,9 @@ const App = {
   },
   regenerateMessage(index) {
     regenerate(index);
+  },
+  retryLastMessage() {
+    return retryLastMessage();
   },
   editMessage(index) {
     const text = editMessage(index);

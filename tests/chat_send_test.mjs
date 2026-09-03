@@ -46,7 +46,7 @@ const { installStorageTestHooks, resetStorageTestHooks } = await import(
 );
 const { messageStore } = await import(srcHref("src/domain/message-store.js"));
 const { createFromTemplate } = await import(srcHref("src/domain/persona.js"));
-const { sendMessage, stopGeneration, isSending } = await import(srcHref("src/domain/chat.js"));
+const { sendMessage, stopGeneration, isSending, retryLastMessage } = await import(srcHref("src/domain/chat.js"));
 const { MAX_USER_MESSAGE_CHARS } = await import(srcHref("src/domain/reply-clean.js"));
 const {
   getReplyPace,
@@ -231,7 +231,7 @@ await testAsync("does not rewrite the user message", async () => {
   assert.equal(me.text, "我（笑眯眯）只是打个招呼");
 });
 
-await testAsync("empty reply: sending false, streaming placeholder removed", async () => {
+await testAsync("empty reply: keeps error assistant row and the user message", async () => {
   resetAll();
   store.updateSettings({ apiKey: "sk-test-key", baseUrl: "https://api.example.com/v1" });
   const chat = await makeChat();
@@ -239,9 +239,15 @@ await testAsync("empty reply: sending false, streaming placeholder removed", asy
   await sendMessage("嗨");
   assert.equal(isSending(), false);
   assert.equal(leftoverStreaming(chat.id).length, 0);
+  const msgs = messageStore.peekMessages(chat.id);
+  const me = msgs.filter((m) => m.role === "me").pop();
+  const her = msgs.filter((m) => m.role === "her").pop();
+  assert.equal(me.text, "嗨");
+  assert.equal(her.status, "error");
+  assert.ok(her.id, "error assistant row must remain");
 });
 
-await testAsync("error: sending false, no streaming leftover", async () => {
+await testAsync("error: keeps error assistant row and the user message", async () => {
   resetAll();
   store.updateSettings({ apiKey: "sk-test-key", baseUrl: "https://api.example.com/v1" });
   const chat = await makeChat();
@@ -249,6 +255,31 @@ await testAsync("error: sending false, no streaming leftover", async () => {
   await sendMessage("嗨");
   assert.equal(isSending(), false);
   assert.equal(leftoverStreaming(chat.id).length, 0);
+  const msgs = messageStore.peekMessages(chat.id);
+  const me = msgs.filter((m) => m.role === "me").pop();
+  const her = msgs.filter((m) => m.role === "her").pop();
+  assert.equal(me.text, "嗨");
+  assert.equal(her.status, "error");
+  assert.ok(her.id, "error assistant row must remain");
+});
+
+await testAsync("retry after failed send reuses send path without dropping the user turn", async () => {
+  resetAll();
+  store.updateSettings({ apiKey: "sk-test-key", baseUrl: "https://api.example.com/v1" });
+  const chat = await makeChat();
+  installFetchStream("", { status: 401 });
+  await sendMessage("嗨");
+  assert.equal(messageStore.peekMessages(chat.id).filter((m) => m.status === "error").length, 1);
+  installFetchStream("我在");
+  await retryLastMessage();
+  assert.equal(isSending(), false);
+  const msgs = messageStore.peekMessages(chat.id);
+  const me = msgs.filter((m) => m.role === "me");
+  const her = msgs.filter((m) => m.role === "her").pop();
+  assert.equal(me.filter((m) => m.text === "嗨").length, 1);
+  assert.equal(her.text, "我在");
+  assert.notEqual(her.status, "error");
+  assert.notEqual(her.status, "streaming");
 });
 
 await testAsync("cancel: sending false, no streaming leftover", async () => {

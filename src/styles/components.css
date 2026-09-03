@@ -353,6 +353,9 @@
   border-color: var(--color-danger);
   background: color-mix(in srgb, var(--color-danger) 12%, var(--color-surface));
 }
+.msg-error .msg-bubble:empty {
+  display: none;
+}
 .msg-actions {
   display: none;
   flex-wrap: wrap;

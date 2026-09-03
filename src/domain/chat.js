@@ -29,13 +29,18 @@ export function getStreamingChatId() {
   return streamingChatId;
 }
 
+function keepFailedAssistantRow(chatId, msgId) {
+  if (!chatId || !msgId) return;
+  messageStore.updateMessage(chatId, msgId, { text: "", status: "error" });
+}
+
 function finishStreamingPlaceholders(chatId) {
   if (!chatId) return;
   const msgs = messageStore.peekMessages(chatId);
   for (const m of msgs) {
     if (m.role !== "her" || m.status !== "streaming") continue;
     const cleaned = cleanAssistantReply(m.text || "");
-    if (!cleaned) messageStore.deleteMessage(chatId, m.id);
+    if (!cleaned) keepFailedAssistantRow(chatId, m.id);
     else messageStore.updateMessage(chatId, m.id, { text: cleaned, status: "sent" });
   }
 }
@@ -148,7 +153,7 @@ export async function sendMessage(text) {
 
       maybeAutoSummary(store.getCurrentChat() || chat);
     } else {
-      messageStore.deleteMessage(chat.id, tempMsg.id);
+      keepFailedAssistantRow(chat.id, tempMsg.id);
     }
   } catch (e) {
     if (e.name === "AbortError") {
@@ -169,7 +174,8 @@ export async function sendMessage(text) {
     if (lastMsg?.status === "streaming") {
       const cleaned = cleanAssistantReply(streamed || lastMsg.text || "");
       if (!cleaned) {
-        messageStore.deleteMessage(id, lastMsg.id);
+        if (e.name === "AbortError") messageStore.deleteMessage(id, lastMsg.id);
+        else keepFailedAssistantRow(id, lastMsg.id);
       } else {
         messageStore.updateMessage(id, lastMsg.id, {
           text: cleaned,
@@ -209,8 +215,7 @@ export async function retryLastMessage() {
   // 删除最后一条用户消息之后的所有消息（双写：localStorage + Dexie）
   await messageStore.truncateMessages(chat.id, lastUserIdx);
 
-  // 重新发送
-  sendMessage(userText);
+  return sendMessage(userText);
 }
 
 // 重新生成 AI 回复

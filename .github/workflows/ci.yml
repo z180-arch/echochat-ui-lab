@@ -64,6 +64,9 @@ jobs:
       - name: UI Refinement Wave 3B
         run: node tests/ui_refinement_wave3b_test.mjs
 
+      - name: UI Refinement Wave 4
+        run: node tests/ui_refinement_wave4_test.mjs
+
       - name: Syntax check (src)
         run: |
           set -euo pipefail
@@ -82,5 +85,10 @@ jobs:
 
       - name: Wave 3B browser verify
         run: node scripts/wave3b_ui_verify.mjs
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+
+      - name: Wave 4 browser verify
+        run: node scripts/wave4_ui_verify.mjs
         env:
           CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}

@@ -560,6 +560,7 @@ const App = {
           showToast({ message: "无法解析角色卡", type: "error" });
           return;
         }
+        document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
         store.setSelectedCharacter(result.characterId);
         store.setActiveTab("companion");
         this.view = "app";
@@ -645,6 +646,10 @@ const App = {
   },
   saveCharacterEdit(characterId) {
     const name = document.getElementById("edit-char-name")?.value?.trim();
+    if (!name) {
+      showToast({ message: "先写个名字", type: "warning" });
+      return;
+    }
     const identity = document.getElementById("edit-char-identity")?.value || "";
     const scenario = document.getElementById("edit-char-scenario")?.value || "";
     const mesExample = document.getElementById("edit-char-examples")?.value || "";
@@ -652,24 +657,28 @@ const App = {
     const avatar = this._charDraftAvatar;
     this._charDraftAvatar = null;
     Character.updateCharacter(characterId, {
-      name: name || undefined,
+      name,
       identity,
       personality: { description: identity, scenario, mesExample },
       speakingStyle: speakingStyle ? { notes: speakingStyle } : {},
       ...(avatar ? { avatar } : {}),
-    }).then(() => {
-      const chats = store.getState().chats.filter((c) => c.roleId === characterId);
-      chats.forEach((c) => {
-        store.updateChat(c.id, {
-          name: name || c.name,
-          ...(avatar ? { avatar } : {}),
-          config: { ...c.config, persona: identity, scenario, mesExample, speakingStyle },
+    })
+      .then(() => {
+        const chats = store.getState().chats.filter((c) => c.roleId === characterId);
+        chats.forEach((c) => {
+          store.updateChat(c.id, {
+            name,
+            ...(avatar ? { avatar } : {}),
+            config: { ...c.config, persona: identity, scenario, mesExample, speakingStyle },
+          });
         });
+        document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+        this.render();
+        showToast({ message: "角色已更新", type: "success" });
+      })
+      .catch(() => {
+        showToast({ message: "保存失败", type: "error" });
       });
-      document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
-      this.render();
-      showToast({ message: "角色已更新", type: "success" });
-    });
   },
   setCharacterReplyPace(roleId, pace) {
     setReplyPaceForCharacter(roleId, pace);
@@ -751,8 +760,8 @@ const App = {
     this._paintBringModal();
   },
   _paintBringModal() {
-    const card = (icon, title, desc, onClick, featured) => `
-      <button type="button" class="create-card ${featured ? "create-card-featured" : ""}" onclick="this.closest('.modal-overlay').remove();${onClick}">
+    const card = (icon, title, desc, onClick, featured, keepOpen) => `
+      <button type="button" class="create-card ${featured ? "create-card-featured" : ""}" onclick="${keepOpen ? onClick : `this.closest('.modal-overlay').remove();${onClick}`}">
         <span class="create-card-ic">${icon}</span>
         <span>
           <span class="create-card-title">${title}</span>
@@ -766,7 +775,7 @@ const App = {
         <p class="create-sub">从聊天记录、角色卡或一句话，把 TA 带进来。</p>
         <div class="create-cards">
           ${card(Icons.message, "导入聊天记录", "微信 / QQ 等导出的记录，或粘贴纯文本", "window.EchoApp.openReconstruction()", true)}
-          ${card(Icons.upload, "导入角色卡", "SillyTavern 角色卡 JSON", "window.EchoApp.importCharacterCard()")}
+          ${card(Icons.upload, "导入角色卡", "SillyTavern 角色卡 JSON", "window.EchoApp.importCharacterCard()", false, true)}
           ${card(Icons.sparkles, "创建新人设", "填写名字与头像，可用一句话补全人设", "window.EchoApp.openCreateBlank()")}
           ${card(Icons.users, "从内置角色开始", "挑一个现成的性格，直接体验对话", "window.EchoApp.openTemplatePicker()")}
         </div>
@@ -796,7 +805,7 @@ const App = {
             .map(
               (t) => `
             <button type="button" class="create-card" onclick="this.closest('.modal-overlay').remove();window.EchoApp.selectTemplate('${esc(t.name)}')">
-              <span class="create-card-ic">${t.emoji || Icons.users}</span>
+              <span class="create-card-ic">${Icons.users}</span>
               <span>
                 <span class="create-card-title">${esc(t.name)}</span>
                 <span class="create-card-desc">${esc(t.tag || "")}${t.firstMessage ? ` · ${esc(t.firstMessage.slice(0, 24))}` : ""}</span>
@@ -1217,12 +1226,12 @@ const App = {
       const global = books.find((b) => b.id === "global") || books[0];
       const entries = (global?.entries || []).slice(0, 24);
       content = `
-        <p class="create-sub">提到关键词时，条目会注入当前对话。每条最多 1200 字。不改匹配规则。</p>
+        <p class="create-sub">提到关键词时会注入当前对话。对所有角色共用。每条最多 1200 字。</p>
         <label class="field-label">关键词（逗号分隔）</label>
         <input class="input" id="wb-keys" placeholder="雨天, 咖啡馆" />
         <label class="field-label">设定</label>
         <textarea class="input" id="wb-content" rows="4" maxlength="1200" placeholder="只有提到关键词时才会用到。"></textarea>
-        <button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px" onclick="window.EchoApp.addWorldbookEntry()">添加条目</button>
+        <button type="button" class="btn btn-secondary btn-sm" style="margin-top:12px" onclick="window.EchoApp.addWorldbookEntry()">添加条目</button>
         <div class="wb-list" style="margin-top:16px">
           ${entries.length
             ? entries
@@ -1235,7 +1244,7 @@ const App = {
             </div>`
                 )
                 .join("")
-            : `<p class="profile-muted">还没有条目。</p>`}
+            : `<p class="profile-muted">还没有条目。写好关键词和设定后点添加。</p>`}
         </div>`;
       footer = `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">返回</button>`;
     } else if (section === "voice") {
@@ -1247,7 +1256,12 @@ const App = {
             desc: s.settings.ttsEnabled ? "已开启" : "已关闭",
             onClick: "window.EchoApp.toggleTTS();window.EchoApp.openSettings('voice')",
           })}
-          ${SettingRow({ icon: Icons.mic, title: "语音输入", desc: "开发中", onClick: "window.EchoApp.toggleSTT()" })}
+          ${SettingRow({
+            icon: Icons.mic,
+            title: "语音输入",
+            desc: "即将支持",
+            right: "<span></span>",
+          })}
         </div>`;
       footer = `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">返回</button>`;
     }
@@ -1651,7 +1665,6 @@ const App = {
         this._recon.importMode = "text";
         this._recon.error = "";
         this._paintReconstruction();
-        showToast({ message: "聊天记录已导入", type: "success" });
       })
       .catch(() => showToast({ message: "无法读取文件", type: "error" }));
   },
@@ -1709,15 +1722,10 @@ const App = {
       this._paintReconstruction();
       return;
     }
-    // 先亮一帧「解析中」，让这一步有过程感而不是瞬间跳转
-    this._recon.step = "parsing";
+    this._recon.draft = built.draft;
     this._recon.error = "";
+    this._recon.step = "review";
     this._paintReconstruction();
-    setTimeout(() => {
-      this._recon.draft = built.draft;
-      this._recon.step = "review";
-      this._paintReconstruction();
-    }, 620);
   },
   reconstructionLoadFile() {
     const input = document.createElement("input");
@@ -1790,10 +1798,9 @@ const App = {
       this.render();
       setTimeout(() => {
         this._closeReconstruction();
-        showToast({
-          message: insufficient ? `${charName} 已创建，部分设定仍需补充` : `从对话里认出了 ${charName}`,
-          type: "success",
-        });
+        if (insufficient) {
+          showToast({ message: `${charName} 已创建，部分设定仍需补充`, type: "success" });
+        }
       }, 1100);
     } catch (err) {
       showToast({ message: "创建失败", type: "error" });

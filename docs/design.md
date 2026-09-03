@@ -1,13 +1,9 @@
 # EchoChat Design System
 
-**Status:** HISTORICAL design research. V1.1 RC shipped at `403e721`.  
-**Written at:** V1 Runtime `9f2a6b2` · Morning Mint frozen  
-**Date:** 2026-09-02  
-**Do not treat this file as unimplemented work.** Current state: [`docs/baseline/V1_1_RC_CURRENT_STATE.md`](baseline/V1_1_RC_CURRENT_STATE.md).
+**Status:** Shipped with V1.1 RC (`403e721`). Morning Mint / motion language.  
+**Not a plan.** Product state: [`docs/baseline/V1_1_RC_CURRENT_STATE.md`](baseline/V1_1_RC_CURRENT_STATE.md).
 
----
-
-This document is the Design / Frontend / Motion layer. It **inherits** the V1.1 product strategy. It does not replace it.
+This is the Design / Frontend / Motion layer. It does not replace current-state or code.
 
 ---
 
@@ -17,11 +13,9 @@ This document is the Design / Frontend / Motion layer. It **inherits** the V1.1 
 
 Source of truth in this repo:
 
-- `docs/OPEN_SOURCE_ARCHITECTURE_BENCHMARK.md` — architecture, companion loop, licenses, V1.1 upgrades
-- `docs/baseline/CURRENT_STATE.md` — current product surfaces
-- `docs/baseline/V1_BASELINE.md` — runtime/storage lock
-- `docs/roadmap/ECHOCHAT_CURSOR_MASTER_ROADMAP.md` — Morning Mint freeze
-- Existing UI Freeze: Morning Mint + Logo A Ripple (`docs/design/OPENDESIGN_PROMPT_polish-motion.md`)
+- [`docs/baseline/V1_1_RC_CURRENT_STATE.md`](baseline/V1_1_RC_CURRENT_STATE.md) — current product
+- [`docs/baseline/V1_BASELINE.md`](baseline/V1_BASELINE.md) — runtime/storage lock
+- Code: `src/styles/tokens.css`, `src/styles/motion.css`, `src/ui/ambient-policy.js`
 
 Requested files **not present** in the repository (ignored, not reconstructed):
 
@@ -686,4 +680,4 @@ Rules for implementers:
 | Character visual | Chromium + Profile home. No 3D. |
 | Chinese apps | WeChat composer/long-press; Xiaohongshu Moments cards; Douyin only as website vertical rhythm. |
 
-This file is the design source of truth going forward. Implementation order lives in `docs/V1_1_IMPLEMENTATION_PLAN.md`.
+This file records the shipped Morning Mint / motion language. Implementation order is not in this file; next work follows the V1.1 RC maintenance loop.

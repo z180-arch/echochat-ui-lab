@@ -6,7 +6,7 @@
 > Full hash: `403e72158a95eac33d065c07402701d39a710b99`  
 > Status: **V1.1 RC — live on production**
 
-Older Foundation / Stage 0–13 language in this repository is **historical**. Do not treat those stages as unfinished work. Do not start from the old Master Roadmap.
+Older Foundation / Stage 0–13 language is **abandoned**. Do not treat those stages as unfinished work. There is no Master Roadmap in this repository.
 
 If another document disagrees with this file, **this file wins**.
 
@@ -199,35 +199,29 @@ Do not refactor merely for cleanliness.
 
 ---
 
-## 9. Stale documents (do not execute)
+## 9. Remaining docs
 
-These files describe earlier phases. They are **not** a to-do list for V1.1 RC:
-
-| Document | Stale relative to `403e721` |
-|----------|------------------------------|
-| `README.md` | Still said Foundation Closure; listed Reconstruction / Context Builder / Relationship events as unimplemented |
-| `docs/baseline/CURRENT_STATE.md` | Snapshot ~2026-09-01; Stage 6–9 still framed as next |
-| `docs/baseline/CURSOR_HANDOFF_BASELINE.md` | Instructs STAGE 0 first; marks STAGE 1–6 as unfinished |
-| `docs/roadmap/ECHOCHAT_CURSOR_MASTER_ROADMAP.md` | Declared ACTIVE Stage 0→13 route |
-| `docs/baseline/V1_BASELINE.md` | V1 runtime/storage lock — still valid as **contract**, not as “current product surface” |
-| `docs/design.md` | Planning/research at `9f2a6b2`; “no product code changed” is obsolete |
-| `docs/V1_1_IMPLEMENTATION_PLAN.md` | “Planning only / do not implement” is obsolete — V1.1 RC shipped |
-| `docs/OPEN_SOURCE_ARCHITECTURE_BENCHMARK.md` | Research only at `9f2a6b2`; not an execution queue |
-| `docs/UI_V2_IMPLEMENTATION_BASELINE.md` | **Not in the repository** |
-| `docs/UI_V2_IMPLEMENTATION_LOG.md` | **Not in the repository** |
-| `docs/UI_V2_MODULE_REGISTRY.md` | **Not in the repository** |
-
-Phase 0–6 gate reports under `docs/baseline/PHASE_0_6_*` and `docs/history/*` remain historical evidence.
+| File | Role |
+|------|------|
+| This file | Current product / verification / how to continue |
+| `README.md` | Entry, run, tests, contract, agent rules |
+| `docs/baseline/V1_BASELINE.md` | Frozen storage keys, schema v2, API contract |
+| `docs/architecture/DATA_OWNERSHIP.md` | Local-first vs provider traffic |
+| `docs/architecture/PLUGIN_POLICY.md` | Constraint if plugins are ever authorized — **not a work item** |
+| `docs/design.md` | Morning Mint / motion language (shipped with V1.1; not a plan) |
 
 Known remaining **non-V1.1** debt (not a roadmap mandate): Memory/Relationship/Moments still on localStorage (not Dexie); no vector RAG; no plugin/cloud/native; no formal Playwright E2E.
+
+Stage 0–13 roadmaps, Cursor handoff, old CURRENT_STATE, Phase 0–6 gate reports, AI_* history reports, the 2–3 year architecture proposal, and the V1.1 implementation plan were removed so they cannot be executed by mistake.
 
 ---
 
 ## 10. First file for a new agent
 
 1. This file — `docs/baseline/V1_1_RC_CURRENT_STATE.md`
-2. `docs/baseline/V1_BASELINE.md` — storage/API contract lock
-3. `docs/architecture/DATA_OWNERSHIP.md` — local-first vs API
-4. Code at `403e721`
+2. `README.md`
+3. `docs/baseline/V1_BASELINE.md` — storage/API contract lock
+4. `docs/architecture/DATA_OWNERSHIP.md` — local-first vs API
+5. Code and `tests/`
 
-Do not open the Master Roadmap to decide what to build next.
+Do not look for a Master Roadmap or Stage list.

@@ -1,5 +1,9 @@
 # EchoChat Plugin Architecture Policy
 
+**Not a work item.** Plugins are not implemented. Do not start a plugin system unless an explicit work package authorizes it. This file only records the permission boundary if that ever happens.
+
+---
+
 ## 目的
 
 本文档定义 EchoChat 未来插件系统的架构原则和权限边界。

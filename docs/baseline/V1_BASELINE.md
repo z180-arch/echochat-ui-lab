@@ -169,12 +169,10 @@
 
 | Document | Purpose |
 |----------|---------|
-| `README.md` | Project overview + quick start |
-| `docs/architecture/ECHOCHAT_LONG_TERM_ARCHITECTURE.md` | Long-term architecture proposal (R2) |
+| `README.md` | Project entry |
+| `docs/baseline/V1_1_RC_CURRENT_STATE.md` | Authoritative current state |
 | `docs/architecture/DATA_OWNERSHIP.md` | Data classification + privacy |
-| `docs/architecture/PLUGIN_POLICY.md` | Plugin security boundary |
-| `docs/LICENSING_POLICY.md` | License selection rationale |
-| `docs/AI_*_REPORT.md` | V1 closing pass reports (7 docs) |
+| `docs/architecture/PLUGIN_POLICY.md` | Plugin security boundary (not a backlog item) |
 | `LICENSE` | PolyForm Noncommercial 1.0.0 |
 | `COPYRIGHT.md` | Copyright + asset classification |
 | `TRADEMARKS.md` | Brand usage policy |

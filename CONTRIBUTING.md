@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-EchoChat 处于 **Active Development** 阶段。欢迎外部贡献，但项目治理和架构仍在演进中。
+EchoChat Lite 处于 **V1.1 RC**。当前状态：[`docs/baseline/V1_1_RC_CURRENT_STATE.md`](docs/baseline/V1_1_RC_CURRENT_STATE.md)。
 
 提交贡献前请理解：
 

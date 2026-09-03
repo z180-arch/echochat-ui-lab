@@ -275,7 +275,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 var(--space-3);
+  margin: 0 var(--space-3) var(--space-2);
   padding: 6px 12px;
   border-radius: var(--radius-pill);
   background: var(--color-primary-soft);
@@ -290,18 +290,36 @@
 /* ---- 消息气泡 ---- */
 .msg {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   padding: 8px 16px;
   align-items: flex-end;
+}
+.msg-group-cont {
+  padding-top: 0;
 }
 .msg-me {
   flex-direction: row-reverse;
 }
+.msg-avatar-slot {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
 .msg-col {
   max-width: min(78%, 36em);
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.msg-me .msg-col {
+  align-items: flex-end;
 }
 .msg-bubble {
+  width: max-content;
+  max-width: 100%;
   padding: 10px 14px;
   border-radius: 16px;
   font-size: var(--font-body);
@@ -361,6 +379,7 @@
   flex-wrap: wrap;
   gap: 2px;
   margin-top: 2px;
+  max-width: 100%;
 }
 .msg.show-actions .msg-actions,
 .msg:focus-within .msg-actions {

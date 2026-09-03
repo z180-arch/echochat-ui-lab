@@ -57,3 +57,49 @@ export function composerCountVisible(n, max = 2000) {
   const cap = Number(max) || 2000;
   return count >= Math.floor(cap * COMPOSER_COUNT_NEAR_RATIO) || count > cap;
 }
+
+export function sameSender(previous, current) {
+  if (!previous || !current) return false;
+  return previous.role === current.role;
+}
+
+export function isVisibleTranscriptMessage(m) {
+  if (!m) return false;
+  if (m.status === "streaming" && !String(m.text || "").trim()) return false;
+  return true;
+}
+
+function nearestVisible(messages, from, step) {
+  for (let i = from; i >= 0 && i < messages.length; i += step) {
+    if (isVisibleTranscriptMessage(messages[i])) return messages[i];
+  }
+  return null;
+}
+
+export function transcriptGroupFlags(messages, index) {
+  const list = messages || [];
+  const current = list[index];
+  const isMe = current?.role === "me";
+  if (!isVisibleTranscriptMessage(current)) {
+    return {
+      isGroupStart: false,
+      isGroupEnd: false,
+      showAvatar: false,
+      showName: false,
+      showTime: false,
+      showUserAvatar: false,
+    };
+  }
+  const prev = nearestVisible(list, index - 1, -1);
+  const next = nearestVisible(list, index + 1, 1);
+  const groupedWithPrev = sameSender(prev, current);
+  const groupedWithNext = sameSender(current, next);
+  return {
+    isGroupStart: !groupedWithPrev,
+    isGroupEnd: !groupedWithNext,
+    showAvatar: !isMe && !groupedWithPrev,
+    showName: !isMe && !groupedWithPrev,
+    showTime: !groupedWithNext,
+    showUserAvatar: false,
+  };
+}

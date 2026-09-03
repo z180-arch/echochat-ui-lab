@@ -30,7 +30,7 @@ import { peekMessages } from "../../domain/message-store.js";
 import { listCharactersForHub, listActiveConversations, resolveAvatarSrc } from "../../domain/character-hub.js";
 import { getCharacterSlots } from "../../domain/context-builder.js";
 import { listBooks } from "../../domain/worldbook.js";
-import { hubSecondaryLine, presentCompanionStage } from "../present.js";
+import { hubSecondaryLine, presentCompanionStage, transcriptGroupFlags } from "../present.js";
 
 function isWide() {
   return typeof window !== "undefined" && window.innerWidth >= 1024;
@@ -273,7 +273,7 @@ function renderChatPane(chat, hideChatMobile) {
             <div class="chat-empty-t">${messages.length || affinity?.hasHistory ? `继续和 ${esc(chat.name || "TA")} 相处` : `还没有和 ${esc(chat.name || "TA")} 聊过`}</div>
             <p>直接说一句就好。重要的事确认后，会成为你们的记忆。</p>
           </div>`
-        : messages.map((m, i) => renderMessage(m, i, chat)).join("")}
+        : messages.map((m, i) => renderMessage(m, i, chat, messages)).join("")}
     </div>
     <div class="chat-input-area">
       <div class="chat-input-wrap">
@@ -288,30 +288,37 @@ function renderChatPane(chat, hideChatMobile) {
   </div>`;
 }
 
-function renderMessage(m, index, chat) {
+function renderMessage(m, index, chat, messages = []) {
   const isMe = m.role === "me";
   const isStreaming = m.status === "streaming";
   const isError = m.status === "error";
   const raw = m.text || "";
   if (isStreaming && !raw.trim()) return "";
+  const flags = transcriptGroupFlags(messages, index);
   const text = renderMarkdown(raw);
   const settings = store.getState().settings;
   const myName = settings.myName || "我";
-  const avatar = isMe
-    ? `<button type="button" class="msg-avatar-btn" onclick="window.EchoApp.openUserProfile()" aria-label="编辑我的资料">
-        ${Avatar({ src: settings.myAvatar || "assets/avatars/user-default.svg", size: "sm", circle: true, alt: myName })}
+  const herName = chat.name || "角色";
+  const avatar = flags.showAvatar
+    ? `<button type="button" class="msg-avatar-btn" onclick="window.EchoApp.editCharacterFromChat()" aria-label="编辑角色资料">
+        ${CharacterAvatar({ src: getRoleAvatar(chat), size: "sm", alt: herName, name: herName })}
       </button>`
-    : `<button type="button" class="msg-avatar-btn" onclick="window.EchoApp.editCharacterFromChat()" aria-label="编辑角色资料">
-        ${CharacterAvatar({ src: getRoleAvatar(chat), size: "sm", alt: chat.name || "角色", name: chat.name || "角色" })}
-      </button>`;
+    : isMe
+      ? ""
+      : `<span class="msg-avatar-slot" aria-hidden="true"></span>`;
+  const groupClass = [
+    flags.isGroupStart ? "msg-group-start" : "",
+    flags.isGroupEnd ? "msg-group-end" : "",
+    !flags.isGroupStart ? "msg-group-cont" : "",
+  ].filter(Boolean).join(" ");
   return `
-  <div class="msg ${isMe ? "msg-me" : "msg-her"} ${isStreaming ? "msg-streaming" : ""} ${isError ? "msg-error" : ""}" data-msg-index="${index}">
+  <div class="msg ${isMe ? "msg-me" : "msg-her"} ${isStreaming ? "msg-streaming" : ""} ${isError ? "msg-error" : ""} ${groupClass}" data-msg-index="${index}">
     ${avatar}
     <button type="button" class="msg-more-btn" aria-label="消息操作" onclick="window.EchoApp.toggleMessageActions(this)">${Icons.more}</button>
     <div class="msg-col">
-      <div class="msg-name">${esc(isMe ? myName : chat.name || "TA")}</div>
+      ${flags.showName ? `<div class="msg-name">${esc(herName)}</div>` : ""}
       <div class="msg-bubble">${text || ""}</div>
-      <div class="msg-time">${formatDateTime(m.time)}</div>
+      ${flags.showTime ? `<div class="msg-time">${formatDateTime(m.time)}</div>` : ""}
       ${isError ? `<div class="msg-status">没发出去<button type="button" class="msg-retry-btn" onclick="window.EchoApp.retryLastMessage()">重试</button></div>` : ""}
       <div class="msg-actions">
         <button class="msg-action-btn" onclick="window.EchoApp.copyMessage(${index})">复制</button>

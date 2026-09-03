@@ -911,8 +911,8 @@
   text-align: right;
 }
 .msg-more-btn {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border-radius: 6px;
   display: grid;
   place-items: center;
@@ -923,8 +923,8 @@
   transition: opacity var(--dur-fast), background var(--dur-fast);
 }
 .msg-more-btn svg {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
 }
 @media (hover: hover) and (pointer: fine) {
   .msg-more-btn {

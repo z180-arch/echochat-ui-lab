@@ -37,7 +37,7 @@ import {
 } from "./ui/theme.js";
 import { needsApiSetup } from "./domain/provider.js";
 import { MAX_USER_MESSAGE_CHARS } from "./domain/reply-clean.js";
-import { composerCountVisible } from "./ui/present.js";
+import { composerCountVisible, PROFILE_PERSIST_MIN_WIDTH } from "./ui/present.js";
 import {
   getReplyPace,
   setReplyPaceForCharacter,
@@ -382,10 +382,10 @@ const App = {
       if (e.target.closest(".msg")) return;
       document.querySelectorAll(".msg.show-actions").forEach((m) => m.classList.remove("show-actions"));
     });
-    let wide = typeof window !== "undefined" && window.innerWidth >= 1024;
+    let wide = typeof window !== "undefined" && window.innerWidth >= PROFILE_PERSIST_MIN_WIDTH;
     let compact = typeof window !== "undefined" && window.innerWidth < 768;
     window.addEventListener("resize", () => {
-      const now = window.innerWidth >= 1024;
+      const now = window.innerWidth >= PROFILE_PERSIST_MIN_WIDTH;
       const nowCompact = window.innerWidth < 768;
       if (now !== wide) {
         wide = now;
@@ -930,7 +930,7 @@ const App = {
   },
   selectChat(id) {
     store.selectChat(id);
-    store.setProfileOpen(window.innerWidth >= 1024);
+    store.setProfileOpen(window.innerWidth >= PROFILE_PERSIST_MIN_WIDTH);
     import("./domain/message-store.js")
       .then(({ messageStore }) => messageStore.hydrateChat(id))
       .then(() => this.render())

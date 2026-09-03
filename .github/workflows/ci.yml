@@ -58,6 +58,9 @@ jobs:
       - name: UI Refinement Wave 2
         run: node tests/ui_refinement_wave2_test.mjs
 
+      - name: UI Refinement Wave 3A
+        run: node tests/ui_refinement_wave3a_test.mjs
+
       - name: Syntax check (src)
         run: |
           set -euo pipefail

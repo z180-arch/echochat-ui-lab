@@ -30,10 +30,10 @@ import { peekMessages } from "../../domain/message-store.js";
 import { listCharactersForHub, listActiveConversations, resolveAvatarSrc } from "../../domain/character-hub.js";
 import { getCharacterSlots } from "../../domain/context-builder.js";
 import { listBooks } from "../../domain/worldbook.js";
-import { hubSecondaryLine, presentCompanionStage, transcriptGroupFlags } from "../present.js";
+import { hubSecondaryLine, presentCompanionStage, transcriptGroupFlags, PROFILE_PERSIST_MIN_WIDTH } from "../present.js";
 
 function isWide() {
-  return typeof window !== "undefined" && window.innerWidth >= 1024;
+  return typeof window !== "undefined" && window.innerWidth >= PROFILE_PERSIST_MIN_WIDTH;
 }
 
 // ============================================================

@@ -1044,6 +1044,15 @@
     background: rgba(36, 50, 56, 0.28);
   }
 }
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .profile-mask {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--z-drawer) - 1);
+    background: rgba(36, 50, 56, 0.28);
+  }
+}
 
 /* ---- 桌面端：资料栏收起过渡 ---- */
 @media (min-width: 1024px) {

@@ -11,12 +11,6 @@
   .bottom-nav {
     display: none;
   }
-  .profile-pane {
-    display: flex;
-  }
-  .profile-close {
-    display: none;
-  }
   .list-pane {
     display: flex;
   }
@@ -47,8 +41,33 @@
     padding-left: var(--space-6);
     padding-right: var(--space-6);
   }
+}
+
+@media (min-width: 1024px) and (max-width: 1279px) {
+  :root {
+    --list-width: 260px;
+  }
   .profile-pane {
+    display: none;
+  }
+  .profile-pane.open {
+    display: flex;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: var(--z-drawer);
+    box-shadow: var(--shadow-lg);
+  }
+}
+
+@media (min-width: 1280px) {
+  .profile-pane {
+    display: flex;
     width: var(--profile-width);
+  }
+  .profile-close {
+    display: none;
   }
 }
 

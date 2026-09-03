@@ -51,6 +51,23 @@ export function relationshipEmptyCopy(presented) {
 }
 
 export const COMPOSER_COUNT_NEAR_RATIO = 0.9;
+export const PROFILE_PERSIST_MIN_WIDTH = 1280;
+export const COMPACT_DESKTOP_MIN_WIDTH = 1024;
+export const COMPACT_DESKTOP_LIST_WIDTH = 260;
+export const DEFAULT_LIST_WIDTH = 320;
+export const CHAT_COLUMN_MIN_WIDTH = 360;
+
+export function compactDesktopListWidth(viewport) {
+  const w = Number(viewport);
+  if (w >= 1440) return 340;
+  if (w >= PROFILE_PERSIST_MIN_WIDTH) return DEFAULT_LIST_WIDTH;
+  if (w >= COMPACT_DESKTOP_MIN_WIDTH) return COMPACT_DESKTOP_LIST_WIDTH;
+  return DEFAULT_LIST_WIDTH;
+}
+
+export function chatColumnMinWidth() {
+  return CHAT_COLUMN_MIN_WIDTH;
+}
 
 export function composerCountVisible(n, max = 2000) {
   const count = Number(n) || 0;

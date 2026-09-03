@@ -3,6 +3,8 @@
  * Isolated Chrome profile. Usage: node scripts/wave3a_ui_verify.mjs
  */
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { setTimeout as sleep } from "node:timers/promises";
 import { writeFile, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -12,8 +14,22 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CDP_PORT = Number(process.env.CDP_PORT || 9420);
 const HTTP_PORT = Number(process.env.APP_PORT || 8800);
 const BASE = `http://127.0.0.1:${HTTP_PORT}/`;
-const CHROME = process.env.CHROME_PATH || "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
-const USER_DATA = `${process.env.TEMP}\\echochat-wave3a-${Date.now()}`;
+const CHROME_CANDIDATES = [
+  process.env.CHROME_PATH,
+  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+  "/usr/bin/google-chrome",
+  "/usr/bin/google-chrome-stable",
+  "/usr/bin/chromium",
+  "/usr/bin/chromium-browser",
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+].filter(Boolean);
+const CHROME = CHROME_CANDIDATES.find((p) => existsSync(p));
+if (!CHROME) {
+  throw new Error("Chrome not found. Set CHROME_PATH to a Chrome/Chromium binary.");
+}
+const USER_DATA = process.env.CHROME_USER_DATA || join(tmpdir(), `echochat-wave3a-${Date.now()}`);
+const WSImpl = globalThis.WebSocket || (await import("undici")).WebSocket;
 const OUT = join(ROOT, ".tmp-shots");
 const LONG_CJK = "这是一段很长的中文回复，用来确认气泡会正常换行而不会把页面撑出横向滚动。".repeat(4);
 
@@ -37,7 +53,7 @@ async function waitForJson(url, attempts = 60) {
 }
 
 async function cdpConnect(wsUrl) {
-  const ws = new WebSocket(wsUrl);
+  const ws = new WSImpl(wsUrl);
   await new Promise((resolve, reject) => {
     ws.addEventListener("open", resolve);
     ws.addEventListener("error", reject);
@@ -332,6 +348,8 @@ const chrome = spawn(
     "--no-first-run",
     "--disable-gpu",
     "--hide-scrollbars",
+    "--no-sandbox",
+    "--disable-dev-shm-usage",
     "about:blank",
   ],
   { stdio: "ignore" }

@@ -8,7 +8,7 @@ jobs:
   test:
     name: Foundation Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -67,3 +67,12 @@ jobs:
           while IFS= read -r -d '' f; do
             node --check "$f"
           done < <(find src -type f -name '*.js' -print0)
+
+      - name: Install Chrome
+        id: chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Wave 3A browser verify
+        run: node scripts/wave3a_ui_verify.mjs
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}

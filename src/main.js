@@ -37,6 +37,7 @@ import {
 } from "./ui/theme.js";
 import { needsApiSetup } from "./domain/provider.js";
 import { MAX_USER_MESSAGE_CHARS } from "./domain/reply-clean.js";
+import { composerCountVisible } from "./ui/present.js";
 import {
   getReplyPace,
   setReplyPaceForCharacter,
@@ -1010,9 +1011,11 @@ const App = {
     if (!cap) return;
     const n = el?.value?.length || 0;
     const over = n > MAX_USER_MESSAGE_CHARS;
-    cap.hidden = false;
+    const near = composerCountVisible(n, MAX_USER_MESSAGE_CHARS);
+    cap.hidden = !near;
     cap.textContent = `${n} / ${MAX_USER_MESSAGE_CHARS}`;
     cap.classList.toggle("is-over", over);
+    cap.classList.toggle("is-near", near && !over);
   },
   onChatInput(el) {
     this.autoGrowInput(el);

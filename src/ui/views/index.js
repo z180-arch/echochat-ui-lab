@@ -30,15 +30,10 @@ import { peekMessages } from "../../domain/message-store.js";
 import { listCharactersForHub, listActiveConversations, resolveAvatarSrc } from "../../domain/character-hub.js";
 import { getCharacterSlots } from "../../domain/context-builder.js";
 import { listBooks } from "../../domain/worldbook.js";
+import { hubSecondaryLine, presentCompanionStage } from "../present.js";
 
 function isWide() {
   return typeof window !== "undefined" && window.innerWidth >= 1024;
-}
-
-function companionStage(affinity, hasTalk) {
-  if (affinity?.hasHistory) return affinity.stageLabel;
-  if (hasTalk) return "刚刚认识";
-  return "还没有聊过";
 }
 
 // ============================================================
@@ -198,19 +193,15 @@ function renderCompanionInbox(searchQuery, currentChat, hideListMobile) {
         : hub.map((h) => {
             const affinity = getAffinity(h.id, { moments: listMoments(h.id) });
             const hasTalk = !!h.lastPreview || (affinity?.hasHistory);
-            const presence = affinity?.hasHistory
-              ? `相处 ${affinity.knownDays} 天`
-              : hasTalk
-                ? "刚刚认识"
-                : "还没有聊过";
+            const presented = presentCompanionStage(affinity, hasTalk);
             return CharacterCard({
               name: h.name,
               avatar: resolveAvatarSrc(h.avatar),
-              presence,
+              presence: hubSecondaryLine(presented),
               lastLine: h.lastPreview || "",
               time: h.lastAt ? relativeTime(h.lastAt) : "",
-              stage: affinity?.stage || "none",
-              stageLabel: companionStage(affinity, hasTalk),
+              stage: presented.stage,
+              stageLabel: presented.label,
               active: currentRole === h.id,
               onClick: `window.EchoApp.selectCharacter('${h.id}')`,
             });
@@ -239,7 +230,8 @@ function renderChatPane(chat, hideChatMobile) {
   const affinity = roleId ? getAffinity(roleId, { moments: listMoments(roleId) }) : null;
   const convos = roleId ? listActiveConversations(roleId) : [];
   const empty = messages.length === 0;
-  const stage = companionStage(affinity, messages.length > 0);
+  const presented = presentCompanionStage(affinity, messages.length > 0);
+  const stage = presented.label;
 
   const recall = getLastMemoryRetrieve();
   const showRecall = recall.hadHit && recall.chatId === chat.id && recall.preview;
@@ -255,7 +247,7 @@ function renderChatPane(chat, hideChatMobile) {
           <div class="chat-header-status" ${sending ? `aria-live="polite"` : ""}>${
             sending
               ? `<span class="chat-composing">正在整理思绪</span>`
-              : StageChip({ label: stage, stage: affinity?.stage || "none" })
+              : StageChip({ label: stage, stage: presented.stage })
           }</div>
         </div>
       </div>
@@ -291,7 +283,7 @@ function renderChatPane(chat, hideChatMobile) {
           ? `<button class="chat-send-btn chat-send-stop" onclick="window.EchoApp.stopSend()" title="停止">${Icons.stop}</button>`
           : `<button class="chat-send-btn motion-press" onclick="window.EchoApp.sendMessage()" title="发送">${Icons.send}</button>`}
       </div>
-      <div class="composer-count" id="chat-count">0 / 2000</div>
+      <div class="composer-count" id="chat-count" hidden></div>
     </div>
   </div>`;
 }
@@ -356,6 +348,7 @@ function renderProfilePane(chat) {
   const convos = roleId ? listActiveConversations(roleId) : [];
   const hasTalk = (peekMessages(chat.id) || []).length > 0;
   const worldPeek = roleId ? peekWorldbook(roleId) : [];
+  const presented = presentCompanionStage(affinity, hasTalk);
 
   return `
   <aside class="profile-pane open">
@@ -363,7 +356,7 @@ function renderProfilePane(chat) {
       <button class="icon-btn profile-close" onclick="window.EchoApp.toggleProfile()" aria-label="关闭">${Icons.close}</button>
       ${CharacterAvatar({ src: getRoleAvatar(chat), size: "lg", className: "profile-avatar", alt: chat.name || "角色", name: chat.name || "角色" })}
       <div class="profile-name">${esc(chat.name || "角色")}</div>
-      <div class="profile-status">${StageChip({ label: companionStage(affinity, hasTalk), stage: affinity?.stage || "none" })}${affinity?.hasHistory ? `<span>相处 ${affinity.knownDays} 天</span>` : ""}</div>
+      <div class="profile-status">${StageChip({ label: presented.label, stage: presented.stage })}${presented.hasHistory && presented.knownDays ? `<span>相处 ${presented.knownDays} 天</span>` : ""}</div>
     </div>
     <div class="profile-section">
       <div class="profile-section-title">关于 TA</div>
@@ -378,7 +371,6 @@ function renderProfilePane(chat) {
       ${roleId ? `
         <div class="profile-tools">
           <button class="btn btn-secondary btn-sm" onclick="window.EchoApp.editCharacter('${roleId}')">编辑</button>
-          <button class="btn btn-ghost btn-sm" onclick="window.EchoApp.exportCharacterCard('${roleId}')">导出角色卡</button>
         </div>
       ` : ""}
     </div>
@@ -400,7 +392,7 @@ function renderProfilePane(chat) {
     <div class="profile-section">
       <div class="profile-section-title">关系</div>
       <div class="profile-section-content">
-        ${RelationshipBrief({ affinity })}
+        ${RelationshipBrief({ affinity, hasTalk })}
       </div>
     </div>
     <details class="profile-fold">
@@ -454,6 +446,14 @@ function renderProfilePane(chat) {
         ${roleId ? `<button class="btn btn-secondary btn-sm" onclick="window.EchoApp.startNewConversation('${roleId}')">开一条新的相处线</button>` : ""}
       </div>
     </details>
+    ${roleId ? `
+    <details class="profile-fold">
+      <summary class="profile-section-title">更多</summary>
+      <div class="profile-section-content">
+        <button class="btn btn-ghost btn-sm" onclick="window.EchoApp.exportCharacterCard('${roleId}')">导出角色卡</button>
+      </div>
+    </details>
+    ` : ""}
   </aside>`;
 }
 

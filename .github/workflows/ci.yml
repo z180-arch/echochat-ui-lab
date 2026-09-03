@@ -52,6 +52,9 @@ jobs:
       - name: V1.1 Context
         run: node tests/v1_1_context_test.mjs
 
+      - name: UI Refinement Wave 1
+        run: node tests/ui_refinement_wave1_test.mjs
+
       - name: Syntax check (src)
         run: |
           set -euo pipefail

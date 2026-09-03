@@ -4,6 +4,7 @@
 // ============================================================
 
 import { esc, formatDateTime, relativeTime } from "../../core/utils.js";
+import { hubShowsStageChip, presentCompanionStage, relationshipEmptyCopy } from "../present.js";
 
 // SVG 图标库
 export const Icons = {
@@ -113,6 +114,7 @@ export function CharacterCard({
   active = false,
   onClick = "",
 }) {
+  const subtitle = presence || "还没有聊过";
   return `<button type="button" class="list-item character-card motion-press ${active ? "list-item-active" : ""}" ${
     onClick ? `onclick="${onClick}"` : ""
   }>
@@ -122,8 +124,8 @@ export function CharacterCard({
         <span class="list-item-title">${esc(name)}</span>
         <span class="list-item-time">${esc(time || "")}</span>
       </div>
-      <div class="list-item-subtitle">${esc(presence || "还没有聊过")}</div>
-      <div class="list-item-meta">${StageChip({ label: stageLabel, stage })}</div>
+      <div class="list-item-subtitle">${esc(subtitle)}</div>
+      ${hubShowsStageChip(subtitle, stageLabel) ? `<div class="list-item-meta">${StageChip({ label: stageLabel, stage })}</div>` : ""}
       ${lastLine ? `<div class="list-item-last">${esc(lastLine)}</div>` : ""}
     </div>
   </button>`;
@@ -137,10 +139,11 @@ export function MemoryRow({ content = "", onDelete = "" }) {
   </div>`;
 }
 
-export function RelationshipBrief({ affinity = null, lastEvent = "" }) {
+export function RelationshipBrief({ affinity = null, lastEvent = "", hasTalk = false }) {
   if (!affinity?.hasHistory) {
+    const presented = presentCompanionStage(affinity, hasTalk);
     return `<div class="relationship-brief">
-      <p class="profile-muted">还没有聊过。开口第一句，关系从这里开始。</p>
+      <p class="profile-muted">${esc(relationshipEmptyCopy(presented))}</p>
     </div>`;
   }
   const event = String(lastEvent || affinity.lastEvent || "").trim();

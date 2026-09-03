@@ -310,6 +310,9 @@
   line-height: 1.3;
   font-variant-numeric: tabular-nums;
 }
+.composer-count.is-near {
+  color: var(--color-text-secondary);
+}
 .composer-count.is-over {
   color: var(--color-danger);
   font-weight: 600;

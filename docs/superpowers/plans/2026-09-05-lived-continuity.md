@@ -4,7 +4,12 @@
 
 **Goal:** Make Quiet Companion gap-return turns prove **Lived Continuity** — memory × relationship actually shape the prompt the model sees — without new Memory/Relationship UI.
 
-**Architecture:** Keep the existing `buildSystemPrompt` pipeline in `src/domain/chat.js`. Add a falsifiable `tests/lived_continuity_test.mjs` that encodes the Success Definition. Improve `retrieveMemoriesForTurn` with an idle/gap **anchor fallback** when token overlap is empty, and ensure lived salient memories refresh relationship brief/events so affinity injection stays non-empty. No storage key/schema renames. No new feature pages.
+**Architecture:** Keep the existing `buildSystemPrompt` pipeline in `src/domain/chat.js`. Add a falsifiable `tests/lived_continuity_test.mjs` that encodes the Success Definition. Improve `retrieveMemoriesForTurn` with a **gap/idle-gated** continuity anchor fallback (not a generic no-overlap dump). Relationship axis: verify existing public write/read path first; change production only if verification fails. Keep `continuitySignals` in the test file unless production truly needs a shared helper. No storage key/schema renames. No new feature pages.
+
+**Plan corrections (approved 2026-09-05):**
+1. Anchor fallback only on **gap/idle return + weak/empty overlap** — never on every no-overlap active turn.
+2. Task 3 is **verify-first**; production relationship writes only if Success Definition cannot be met with existing APIs.
+3. Do **not** default-create `src/domain/continuity.js`.
 
 **Tech Stack:** Existing zero-build ES modules, Node test harness (`node --test` style used by current `tests/*.mjs`), in-memory store patterns from `tests/v1_1_context_test.mjs`.
 
@@ -25,11 +30,11 @@ Before marking a task done, answer in the commit/PR note:
 | File | Role |
 |------|------|
 | `tests/lived_continuity_test.mjs` | **Create** — Success Definition fixtures |
-| `src/domain/memory.js` | **Modify** — gap/idle anchor fallback in retrieve |
-| `src/domain/relations.js` | **Modify** — link salient memory to brief/event (compatible) |
-| `src/domain/chat.js` | **Modify only if needed** — keep assembly; maybe tiny helper export for tests |
-| `src/domain/behavior.js` | Touch only if integrity helper belongs here |
+| `src/domain/memory.js` | **Modify** — gap/idle-gated anchor fallback in retrieve |
+| `src/domain/relations.js` | **Modify only if Task 3 verification proves insufficient** |
+| `src/domain/chat.js` | **Modify only if needed** to pass idle/lastChatAt into retrieve (prefer reuse) |
 | `docs/product-lab/experiments/lived-continuity-mvp.md` | **Update** — mark experiment status after green |
+| `src/domain/continuity.js` | **Do not create** unless production code must share the helper |
 
 Do **not** modify: `index.html`, `app/index.html`, UI views for new pages, Dexie schema, storage keys, PWA, landing.
 
@@ -54,6 +59,9 @@ Create `tests/lived_continuity_test.mjs` that:
 7. Asserts prompt includes a distinctive substring from the memory (e.g. `怕坐飞机` or `飞行`).
 8. Asserts prompt includes relationship continuity (`Relationship with the user` block or `brief` / stage / tone text from `buildBehaviorContext`).
 9. **Integrity:** build a parallel behavior string with `memories: []` or `affinity: null` and assert the full prompt continuity check fails a helper `continuitySignals(prompt)` requiring `{ hasMemory: true, hasRelationship: true }`.
+10. **Anti-contamination (must pass on current code):** after a *recent* `lastChatAt` (active conversation, not idle), a no-overlap query must **not** inject the flight-fear memory into `buildSystemPrompt`. This locks Correction 1 before Task 2.
+
+Keep `continuitySignals()` **inside this test file** (Correction 3).
 
 Sketch (adapt imports/helpers to match repo test style exactly when implementing):
 
@@ -117,15 +125,22 @@ git commit -m "test: add lived continuity gap-return success fixtures"
 node tests/lived_continuity_test.mjs
 ```
 
-- [ ] **Step 2: Implement minimal anchor fallback**
+- [ ] **Step 2: Implement minimal gap/idle-gated anchor fallback**
 
-In `retrieveMemoriesForTurn`, after building `pool` from overlap:
+**Hard rule:** Memory fallback is a **gap-return continuity mechanism**, not a **no-overlap memory dump**.
 
-- If `q` is non-empty and `pool` is empty (or too thin), and there are high-importance memories (e.g. `importance >= 7`), inject up to `min(2, injectMax)` top importance+recency memories as **anchors**.
-- Prefer anchors when the role appears idle: caller may pass nothing extra if we treat “empty overlap + important memories” as sufficient for MVP; optionally accept `opts.idleDays` later — **do not** require UI.
-- Update `lastRetrieve` so tests/debug can see `hadHit` / items including anchors (e.g. set preview from first anchor).
+In `retrieveMemoriesForTurn` (signature may accept optional idle signal from caller):
 
-Keep token-overlap path unchanged when overlaps exist (do not regress `v1_1_context_test`).
+- Apply anchors **only when** all of:
+  1. Query is non-empty, and
+  2. Overlap pool is empty or very weak, and
+  3. Role is in **gap/idle return** (reuse existing `lastChatAt` / relationship timing — e.g. idle ≥ 2 days; pass from `buildSystemPrompt` via `getAffinity(...).lastChatAt` or equivalent public data — **no new storage field**)
+- Then inject at most **1–2** high-importance memories (`importance >= 7`), ranked with existing importance + recency signals only. Do not invent a new scoring system.
+- **Active conversation** (not idle): if overlap is empty, keep **current** behavior (do not broadcast important memories).
+- Add a regression assertion in the suite: active/non-idle + no-overlap query must **not** inject the flight-fear anchor.
+- Update `lastRetrieve` so tests can observe anchor items.
+
+Keep strong-overlap path unchanged (do not regress `v1_1_context_test`).
 
 - [ ] **Step 3: Run continuity + context suites**
 
@@ -145,19 +160,26 @@ git commit -m "feat: idle memory anchors for gap-return continuity"
 
 ---
 
-### Task 3: Salient memory refreshes relationship continuity signal
+### Task 3: Verify relationship continuity path (modify production only if needed)
 
 **Files:**
-- Modify: `src/domain/relations.js` and/or call site in memory confirm / `addMemory` path used by tests
-- Prefer: when `addMemory(..., importance >= 7)` or existing confirm path runs, call `recordRelationshipEvent` with a short continuity-safe line that still yields `Brief:` in behavior (may reference that something important about travel/fear was shared — **do not** dump full secrets if current product rule forbids; but Success Definition requires *some* relationship signal; memory carries the fact body).
+- Test: `tests/lived_continuity_test.mjs` (primary)
+- Modify `src/domain/relations.js` / memory write path **only if** verification fails
 
-Check `tests/continuity_write_path_test.mjs`: confirmed memory already creates event `记下了一件关于你的事`. Ensure gap-return seed uses that path **or** `recordRelationshipEvent` so `hasRelationship` is true after idle.
+**Verify-first order (mandatory):**
 
-- [ ] **Step 1: Write/adjust test asserting brief/event survives idle and appears in `buildSystemPrompt`**
+1. Construct relationship state with **existing public APIs** (`recordChatTurn`, `recordRelationshipEvent`, and/or existing continuity confirm path that writes `记下了一件关于你的事`).
+2. Prove brief/event/stage **still exist after idle gap**.
+3. Prove they **enter** `buildSystemPrompt()` / behavior context.
+4. **Only then**, if Success Definition still fails on the relationship axis, make the smallest production fix.
 
-- [ ] **Step 2: Implement minimal wiring if seed-only is insufficient**
+Do **not** expand automatic relationship writes just because Memory × Relationship is the product bet.
 
-If public APIs already suffice, only fix the test seed to use `recordRelationshipEvent` + `recordChatTurn` — still commit a note that relationship axis is mandatory. If brief clears on idle (it should not), fix persistence bug.
+If existing APIs suffice, Task 3 ends as a **verification/test** commit (no `relations.js` change), with a short note in the commit body.
+
+- [ ] **Step 1: Verify with public APIs + adjust test seed if needed**
+
+- [ ] **Step 2: Production fix only if verification proves a real gap**
 
 - [ ] **Step 3: Run**
 
@@ -169,22 +191,29 @@ node tests/v1_1_context_test.mjs
 
 - [ ] **Step 4: Commit**
 
+If tests-only:
+
 ```bash
-git add src/domain/relations.js src/domain/memory.js tests/lived_continuity_test.mjs
-git commit -m "feat: keep relationship brief in lived continuity turns"
+git add tests/lived_continuity_test.mjs
+git commit -m "test: verify relationship continuity on gap-return path"
+```
+
+If production fix required:
+
+```bash
+git add src/domain/relations.js tests/lived_continuity_test.mjs
+git commit -m "fix: restore relationship brief on gap-return continuity turns"
 ```
 
 ---
 
-### Task 4: Continuity integrity helper + prompt-level gate
+### Task 4: Continuity integrity gate (test-local helper)
 
 **Files:**
-- Create or modify: small helper — prefer `src/domain/continuity.js` **only if** both chat tests and domain need it; otherwise keep `continuitySignals` in the test file and export `buildSystemPrompt` usage only.
-- Modify: `tests/lived_continuity_test.mjs`
+- Modify: `tests/lived_continuity_test.mjs` only by default
+- **Do not create** `src/domain/continuity.js` unless production chat/domain code must share the helper (default: keep `continuitySignals()` in the test file)
 
-- [ ] **Step 1: Add test that fails if either axis stripped from the assembled turn**
-
-Example:
+- [ ] **Step 1: Ensure integrity tests require both axes on assembled turns**
 
 ```js
 test("Success Definition: assembled turn requires memory × relationship", () => {
@@ -194,18 +223,18 @@ test("Success Definition: assembled turn requires memory × relationship", () =>
 });
 ```
 
-- [ ] **Step 2: No production UI changes**
+Also keep the mem-only / rel-only insufficiency checks from Task 1.
 
-Verify `git diff --stat` does not touch `src/ui/views/` except if absolutely required (should be none).
+- [ ] **Step 2: No production UI / no unnecessary domain abstraction**
+
+`git diff --stat` must not touch `src/ui/`. Must not add `src/domain/continuity.js` without a proven need.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add tests/lived_continuity_test.mjs src/domain/continuity.js
+git add tests/lived_continuity_test.mjs
 git commit -m "test: enforce memory×relationship continuity integrity"
 ```
-
-(Omit `continuity.js` from `git add` if not created.)
 
 ---
 

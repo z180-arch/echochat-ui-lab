@@ -36,6 +36,13 @@ Default reuse policy: **borrow ideas and models, not code**, unless license + at
 
 See [product-thesis/echochat-next-bet.md](product-thesis/echochat-next-bet.md).
 
+Proven experiments:
+
+- [Lived Continuity MVP](experiments/lived-continuity-mvp.md) — memory × relationship enter gap-return prompt
+- [Lived Thread](experiments/lived-thread-behavior.md) — gap-return prompt binds **this turn** to the lived thread (cooperative-stub contract)
+
+Latest decision: [decisions/2026-09-05-after-continuity-mvp.md](decisions/2026-09-05-after-continuity-mvp.md)
+
 ## Formal engineering artifacts
 
 - Design spec: [../superpowers/specs/2026-09-05-lived-continuity-design.md](../superpowers/specs/2026-09-05-lived-continuity-design.md)

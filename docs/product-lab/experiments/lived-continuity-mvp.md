@@ -1,8 +1,20 @@
 # MVP Experiment — Lived Continuity (Memory × Relationship)
 
-**Status:** Draft for review (not implemented)  
+**Status:** Proven (2026-09-05)  
 **Thesis:** [../product-thesis/echochat-next-bet.md](../product-thesis/echochat-next-bet.md)  
 **Concept:** [../product-thesis/echochat-product-concept.md](../product-thesis/echochat-product-concept.md)
+
+---
+
+## Verification
+
+**Success Definition met** via gap-return test (`tests/lived_continuity_test.mjs`): after simulated idle, memory × relationship together shape `buildSystemPrompt` without the user restating the salient fact. Memory-only or relationship-only is insufficient (integrity test fails).
+
+- **Idle-gated anchors (Correction 1):** retrieve injects salient overlap when the user returns on-topic; active no-overlap turns do not dump unrelated memories (anti-contamination test).
+- **Relationship axis:** verified through existing public APIs (`buildBehaviorContext`, affinity brief/events) — no production API expansion.
+- **Scope held:** no new UI, no `continuity.js`, no storage schema or key changes.
+
+Full regression pack green: lived_continuity 3/0, foundation 27/0, storage 28/0, v1_1_context 7/0, continuity_write_path 18/0, core_product 19/0.
 
 ---
 

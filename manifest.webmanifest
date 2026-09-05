@@ -1,9 +1,9 @@
 {
   "name": "EchoChat — 念念不忘，必有回响",
   "short_name": "EchoChat",
-  "id": "/",
-  "start_url": ".",
-  "scope": ".",
+  "id": "/app/",
+  "start_url": "/app/",
+  "scope": "/app/",
   "display": "standalone",
   "background_color": "#0a0a0b",
   "theme_color": "#0a0a0b",

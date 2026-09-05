@@ -1,12 +1,12 @@
 /**
  * Core loop browser verification: memory candidates, relationship empty state, isolation.
- * Usage: $env:APP_URL='http://127.0.0.1:8772/'; $env:CDP_PORT='9337'; node scripts/core_loop_browser_verify.mjs
+ * Usage: $env:APP_URL='http://127.0.0.1:8772/app/'; $env:CDP_PORT='9337'; node scripts/core_loop_browser_verify.mjs
  */
 import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
 
 const CDP_PORT = Number(process.env.CDP_PORT || 9337);
-const BASE_RAW = process.env.APP_URL || "http://127.0.0.1:8772/";
+const BASE_RAW = process.env.APP_URL || "http://127.0.0.1:8772/app/";
 const BASE = BASE_RAW.includes("?")
   ? `${BASE_RAW}&loop=${Date.now()}`
   : `${BASE_RAW}${BASE_RAW.endsWith("/") ? "" : "/"}?loop=${Date.now()}`;

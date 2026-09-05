@@ -9,7 +9,7 @@ import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
 
 const CDP_PORT = Number(process.env.CDP_PORT || 9334);
-const BASE_RAW = process.env.APP_URL || "http://127.0.0.1:8765/";
+const BASE_RAW = process.env.APP_URL || "http://127.0.0.1:8765/app/";
 const BASE = BASE_RAW.includes("?")
   ? `${BASE_RAW}&batch1=${Date.now()}`
   : `${BASE_RAW}${BASE_RAW.endsWith("/") ? "" : "/"}?batch1=${Date.now()}`;

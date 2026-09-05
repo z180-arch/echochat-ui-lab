@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 const CDP_PORT = 9335;
 const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 const USER_DATA = `${process.env.TEMP}\\echochat-batch1-perf-${Date.now()}`;
-const BASE = `http://127.0.0.1:8765/?perf=${Date.now()}`;
+const BASE = `http://127.0.0.1:8765/app/?perf=${Date.now()}`;
 
 async function cdpConnect(wsUrl) {
   const ws = new WebSocket(wsUrl);

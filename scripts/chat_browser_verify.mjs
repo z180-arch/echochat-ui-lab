@@ -11,7 +11,7 @@ import { dirname, join } from "node:path";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CDP_PORT = Number(process.env.CDP_PORT || 9411);
 const HTTP_PORT = Number(process.env.APP_PORT || 8793);
-const BASE = `http://127.0.0.1:${HTTP_PORT}/`;
+const BASE = `http://127.0.0.1:${HTTP_PORT}/app/`;
 const CHROME = process.env.CHROME_PATH || "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 const USER_DATA = `${process.env.TEMP}\\echochat-chat-verify-${Date.now()}`;
 const OUT = join(ROOT, ".tmp-shots");

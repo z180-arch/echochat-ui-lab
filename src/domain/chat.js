@@ -68,8 +68,10 @@ export function buildSystemPrompt(chat, opts = {}) {
   const persona = getPersona(chat);
   const query = opts.query != null ? String(opts.query) : "";
   noteRetrieveChat(chat?.id);
-  const memories = roleId ? retrieveMemoriesForTurn(roleId, query) : [];
   const affinity = roleId ? getAffinity(roleId, { moments: listMoments(roleId) }) : null;
+  const memories = roleId
+    ? retrieveMemoriesForTurn(roleId, query, undefined, { lastChatAt: affinity?.lastChatAt })
+    : [];
   const { behavior } = assembleBehaviorContext({ chat, memories, affinity });
 
   const parts = [];

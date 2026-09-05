@@ -100,7 +100,39 @@ export function getLastMemoryRetrieve() {
   return lastRetrieve;
 }
 
-export function retrieveMemoriesForTurn(roleId, query, limit) {
+const IDLE_GAP_MS = 2 * DAY_MS;
+const ANCHOR_IMPORTANCE_MIN = 7;
+const ANCHOR_MAX = 2;
+/** Best overlap at or below this counts as weak (single bigram ≈ 2). */
+const WEAK_OVERLAP_MAX = 2;
+
+function isGapIdle(opts = {}) {
+  if (opts.idleMs != null) return Number(opts.idleMs) >= IDLE_GAP_MS;
+  if (opts.idleDays != null) return Number(opts.idleDays) >= 2;
+  const lastChatAt = Number(opts.lastChatAt) || 0;
+  if (!lastChatAt) return false;
+  return Date.now() - lastChatAt >= IDLE_GAP_MS;
+}
+
+function continuityAnchors(all, now, max) {
+  return all
+    .filter((m) => (Number(m.importance) || 0) >= ANCHOR_IMPORTANCE_MIN)
+    .map((m) => {
+      const recency = 1 / (1 + Math.max(0, now - (m.createdAt || 0)) / (14 * DAY_MS));
+      const importance = Number(m.importance) || 0;
+      return { mem: m, score: importance + recency * 0.2 };
+    })
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        (b.mem.importance || 0) - (a.mem.importance || 0) ||
+        (b.mem.createdAt || 0) - (a.mem.createdAt || 0)
+    )
+    .slice(0, max)
+    .map((r) => r.mem);
+}
+
+export function retrieveMemoriesForTurn(roleId, query, limit, opts = {}) {
   const injectMax = limit || store.getState().memoryCfg?.injectMax || 10;
   const all = getMemory(roleId).memories || [];
   if (!roleId || !all.length) {
@@ -121,8 +153,26 @@ export function retrieveMemoriesForTurn(roleId, query, limit) {
     (a, b) => b.score - a.score || (b.mem.importance || 0) - (a.mem.importance || 0) || (b.mem.createdAt || 0) - (a.mem.createdAt || 0)
   );
   const pool = q ? ranked.filter((r) => r.overlap > 0) : ranked;
-  const items = pool.slice(0, injectMax).map((r) => r.mem);
-  const hit = q ? pool[0] : null;
+  const bestOverlap = pool.length ? pool[0].overlap : 0;
+  const weakOrEmpty = !pool.length || bestOverlap <= WEAK_OVERLAP_MAX;
+
+  // Gap/idle return only: when overlap is empty/weak, surface 1–2 high-importance anchors.
+  // Active conversation keeps current behavior (no important-memory dump on miss).
+  let items;
+  let usedAnchors = false;
+  if (q && weakOrEmpty && isGapIdle(opts)) {
+    const anchors = continuityAnchors(all, now, Math.min(ANCHOR_MAX, injectMax));
+    if (anchors.length) {
+      items = anchors;
+      usedAnchors = true;
+    } else {
+      items = pool.slice(0, injectMax).map((r) => r.mem);
+    }
+  } else {
+    items = pool.slice(0, injectMax).map((r) => r.mem);
+  }
+
+  const hit = usedAnchors ? (items[0] ? { mem: items[0] } : null) : q ? pool[0] : null;
   const hadHit = !!(hit && items.some((m) => m.id === hit.mem.id));
   lastRetrieve = {
     roleId,
@@ -130,6 +180,7 @@ export function retrieveMemoriesForTurn(roleId, query, limit) {
     items,
     hadHit,
     preview: hadHit ? String(hit.mem.content || "").slice(0, 28) : "",
+    usedAnchors,
   };
   return items;
 }

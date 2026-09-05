@@ -5,7 +5,7 @@
 
 ## Hypothesis
 
-A user can state a durable first-person fact in chat (`我很怕坐飞机…`) and it is **quietly persisted** (memory + a relationship “记下了一件关于你的事” event) **without** memory-review UI. Greetings, questions, and venting do not persist.
+A user can state a durable first-person fact in chat (`我很怕坐飞机…`) **or a dated lived event** (`我明天要出差`) and it is **quietly persisted** without memory-review UI. Greetings, questions, vents, and “下周再聊” do not persist.
 
 This is the missing third evidence layer:
 

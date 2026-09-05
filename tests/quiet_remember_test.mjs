@@ -109,7 +109,15 @@ test("greetings questions and vents do not persist", () => {
   assert.equal(quietRememberUserText(ROLE_ID, "量子力学作业怎么做"), null);
   assert.equal(quietRememberUserText(ROLE_ID, "哈哈哈"), null);
   assert.equal(quietRememberUserText(ROLE_ID, "好累"), null);
+  assert.equal(quietRememberUserText(ROLE_ID, "我们下周再聊"), null);
+  assert.equal(quietRememberUserText(ROLE_ID, "后天考试怎么办"), null);
   assert.equal(getMemoryList(ROLE_ID).length, 0);
+});
+
+test("upcoming lived events persist without confirm", () => {
+  resetAll();
+  assert.ok(quietRememberUserText(ROLE_ID, "我明天要出差"));
+  assert.ok(getMemoryList(ROLE_ID).some((m) => m.content.includes("出差")));
 });
 
 test("duplicate durable fact is not written twice", () => {

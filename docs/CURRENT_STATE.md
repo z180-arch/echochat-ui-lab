@@ -31,8 +31,6 @@ Landing does not initialize application storage. It does not read or write `loca
 
 The application continues to use existing storage keys and schemas. Changing the URL from `/` to `/app/` does not create new data keys.
 
-`landing.html` in the working tree may still be leftover visual work from before the entry split. It is **not** the official `/` entry. Do not mix it into entry-split or packaging assumptions.
-
 ---
 
 ## Current architecture (implemented)
@@ -42,7 +40,7 @@ The application continues to use existing storage keys and schemas. Changing the
 | Character | Implemented as a first-class domain + Dexie `characters` table, with legacy fallback from chats |
 | Conversation | Implemented; a character can have more than one conversation |
 | Message | Dexie-backed message store with localStorage dual-write / fallback |
-| Memory | Implemented (retrieve-for-turn, conservative candidate write) |
+| Memory | Retrieve-for-turn; idle-gated anchors; quiet auto-write of durable self-facts and a few lived events; candidate review still optional |
 | Worldbook | Implemented (global + character books) |
 | Relationship | Implemented (affinity plus brief/events) |
 | Moments | Implemented |

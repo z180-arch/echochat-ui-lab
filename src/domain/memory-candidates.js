@@ -13,6 +13,8 @@ import { recordRelationshipEvent } from "./relations.js";
 
 const FACT_RE = /我(喜欢|讨厌|爱吃|爱|是|在|住|有|想|会|要|叫)|今天|明天|昨天|工作|上学|生日/;
 const DURABLE_SELF_RE = /我(很|有点|有點)?(怕|害怕|讨厌|討厭|喜欢|喜歡|爱吃|愛吃|过敏|過敏|不吃|不能|住)/;
+const LIFE_EVENT_RE =
+  /(明天|后天|後天|下周|這週末|这周末|这星期).{0,12}(出差|考试|考試|面试|面試|住院|手术|手術|搬家|答辩|答辯)|我.{0,6}(住院了|搬家了|分手了)/;
 const QUESTION_RE = /[吗嗎？?]|怎么|怎麼/;
 const ABOUT_USER_RE = /你(喜欢|讨厌|是|在|住|有)/;
 const SKIP_RE = /^(嗨|哈喽|你好|在吗|嗯+|哦+|好的|ok|hi|hey|我在)[。.!！？?\s]*$/i;
@@ -125,10 +127,12 @@ export function clonePendingForReview(roleId) {
 
 export function isQuietDurableFact(text) {
   const t = String(text || "").trim();
-  if (t.length < 8 || t.length > 80) return false;
+  if (t.length > 80) return false;
   if (SKIP_RE.test(t) || EMOTION_ONLY_RE.test(t) || SPECULATION_RE.test(t)) return false;
   if (QUESTION_RE.test(t)) return false;
-  return DURABLE_SELF_RE.test(t);
+  if (LIFE_EVENT_RE.test(t) && t.length >= 6) return true;
+  if (DURABLE_SELF_RE.test(t) && t.length >= 8) return true;
+  return false;
 }
 
 /** Persist a durable first-person fact without the memory-review overlay. */

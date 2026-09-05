@@ -44,7 +44,7 @@ Proven experiments:
 
 Evidence layers: assembly and stub contract are CI-proven; quiet write is CI-proven; **real LLM behavior is not**. Optional probe: `node scripts/lived_thread_llm_probe.mjs` (skipped unless `ECHOCHAT_PROBE_*` env is set).
 
-Latest decision: [decisions/2026-09-05-after-continuity-mvp.md](decisions/2026-09-05-after-continuity-mvp.md)
+Latest decision: [decisions/2026-09-05-seal-continuity-machinery.md](decisions/2026-09-05-seal-continuity-machinery.md)
 
 ## Formal engineering artifacts
 

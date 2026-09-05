@@ -8,7 +8,7 @@ import { store } from "../core/store.js";
 import { events, EVT } from "../core/events.js";
 import { getRoleId, getPersona, getRoleName } from "./persona.js";
 import { buildMessages, streamChat, needsApiSetup } from "./provider.js";
-import { retrieveMemoriesForTurn, noteRetrieveChat, maybeAutoSummary } from "./memory.js";
+import { retrieveMemoriesForTurn, noteRetrieveChat, maybeAutoSummary, isGapIdle } from "./memory.js";
 import { buildWorldbookBlock } from "./worldbook.js";
 import { recordChatTurn, getAffinity } from "./relations.js";
 import { messageStore } from "./message-store.js";
@@ -69,10 +69,14 @@ export function buildSystemPrompt(chat, opts = {}) {
   const query = opts.query != null ? String(opts.query) : "";
   noteRetrieveChat(chat?.id);
   const affinity = roleId ? getAffinity(roleId, { moments: listMoments(roleId) }) : null;
-  const memories = roleId
-    ? retrieveMemoriesForTurn(roleId, query, undefined, { lastChatAt: affinity?.lastChatAt })
-    : [];
-  const { behavior } = assembleBehaviorContext({ chat, memories, affinity });
+  const retrieveOpts = { lastChatAt: affinity?.lastChatAt };
+  const memories = roleId ? retrieveMemoriesForTurn(roleId, query, undefined, retrieveOpts) : [];
+  const { behavior } = assembleBehaviorContext({
+    chat,
+    memories,
+    affinity,
+    gapReturn: isGapIdle(retrieveOpts),
+  });
 
   const parts = [];
   if (behavior) parts.push(behavior);

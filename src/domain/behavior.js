@@ -4,7 +4,14 @@
  * for the current character only.
  */
 
-export function buildBehaviorContext({ persona, slots, userPersona, memories, affinity } = {}) {
+function hasRelationshipSignal(affinity) {
+  return !!(
+    affinity &&
+    (affinity.toneHint || affinity.knownDays || affinity.stageLabel || affinity.brief || affinity.lastEvent)
+  );
+}
+
+export function buildBehaviorContext({ persona, slots, userPersona, memories, affinity, gapReturn } = {}) {
   const parts = [];
   const personaText =
     (slots && slots.identity) ||
@@ -23,13 +30,20 @@ export function buildBehaviorContext({ persona, slots, userPersona, memories, af
     parts.push(`---\nAbout the user (remembered from past conversations):\n${lines.join("\n")}`);
   }
 
-  if (affinity && (affinity.toneHint || affinity.knownDays || affinity.stageLabel || affinity.brief || affinity.lastEvent)) {
+  const relOk = hasRelationshipSignal(affinity);
+  if (relOk) {
     const days = affinity.knownDays != null ? ` Known for ${affinity.knownDays} days.` : "";
     const tone = affinity.toneHint ? ` Tone: ${affinity.toneHint}.` : "";
     const stage = affinity.stageLabel ? ` Stage: ${affinity.stageLabel}.` : "";
     const brief = affinity.brief ? ` Brief: ${affinity.brief}.` : "";
     const last = !affinity.brief && affinity.lastEvent ? ` Last: ${affinity.lastEvent}.` : "";
     parts.push(`---\nRelationship with the user.${days}${tone}${stage}${brief}${last} Stay in character and keep this relationship tone.`);
+  }
+
+  if (gapReturn && memList.length && relOk) {
+    parts.push(
+      "---\nThis turn: continue the lived thread. The user is returning after a pause and may not restate what already happened. If a remembered fact is relevant, let it shape this reply naturally. Do not dump a dossier. Keep the relationship tone."
+    );
   }
 
   return parts.join("\n\n");

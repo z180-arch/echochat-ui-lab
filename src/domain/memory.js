@@ -106,7 +106,7 @@ const ANCHOR_MAX = 2;
 /** Best overlap at or below this counts as weak (single bigram ≈ 2). */
 const WEAK_OVERLAP_MAX = 2;
 
-function isGapIdle(opts = {}) {
+export function isGapIdle(opts = {}) {
   if (opts.idleMs != null) return Number(opts.idleMs) >= IDLE_GAP_MS;
   if (opts.idleDays != null) return Number(opts.idleDays) >= 2;
   const lastChatAt = Number(opts.lastChatAt) || 0;
@@ -283,6 +283,7 @@ export const Memory = {
   updateMemoryImportance,
   retrieveMemoriesForTurn,
   getLastMemoryRetrieve,
+  isGapIdle,
   buildMemoryBlock,
   rememberMessage,
   maybeAutoSummary,

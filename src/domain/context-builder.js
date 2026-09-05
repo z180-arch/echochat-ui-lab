@@ -32,7 +32,7 @@ export function getCharacterSlots(chat) {
   };
 }
 
-export function assembleBehaviorContext({ chat, memories, affinity } = {}) {
+export function assembleBehaviorContext({ chat, memories, affinity, gapReturn } = {}) {
   const slots = getCharacterSlots(chat);
   return {
     slots,
@@ -43,6 +43,7 @@ export function assembleBehaviorContext({ chat, memories, affinity } = {}) {
       userPersona: getActiveUserPersona(),
       memories,
       affinity,
+      gapReturn,
     }),
   };
 }

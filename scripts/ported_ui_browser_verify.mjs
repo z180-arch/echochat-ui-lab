@@ -11,7 +11,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { writeFile, mkdir } from "node:fs/promises";
 
 const CDP_PORT = Number(process.env.CDP_PORT || 9366);
-const BASE = process.env.APP_URL || "http://127.0.0.1:8791/";
+const BASE = process.env.APP_URL || "http://127.0.0.1:8791/app/";
 const CHROME = process.env.CHROME_PATH || "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 const USER_DATA = `${process.env.TEMP}\\echochat-port-verify-${Date.now()}`;
 const OUT = new URL("../.tmp-shots/", import.meta.url).pathname.replace(/^\//, "");

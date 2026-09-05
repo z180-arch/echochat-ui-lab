@@ -20,8 +20,8 @@ const RUNTIME_CACHE = `${CACHE_PREFIX}runtime-v${APP_VERSION}`;
 
 // 预缓存核心资源（HTML + 关键 JS/CSS）
 const PRECACHE_URLS = [
-  "./",
-  "./index.html",
+  "/app/",
+  "/app/index.html",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",
@@ -75,8 +75,17 @@ function getResourceType(request) {
     return "api";
   }
 
-  // HTML
-  if (path.endsWith(".html") || path === "/" || path === "" || path.endsWith("/")) {
+  // Marketing pages: do not intercept (also covers older SW registrations still scoped to `/`)
+  if (
+    path === "/" ||
+    path === "/index.html" ||
+    path === "/landing-v3.html" ||
+    path === "/landing.html"
+  ) {
+    return "api";
+  }
+
+  if (path.endsWith(".html") || path === "/app" || path === "/app/") {
     return "html";
   }
 
@@ -157,7 +166,7 @@ self.addEventListener("fetch", (event) => {
           return response;
         })
         .catch(() =>
-          caches.match(request).then((cached) => cached || caches.match("./index.html"))
+          caches.match(request).then((cached) => cached || caches.match("/app/index.html"))
         )
     );
     return;

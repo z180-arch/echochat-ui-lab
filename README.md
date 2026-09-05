@@ -1,114 +1,148 @@
-# EchoChat
+# EchoChat Lite
 
 > 念念不忘，必有回响。
 
-EchoChat Lite is a **local-first AI character companion**: chat, long-term memory, relationship, moments, and worldbook. Zero-build PWA (HTML / CSS / ES modules). Data stays on the device except messages sent to the API the user configures.
-
-**Current authoritative state:** [`docs/baseline/V1_1_RC_CURRENT_STATE.md`](docs/baseline/V1_1_RC_CURRENT_STATE.md)
+Local-first AI character companion: chat, long-term memory, relationship, moments, and worldbook. Pure frontend PWA (HTML / CSS / ES modules). Data stays on the device except messages sent to the API the user configures.
 
 ---
 
-## Current status: V1.1 RC
+## Current status
 
-Product baseline: `403e721` (`fix: tighten CJK memory retrieval matching`).
+**Active development.** The live product is a working companion app plus a separate marketing landing.
 
-GitHub `main` is the live line. Vercel deploys automatically from `main`. Production is V1.1 RC.
-
-Shipped and accepted: Character Chromium, Context Builder, user persona injection, turn-relevant memory retrieval, conservative memory write, relationship brief/events, Profile/worldbook home, truthful 「想起了」 chip, ambient policy, motion primitives. Real SiliconFlow send path, 390, 1440, and regression **PASS**.
-
-Do not treat Foundation / Stage 0–13 language anywhere as unfinished work.
+Do not treat Foundation / Stage 0–13 language, or files under `docs/history/`, as unfinished work or as the current spec.
 
 ---
 
-## Local run
+## What it is
+
+- Pure frontend PWA (no app bundler, no `package.json` for the product)
+- AI Character / AI Companion
+- Local-first; user-owned data in the browser
+
+---
+
+## Current product model
+
+| Area | State |
+|------|--------|
+| Character | Implemented |
+| Conversation | Implemented |
+| Memory | Implemented |
+| Worldbook | Implemented |
+| Relationship | Implemented |
+| Moments | Implemented |
+
+In progress / planned work is **not** a checked-in backlog. See [docs/ROADMAP.md](docs/ROADMAP.md).
+
+---
+
+## Architecture
+
+```text
+/
+└── Landing          index.html, landing-v3.html
+
+/app/
+└── Application      app/index.html → src/main.js
+
+src/                 application source
+sw.js                registered with scope /app/
+manifest.webmanifest PWA id / start_url / scope = /app/
+```
+
+Landing does not access application storage. Existing localStorage / IndexedDB keys and schemas stay as they are.
+
+---
+
+## Data
+
+Application data remains local (`echodownload_*` localStorage keys, Dexie database `echochat`, blob DB `echodownload_assets`). Those names are compatibility keys — do not rename them.
+
+Landing does not initialize application storage.
+
+---
+
+## Development
+
+No `npm install`. Serve the repo root as static files.
 
 ```bash
 git clone https://github.com/z180-arch/echochat-ui-lab.git
 cd echochat-ui-lab
 python3 -m http.server 8080
-# http://localhost:8080
 ```
 
-If port 8080 is taken, use another port (e.g. `8765`).
+- Landing: http://127.0.0.1:8080/
+- App: http://127.0.0.1:8080/app/
+- Windows helper for landing: `preview-landing.bat`
 
-Configure the model in-app: **我的 → API 与模型**. Do not commit API keys. Do not put keys in `config.js`, `.env`, docs, or tests.
+If port 8080 is taken, use another port.
 
-OpenAI-compatible providers (SiliconFlow / DeepSeek / Moonshot / 智谱 / custom). Default endpoint and model are the V1 contract lock — see the current-state doc.
+Configure the model in the app: **我的 → API 与模型**. Do not commit API keys. Do not put keys in `config.js`, `.env`, docs, or tests.
+
+OpenAI-compatible providers (SiliconFlow / DeepSeek / Moonshot / 智谱 / custom).
 
 ---
 
 ## Tests
 
+CI runs the Node suites in `.github/workflows/ci.yml`. From the repo root, examples:
+
 ```bash
-node tests/migration_atomicity_test.mjs
-node tests/foundation_test.mjs
 node tests/storage_cutover_test.mjs
-node tests/core_product_test.mjs
-node tests/reconstruction_test.mjs
+node tests/foundation_test.mjs
 node tests/core_loop_test.mjs
-node tests/reply_clean_test.mjs
-node tests/chat_send_test.mjs
-node tests/theme_tokens_test.mjs
-node tests/ambient_policy_test.mjs
-node tests/v1_1_context_test.mjs
 ```
 
-Syntax: `node --check` on files under `src/`. CI runs the same suites on push / pull_request.
+Browser UI checks (need Chrome): `scripts/wave3a_ui_verify.mjs`, `wave3b_ui_verify.mjs`, `wave4_ui_verify.mjs`. Those scripts open `/app/`.
+
+There is no `npm test`.
 
 ---
 
-## Protected contract
+## Verification (this branch)
 
-**Freeze the contract, not the implementation.**
+Entry split (2026-09-05): landing / app / CTA / storage / PWA / SW / 1440 / 390 — **25/25**.  
+Storage cutover: **28/28**.
 
-Do not change unless an explicit work package says so:
-
-- Storage / data compatibility and existing user data
-- API contract (`send` / `streamChat` / `buildRequest`, default endpoint and model)
-- Working chat loop
-- Migration compatibility
-
-Allowed when a real work package requires it: domain logic, Context Builder, memory retrieve/write, relationship, worldbook, UI, tests. Do not refactor for cleanliness.
-
-Local-first does not mean “nothing ever leaves the device.” Completions go to the user’s provider. See [DATA_OWNERSHIP.md](docs/architecture/DATA_OWNERSHIP.md).
-
-Storage/API key inventory: [V1_BASELINE.md](docs/baseline/V1_BASELINE.md).
+Historical milestone counts belong in `docs/history/`.
 
 ---
 
-## How to continue (agents)
-
-1. Read [`docs/baseline/V1_1_RC_CURRENT_STATE.md`](docs/baseline/V1_1_RC_CURRENT_STATE.md).
-2. Treat **code + tests** as the final behavior source.
-3. Pick the next item from production observation and evidence — not from an old stage list.
-
-```text
-V1.1 RC → observe production → evidence → small work package
-  → implement → regression → browser → commit → push → Vercel → validate
-```
-
-There is no Master Roadmap. There is no Stage 0–13 queue.
-
----
-
-## Docs that remain
+## Documentation
 
 | File | Role |
 |------|------|
-| [V1.1 RC Current State](docs/baseline/V1_1_RC_CURRENT_STATE.md) | **Authoritative product state** |
-| [V1 Baseline](docs/baseline/V1_BASELINE.md) | Frozen storage / API contract |
-| [DATA_OWNERSHIP](docs/architecture/DATA_OWNERSHIP.md) | Local-first vs API |
-| [PLUGIN_POLICY](docs/architecture/PLUGIN_POLICY.md) | Plugin boundary if plugins are ever authorized (not a backlog item) |
-| [design.md](docs/design.md) | Morning Mint / motion language (shipped; not a plan) |
+| [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md) | Current product / storage / PWA / test facts |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Current layering and entry split |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | CURRENT / NEXT / LATER |
+| [AGENTS.md](AGENTS.md) | Agent working agreement |
+| [docs/history/](docs/history/) | Historical only — not the current spec |
+| [docs/architecture/DATA_OWNERSHIP.md](docs/architecture/DATA_OWNERSHIP.md) | User data vs code vs brand |
+| [docs/design.md](docs/design.md) | In-app Morning Mint language (shipped) |
 
 Governance: [LICENSE](LICENSE), [COPYRIGHT.md](COPYRIGHT.md), [TRADEMARKS.md](TRADEMARKS.md), [CONTRIBUTING.md](CONTRIBUTING.md), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
----
-
-## Stack (short)
-
-Vanilla ES modules, native CSS tokens, localStorage + IndexedDB/Dexie, OpenAI-compatible SSE, PWA, zero build, Node tests with no framework.
+`docs/history/` contains historical documents and must not be treated as the current implementation specification.
 
 ---
 
-*EchoChat Lite · V1.1 RC · 2026*
+## AI / Agent Context
+
+Before modifying code:
+
+1. Read README.md.
+2. Read docs/CURRENT_STATE.md.
+3. Read docs/ARCHITECTURE.md.
+4. Check git status.
+5. Inspect current source before trusting historical docs.
+6. Treat docs/history/ as historical context only.
+
+Do not infer current architecture from old V1/V1.1 documents.  
+Do not resurrect superseded IA or UI decisions.  
+Do not modify product architecture merely because historical documents describe another design.
+
+---
+
+*EchoChat Lite · 2026*

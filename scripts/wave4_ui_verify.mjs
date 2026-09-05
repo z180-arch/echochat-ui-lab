@@ -14,7 +14,7 @@ import { dirname, join } from "node:path";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CDP_PORT = Number(process.env.CDP_PORT || 9422);
 const HTTP_PORT = Number(process.env.APP_PORT || 8802);
-const BASE = `http://127.0.0.1:${HTTP_PORT}/`;
+const BASE = `http://127.0.0.1:${HTTP_PORT}/app/`;
 const CHROME_CANDIDATES = [
   process.env.CHROME_PATH,
   "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",

@@ -1,10 +1,16 @@
+> **HISTORICAL DOCUMENT**
+> This document describes an earlier project state (V1.1 RC snapshot, 2026-09-02).
+> It is NOT an authoritative description of the current implementation.
+> See README.md and docs/CURRENT_STATE.md for the current state.
+>
+> Entry paths in this file are outdated: `/` is now the marketing landing; the app lives at `/app/`.
+
 # EchoChat Lite — V1.1 RC Current State
 
-> **This is the authoritative current-state document.**  
 > Date: 2026-09-02  
 > Commit: `403e721` (`fix: tighten CJK memory retrieval matching`)  
 > Full hash: `403e72158a95eac33d065c07402701d39a710b99`  
-> Status: **V1.1 RC — live on production**
+> Status at the time of writing: **V1.1 RC**
 
 Older Foundation / Stage 0–13 language is **abandoned**. Do not treat those stages as unfinished work. There is no Master Roadmap in this repository.
 

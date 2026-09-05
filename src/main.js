@@ -166,7 +166,7 @@ const App = {
   registerServiceWorker() {
     if (!("serviceWorker" in navigator)) return;
     navigator.serviceWorker
-      .register("./sw.js")
+      .register("/sw.js", { scope: "/app/" })
       .then((reg) => {
         console.log(`[SW] registered, app version: ${APP_VERSION}`);
         reg.addEventListener("updatefound", () => {

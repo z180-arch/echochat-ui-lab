@@ -14,7 +14,7 @@ EchoChat 项目包含不同类型的资产，各资产的版权管理方式不�
 
 ### 1. Source Code（源代码）
 
-- 范围：`src/`、`tests/`、`scripts/`、`config.js`、`sw.js`、`index.html` 等所有代码文件
+- 范围：`src/`、`tests/`、`scripts/`、`config.js`、`sw.js`、`app/index.html`、官网 `index.html` 等所有代码文件
 - 许可证：PolyForm Noncommercial License 1.0.0（详见 `LICENSE`）
 - 版权：归 EchoChat Project Contributors 所有
 - 第三方代码：遵循其各自许可证（详见 `THIRD_PARTY_NOTICES.md`）

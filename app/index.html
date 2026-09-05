@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8" />
+  <base href="/" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#FAFCFB" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="EchoChat" />
+  <title>EchoChat — 念念不忘，必有回响</title>
+  <script>
+    window.__errors = [];
+    window.onerror = function(msg, url, line, col, err) {
+      window.__errors.push({msg, url, line, col, stack: err && err.stack});
+      var pre = document.createElement('pre');
+      pre.style.cssText = 'position:fixed;inset:0;background:#fff;color:#c00;padding:20px;z-index:9999;overflow:auto;white-space:pre-wrap;font-size:13px;';
+      pre.textContent = 'ERROR: ' + msg + '\n' + url + ':' + line + ':' + col + '\n\n' + (err && err.stack || '');
+      document.body.appendChild(pre);
+    };
+    window.addEventListener('unhandledrejection', function(e) {
+      window.__errors.push({msg: 'unhandledrejection', reason: e.reason});
+      var pre = document.createElement('pre');
+      pre.style.cssText = 'position:fixed;inset:0;background:#fff;color:#c00;padding:20px;z-index:9999;overflow:auto;white-space:pre-wrap;font-size:13px;';
+      pre.textContent = 'UNHANDLED: ' + (e.reason && e.reason.message || e.reason) + '\n\n' + (e.reason && e.reason.stack || '');
+      document.body.appendChild(pre);
+    });
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="icon-192.png" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="stylesheet" href="src/styles/tokens.css" />
+  <link rel="stylesheet" href="src/styles/base.css" />
+  <link rel="stylesheet" href="src/styles/components.css" />
+  <link rel="stylesheet" href="src/styles/layouts.css" />
+  <link rel="stylesheet" href="src/styles/responsive.css" />
+  <link rel="stylesheet" href="src/styles/motion.css" />
+</head>
+<body>
+  <!-- Logo 启动动画 (Morning Mint) -->
+  <div id="splash-screen" class="splash-screen">
+    <div class="splash-bg"></div>
+    <div class="splash-content">
+      <div class="splash-logo">
+        <svg viewBox="0 0 48 48" width="64" height="64" fill="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="mintGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#7CB8E8"/>
+              <stop offset="100%" stop-color="#9DD9C2"/>
+            </linearGradient>
+          </defs>
+          <rect width="48" height="48" rx="12" fill="url(#mintGrad)"/>
+          <circle cx="14" cy="24" r="2.2" fill="#fff" opacity=".95"/>
+          <path d="M17 20c5 0 5 8 0 8" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".42"/>
+          <path d="M17 17c8.5 0 8.5 14 0 14" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".68"/>
+          <path d="M17 14c12 0 12 20 0 20" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="splash-wordmark">EchoChat</div>
+      <div class="splash-tagline">把你想长期相处的人带进来</div>
+    </div>
+  </div>
+  <div id="app">
+    <!-- 应用内容由 main.js 渲染 -->
+    <div style="display:flex;align-items:center;justify-content:center;height:100vh;">
+      <div class="spinner"></div>
+    </div>
+  </div>
+
+  <!-- 配置文件（用户复制 config.example.js 为 config.js） -->
+  <script src="config.js"></script>
+
+  <!-- 主应用入口（ES Module） -->
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

@@ -1,13 +1,13 @@
 /**
  * Character Reconstruction MVP — browser verification via CDP.
  * Usage: python -m http.server 8771
- *        $env:APP_URL='http://127.0.0.1:8771/'; $env:CDP_PORT='9336'; node scripts/reconstruction_browser_verify.mjs
+ *        $env:APP_URL='http://127.0.0.1:8771/app/'; $env:CDP_PORT='9336'; node scripts/reconstruction_browser_verify.mjs
  */
 import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
 
 const CDP_PORT = Number(process.env.CDP_PORT || 9336);
-const BASE_RAW = process.env.APP_URL || "http://127.0.0.1:8771/";
+const BASE_RAW = process.env.APP_URL || "http://127.0.0.1:8771/app/";
 const BASE = BASE_RAW.includes("?")
   ? `${BASE_RAW}&recon=${Date.now()}`
   : `${BASE_RAW}${BASE_RAW.endsWith("/") ? "" : "/"}?recon=${Date.now()}`;

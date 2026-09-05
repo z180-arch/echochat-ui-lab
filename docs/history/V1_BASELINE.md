@@ -1,9 +1,16 @@
+> **HISTORICAL DOCUMENT**
+> This document describes an earlier project state (V1 baseline lock, 2026-08-31).
+> It is NOT an authoritative description of the current implementation.
+> See README.md and docs/CURRENT_STATE.md for the current state.
+>
+> Storage key *names* recorded here still match `src/core/storage.js`, but later Dexie (`echochat`) and `echodownload_chat_drafts_v1` are not fully described. Do not treat the “Character is not first-class” limitation as current.
+
 # EchoChat V1 Baseline Lock
 
 > **Phase**: 0 — Baseline Lock
 > **Date**: 2026-08-31
 > **Commit**: 79d8e58
-> **Status**: V1 runtime / storage / API **contract lock** (still in force). Product surface after this lock is V1.1 RC at `403e721` — see [`V1_1_RC_CURRENT_STATE.md`](./V1_1_RC_CURRENT_STATE.md). This file still defines frozen storage keys, schema v2, and the API contract. V1.1 did not change that contract.
+> **Status at the time of writing**: V1 runtime / storage / API contract lock. See [`V1_1_RC_CURRENT_STATE.md`](./V1_1_RC_CURRENT_STATE.md) for the later V1.1 RC snapshot.
 
 ## 1. Repository Baseline
 

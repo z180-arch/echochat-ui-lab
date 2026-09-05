@@ -1,3 +1,8 @@
+> **HISTORICAL DOCUMENT**
+> This document describes an earlier project state.
+> It is NOT an authoritative description of the current implementation.
+> See README.md and docs/CURRENT_STATE.md for the current state.
+
 # EchoChat Landing → OpenDesign Craft Prompt
 
 **Status:** Approved design decisions locked; paste-ready prompt below.  

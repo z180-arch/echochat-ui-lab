@@ -42,7 +42,7 @@
 **包括**：
 - `src/` 目录下的所有代码
 - `tests/` 目录下的测试代码
-- `config.js`、`sw.js`、`index.html`
+- `config.js`、`sw.js`、`app/index.html`、官网 `index.html` / `landing-v3.html`
 - `scripts/` 目录下的脚本
 
 **所有权**：归 **EchoChat Project Contributors** 所有。

@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-EchoChat Lite 处于 **V1.1 RC**。当前状态：[`docs/baseline/V1_1_RC_CURRENT_STATE.md`](docs/baseline/V1_1_RC_CURRENT_STATE.md)。
+EchoChat Lite 处于活跃开发。当前状态：[`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md)。
 
 提交贡献前请理解：
 

@@ -1,9 +1,9 @@
 # EchoChat Design System
 
-**Status:** Shipped with V1.1 RC (`403e721`). Morning Mint / motion language.  
-**Not a plan.** Product state: [`docs/baseline/V1_1_RC_CURRENT_STATE.md`](baseline/V1_1_RC_CURRENT_STATE.md).
+**Status:** Shipped in-app visual language (Morning Mint / motion).  
+**Not a plan.** Not the marketing landing. Current product/entry facts: [`docs/CURRENT_STATE.md`](CURRENT_STATE.md).
 
-This is the Design / Frontend / Motion layer. It does not replace current-state or code.
+This is the Design / Frontend / Motion layer for **the application**. It does not replace current-state or code.
 
 ---
 
@@ -13,8 +13,8 @@ This is the Design / Frontend / Motion layer. It does not replace current-state 
 
 Source of truth in this repo:
 
-- [`docs/baseline/V1_1_RC_CURRENT_STATE.md`](baseline/V1_1_RC_CURRENT_STATE.md) — current product
-- [`docs/baseline/V1_BASELINE.md`](baseline/V1_BASELINE.md) — runtime/storage lock
+- [`docs/CURRENT_STATE.md`](CURRENT_STATE.md) — current product
+- [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) — entry and layering
 - Code: `src/styles/tokens.css`, `src/styles/motion.css`, `src/ui/ambient-policy.js`
 
 Requested files **not present** in the repository (ignored, not reconstructed):

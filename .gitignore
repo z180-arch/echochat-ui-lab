@@ -1,3 +1,6 @@
 .tmp-shots/
 .tmp-proto-shot/
 node_modules/
+.tmp-extract/
+.claude/
+.superpowers/

@@ -14,6 +14,7 @@ import { recordChatTurn, getAffinity } from "./relations.js";
 import { messageStore } from "./message-store.js";
 import { listMoments } from "./moments.js";
 import { assembleBehaviorContext } from "./context-builder.js";
+import { quietRememberUserText } from "./memory-candidates.js";
 import { cleanAssistantReply, MAX_USER_MESSAGE_CHARS } from "./reply-clean.js";
 import { getReplyPace, presentationDelayMs, waitPresentationDelay } from "./reply-pace.js";
 
@@ -99,6 +100,8 @@ export async function sendMessage(text) {
   // Persist the user message first so a missing API key never drops it.
   const userMsg = await messageStore.addMessage(chat.id, { role: "me", text: trimmed, status: "sent" });
   events.emit(EVT.MESSAGE_SENT, { chatId: chat.id, message: userMsg });
+  const spokenRoleId = getRoleId(chat);
+  if (spokenRoleId) quietRememberUserText(spokenRoleId, trimmed);
 
   if (needsApiSetup(chat)) {
     await messageStore.addMessage(chat.id, {

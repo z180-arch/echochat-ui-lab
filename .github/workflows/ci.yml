@@ -58,6 +58,9 @@ jobs:
       - name: Lived Thread
         run: node tests/lived_thread_test.mjs
 
+      - name: Quiet Remember
+        run: node tests/quiet_remember_test.mjs
+
       - name: UI Refinement Wave 1
         run: node tests/ui_refinement_wave1_test.mjs
 

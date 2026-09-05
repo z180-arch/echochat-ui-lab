@@ -43,3 +43,5 @@ If it is right, Primary Bet **does not change**; the execution surface moves fro
 ## Result
 
 Hypothesis **held** under the cooperative-stub contract. Primary Bet unchanged. Stop optimizing retrieve/relationship fields until a live-model or in-product observation contradicts this.
+
+Quiet write (2026-09-05): durable first-person facts now persist from `sendMessage` without the candidate overlay. That closes the loop **as far as product machinery in CI can go**. Real LLM samples remain optional (`scripts/lived_thread_llm_probe.mjs`) and are **not** treated as product proof.

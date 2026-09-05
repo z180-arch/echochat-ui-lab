@@ -2,9 +2,10 @@
 
 This is the current project-state document. If another Markdown file disagrees with **code + tests**, the code wins. Historical snapshots live in [docs/history/](history/).
 
-**Date of this snapshot:** 2026-09-05  
-**Branch at writing:** `feat/landing-app-entry-split`  
-**Entry-split commit:** `83108c7` (`feat: separate landing and app entry`)
+**Last reconciled:** 2026-09-05  
+**Canonical line:** GitHub `main` (production via Vercel)
+
+Entry split (`/` landing, `/app/` application) is shipped on `main`. Do not treat `docs/history/` snapshots as the live entry or storage layout.
 
 ---
 
@@ -130,12 +131,12 @@ node scripts/wave4_ui_verify.mjs
 
 There is no `npm test`. Historical pass counts (114/114, 142/142, …) belong in [docs/history/](history/), not here.
 
-Entry-split check (2026-09-05, isolated Chrome against local static server): landing/app/CTA/storage/PWA/SW/1440/390 **25/25**. Storage cutover suite **28/28**.
+Representative verification after entry split: landing/app/CTA/storage/PWA/SW/1440/390 **25/25**; storage cutover **28/28**.
 
 ---
 
 ## Deploy
 
-GitHub `main` deploys on Vercel as a static site. This branch is not `main` until merged.
+GitHub `main` deploys on Vercel as a static site. A push to `main` may trigger Production Deployment.
 
 Configure the model in-app: **我的 → API 与模型**. Do not commit API keys.

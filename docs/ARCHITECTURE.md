@@ -34,12 +34,23 @@ Packaging later can ship the application without the marketing HTML. App code li
 
 | Layer | Path | Role |
 |-------|------|------|
-| Shell | `src/main.js`, `src/ui/views/` | Routing between in-app welcome and the companion shell |
+| Shell | `src/main.js`, `src/ui/views/` | Bootstrap, orchestration, event wiring; in-app welcome vs companion shell |
 | Domain | `src/domain/` | Character, chat, memory, worldbook, relations, moments, reconstruction, provider |
 | Repository | `src/repository/` | Persistence ports; Dexie with legacy adapter |
 | Infrastructure | `src/infrastructure/` | Dexie, IDB blobs, asset resolver |
 | Core | `src/core/` | Events, store, storage keys, utils |
 | UI | `src/ui/`, `src/styles/` | Morning Mint tokens, components, ambient policy |
+
+Observed dependency direction (from imports, 2026-09-05):
+
+```text
+main → ui / domain / core
+ui → domain / core
+domain → core / repository  (some domains still use core/storage for legacy keys)
+repository → infrastructure / core
+```
+
+There is **no** `ui → Dexie/localStorage` and **no** `domain → ui` import edge. `src/main.js` is large by design (orchestrator), not a second domain layer.
 
 In-app “landing” (`renderLanding` in `src/ui/views/index.js`) is the first-run welcome **inside the app**. It is not `/`.
 

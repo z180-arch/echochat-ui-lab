@@ -101,10 +101,10 @@ There is no `npm test`.
 
 ---
 
-## Verification (this branch)
+## Verification
 
-Entry split (2026-09-05): landing / app / CTA / storage / PWA / SW / 1440 / 390 — **25/25**.  
-Storage cutover: **28/28**.
+Entry split shipped on `main`: `/` marketing landing, `/app/` application, PWA scoped to `/app/`.  
+Representative checks: storage cutover Node suite; landing/app entry browser check (2026-09-05).
 
 Historical milestone counts belong in `docs/history/`.
 

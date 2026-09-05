@@ -35,3 +35,9 @@ Default reuse policy: **borrow ideas and models, not code**, unless license + at
 ## Current bet
 
 See [product-thesis/echochat-next-bet.md](product-thesis/echochat-next-bet.md).
+
+## Formal engineering artifacts
+
+- Design spec: [../superpowers/specs/2026-09-05-lived-continuity-design.md](../superpowers/specs/2026-09-05-lived-continuity-design.md)
+- Implementation plan: [../superpowers/plans/2026-09-05-lived-continuity.md](../superpowers/plans/2026-09-05-lived-continuity.md)
+- Open-source matrix: [open-source/README.md](open-source/README.md)

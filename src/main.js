@@ -65,6 +65,8 @@ import {
   editFindingText,
   confirmReconstruction,
 } from "./domain/reconstruction/index.js";
+import { getLocalPluginRuntime } from "./runtime/index.js";
+import { builtinPlugins } from "./plugins/index.js";
 
 // 应用状态
 const App = {
@@ -137,6 +139,12 @@ const App = {
     // 6. 全局事件委托
     this.bindGlobalEvents();
     this.initialized = true;
+
+    // 6.5 Minimal local plugin runtime (empty builtin list; DSH adapter is a stub)
+    this._pluginRuntime = getLocalPluginRuntime();
+    this._pluginRuntime.start(builtinPlugins).catch((e) => {
+      console.warn("[App] plugin runtime skipped:", e.message);
+    });
 
     // 7. 等待 splash 动画完成后渲染（若 Dexie hydrate 仍在进行则再等一会）
     setTimeout(async () => {

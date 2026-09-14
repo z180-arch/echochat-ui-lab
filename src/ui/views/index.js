@@ -31,7 +31,7 @@ import {
 import { getReplyPace, REPLY_PACE_OPTIONS } from "../../domain/reply-pace.js";
 import { getRoleId, getRoleAvatar } from "../../domain/persona.js";
 import { getMemoryList, getLastMemoryRetrieve } from "../../domain/memory.js";
-import { getPendingCandidates } from "../../domain/memory-candidates.js";
+import { getPendingCandidates, userTextIsKept } from "../../domain/memory-candidates.js";
 import { listMoments } from "../../domain/moments.js";
 import { getAffinity } from "../../domain/relations.js";
 import { isSending, getStreamingChatId } from "../../domain/chat.js";
@@ -261,7 +261,7 @@ function renderChatPane(chat, hideChatMobile) {
         ${IconButton({ icon: Icons.more, title: "相处中", onClick: "window.EchoApp.toggleProfile()" })}
       </div>
     </div>
-    ${showRecall ? `<div class="recall-chip" aria-live="polite">想起了 ${esc(recall.preview)}</div>` : ""}
+    ${showRecall ? `<button type="button" class="recall-chip" aria-live="polite" onclick="window.EchoApp.openContinuitySheet('${esc(roleId)}','${chat.id}')">想起了 ${esc(recall.preview)}</button>` : ""}
     ${convos.length > 1 ? `<button type="button" class="conv-hint" onclick="window.EchoApp.openConversationSwitcher()">当前 · ${esc(chat.name || "日常相处")}</button>` : ""}
     ${needsApiSetup(chat)
       ? `<div class="composer-hint">
@@ -274,7 +274,7 @@ function renderChatPane(chat, hideChatMobile) {
         ? `<div class="chat-empty">
             ${CharacterAvatar({ src: getRoleAvatar(chat), size: "lg", alt: chat.name || "角色", name: chat.name || "角色" })}
             <div class="chat-empty-t">${messages.length || affinity?.hasHistory ? `继续和 ${esc(chat.name || "TA")} 相处` : `还没有和 ${esc(chat.name || "TA")} 聊过`}</div>
-            <p>直接说一句就好。重要的事确认后，会成为你们的记忆。</p>
+            <p>直接说一句就好。重要的事会被悄悄记住，之后还能被想起来。</p>
           </div>`
         : messages.map((m, i) => renderMessage(m, i, chat, messages)).join("")}
     </div>
@@ -299,9 +299,9 @@ function renderMessage(m, index, chat, messages = []) {
   if (isStreaming && !raw.trim()) return "";
   const flags = transcriptGroupFlags(messages, index);
   const text = renderMarkdown(raw);
-  const settings = store.getState().settings;
-  const myName = settings.myName || "我";
   const herName = chat.name || "角色";
+  const roleId = getRoleId(chat);
+  const kept = isMe && m.status === "sent" && userTextIsKept(roleId, raw);
   const avatar = flags.showAvatar
     ? `<button type="button" class="msg-avatar-btn" onclick="window.EchoApp.editCharacterFromChat()" aria-label="编辑角色资料">
         ${CharacterAvatar({ src: getRoleAvatar(chat), size: "sm", alt: herName, name: herName })}
@@ -322,6 +322,7 @@ function renderMessage(m, index, chat, messages = []) {
       ${flags.showName ? `<div class="msg-name">${esc(herName)}</div>` : ""}
       <div class="msg-bubble">${text || ""}</div>
       ${flags.showTime ? `<div class="msg-time">${formatDateTime(m.time)}</div>` : ""}
+      ${kept && roleId ? `<button type="button" class="msg-kept" onclick="window.EchoApp.openContinuitySheet('${esc(roleId)}','${chat.id}')">记下了</button>` : ""}
       ${isError ? `<div class="msg-status">没发出去<button type="button" class="msg-retry-btn" onclick="window.EchoApp.retryLastMessage()">重试</button></div>` : ""}
       <div class="msg-actions">
         <button class="msg-action-btn" onclick="window.EchoApp.copyMessage(${index})">复制</button>
@@ -502,7 +503,7 @@ function renderContinuityJournal(roleId, chatId) {
   ].sort((a, b) => b.time - a.time);
 
   if (items.length === 0) {
-    return `<p class="profile-muted continuity-empty">多聊几句，确认记忆后，痕迹会在这里出现。</p>`;
+    return `<p class="profile-muted continuity-empty">多聊几句，重要的事会留在这里。</p>`;
   }
 
   return `<div class="continuity-journal">${items

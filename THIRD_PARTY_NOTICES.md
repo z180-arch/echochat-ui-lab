@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-截至本文件更新时，EchoChat **不包含任何第三方运行时依赖**。
+截至本文件更新时，EchoChat **没有 npm / pnpm 产品依赖**（无 `package.json` 应用构建）。
 
 项目使用纯原生 Web 技术构建：
 
@@ -15,7 +15,7 @@
 - 原生 HTML
 - 浏览器原生 API（localStorage、Service Worker、IndexedDB 等）
 
-无 npm 依赖、无 CDN 引用、无第三方运行时库。
+无 npm 依赖。页面会加载 Google Fonts（Noto Sans SC）。IndexedDB 访问通过 **vendored Dexie**。
 
 ---
 
@@ -25,13 +25,19 @@
 
 | 名称 | 版本 | 来源 | 许可证 | 用途 |
 |------|------|------|--------|------|
-| （当前无） | - | - | - | - |
+| Dexie | 4.0.10 | https://dexie.org · vendored `src/infrastructure/vendor/dexie.mjs` | Apache-2.0 | IndexedDB wrapper for Character / Conversation / Message / Memory / … |
 
 ### 字体
 
 | 名称 | 版本 | 来源 | 许可证 | 用途 |
 |------|------|------|--------|------|
-| （当前无自定义字体，使用系统字体栈） | - | - | - | - |
+| Noto Sans SC | (Google Fonts CSS) | https://fonts.google.com/specimen/Noto+Sans+SC | SIL Open Font License 1.1 | `app/index.html` stylesheet |
+
+### 仓库内未引用资源
+
+| 名称 | 版本 | 来源 | 许可证 | 用途 |
+|------|------|------|--------|------|
+| three.min.js / three-text-extras / helvetiker | unknown | `assets/` leftover from landing experiments | **LICENSE REVIEW REQUIRED** (Three.js is MIT; confirm the exact copy) | **Not referenced** by current `index.html` / `app/index.html` / `src/` |
 
 ### 图标
 
@@ -116,6 +122,7 @@ EchoChat 通过原生 `fetch` API 调用第三方 AI 服务提供商（如 OpenA
 | 日期 | 变更 |
 |------|------|
 | 2026-08-31 | 初始版本，确认无第三方运行时依赖 |
+| 2026-09-12 | 补记 vendored Dexie 4.0.10、Noto Sans SC；标记未引用的 `assets/three*` 需许可证复核。Chatbox / DSH 无代码迁入，见 `THIRD_PARTY_SOURCES.md` |
 
 ---
 

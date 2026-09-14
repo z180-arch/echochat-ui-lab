@@ -2,7 +2,7 @@
 
 This is the current project-state document. If another Markdown file disagrees with **code + tests**, the code wins. Historical snapshots live in [docs/history/](history/).
 
-**Last reconciled:** 2026-09-05  
+**Last reconciled:** 2026-09-14 (core context integration hardened; Live Utilization still needs `ECHOCHAT_API_KEY`)  
 **Canonical line:** GitHub `main` (production via Vercel)
 
 Entry split (`/` landing, `/app/` application) is shipped on `main`. Do not treat `docs/history/` snapshots as the live entry or storage layout.
@@ -40,12 +40,14 @@ The application continues to use existing storage keys and schemas. Changing the
 | Character | Implemented as a first-class domain + Dexie `characters` table, with legacy fallback from chats |
 | Conversation | Implemented; a character can have more than one conversation |
 | Message | Dexie-backed message store with localStorage dual-write / fallback |
-| Memory | Retrieve-for-turn; idle-gated anchors; quiet auto-write of durable self-facts and a few lived events; candidate review still optional |
-| Worldbook | Implemented (global + character books) |
+| Memory | Quiet auto-write of durable facts (incl. “开始学习…”); chat shows **记下了**; related talk can surface a **想起了** chip; retrieval + idle anchors unchanged; prompt serialization frozen as user-owned background facts |
+| Worldbook | Implemented (global + character books); prompt slot is setting/lore, not user facts |
 | Relationship | Implemented (affinity plus brief/events) |
 | Moments | Implemented |
 | Reconstruction | Implemented (import existing chat into a character) |
 | In-app Welcome | Still exists inside the app for first-time users with no chats; this is not the marketing landing |
+| Plugin runtime | Minimal in-process hook on `assembleTurnContext`. No marketplace / DSH / sandbox. Builtin plugins: none |
+| Product base | EchoChat domain. Chatbox / DSH / SillyTavern / LobeChat / Letta were **not** adopted as a base ([PRODUCT_BASE.md](architecture/PRODUCT_BASE.md)) |
 
 Do not treat old “Character is not first-class” language in history docs as current.
 
@@ -116,6 +118,15 @@ node tests/chat_send_test.mjs
 node tests/theme_tokens_test.mjs
 node tests/ambient_policy_test.mjs
 node tests/v1_1_context_test.mjs
+node tests/memory_representation_test.mjs
+node tests/context_integration_test.mjs
+node tests/plugin_runtime_test.mjs
+node tests/lived_continuity_test.mjs
+node tests/lived_thread_test.mjs
+node tests/quiet_remember_test.mjs
+node tests/continuity_write_path_test.mjs
+node tests/continuity_perception_test.mjs
+node tests/retrieval_regression_test.mjs
 node tests/ui_refinement_wave1_test.mjs
 node tests/ui_refinement_wave2_test.mjs
 node tests/ui_refinement_wave3a_test.mjs
@@ -125,6 +136,8 @@ node --check on src/**/*.js
 node scripts/wave3a_ui_verify.mjs
 node scripts/wave3b_ui_verify.mjs
 node scripts/wave4_ui_verify.mjs
+node scripts/landing_cta_verify.mjs
+node scripts/continuity_ui_verify.mjs
 ```
 
 There is no `npm test`. Historical pass counts (114/114, 142/142, …) belong in [docs/history/](history/), not here.

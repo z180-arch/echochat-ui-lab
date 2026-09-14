@@ -52,6 +52,15 @@ jobs:
       - name: V1.1 Context
         run: node tests/v1_1_context_test.mjs
 
+      - name: Memory Representation
+        run: node tests/memory_representation_test.mjs
+
+      - name: Context Integration
+        run: node tests/context_integration_test.mjs
+
+      - name: Plugin Runtime
+        run: node tests/plugin_runtime_test.mjs
+
       - name: Lived Continuity
         run: node tests/lived_continuity_test.mjs
 
@@ -60,6 +69,15 @@ jobs:
 
       - name: Quiet Remember
         run: node tests/quiet_remember_test.mjs
+
+      - name: Continuity Write Path
+        run: node tests/continuity_write_path_test.mjs
+
+      - name: Continuity Perception
+        run: node tests/continuity_perception_test.mjs
+
+      - name: Retrieval Regression
+        run: node tests/retrieval_regression_test.mjs
 
       - name: UI Refinement Wave 1
         run: node tests/ui_refinement_wave1_test.mjs
@@ -99,5 +117,15 @@ jobs:
 
       - name: Wave 4 browser verify
         run: node scripts/wave4_ui_verify.mjs
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+
+      - name: Landing CTA browser verify
+        run: node scripts/landing_cta_verify.mjs
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+
+      - name: Continuity UI browser verify
+        run: node scripts/continuity_ui_verify.mjs
         env:
           CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}

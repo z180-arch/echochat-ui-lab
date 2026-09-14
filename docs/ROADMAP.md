@@ -17,6 +17,9 @@ Shipped in the running product (see code + [CURRENT_STATE.md](CURRENT_STATE.md))
 - PWA with scope `/app/`
 - Marketing landing at `/`, application at `/app/`
 - Morning Mint in-app UI
+- Minimal in-process plugin contract (empty builtin list; DSH adapter reserved)
+- Architecture decision: EchoChat remains the product base; turn context is the composition root ([PRODUCT_BASE.md](architecture/PRODUCT_BASE.md))
+- Core context composition (Character / persona / Memory / Relationship / Lived Continuity / Worldbook / plugin extraPrompt) is freeze-ready on the product path; live model utilization still needs a local `ECHOCHAT_API_KEY` run
 
 ---
 
@@ -35,4 +38,4 @@ Do not start plugins, storage-key renames, or UI redesigns unless a task explici
 Recorded intent only (not scheduled):
 
 - Package the application **without** the marketing landing (`index.html` / `landing-v3.html`)
-- Plugin system only if separately authorized — see [PLUGIN_POLICY.md](architecture/PLUGIN_POLICY.md)
+- DSH / Cordis / marketplace / sandbox / plugin SDK — not scheduled; see [PLUGIN_POLICY.md](architecture/PLUGIN_POLICY.md)

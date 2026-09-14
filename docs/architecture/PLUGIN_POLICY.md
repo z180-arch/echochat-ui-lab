@@ -1,6 +1,6 @@
 # EchoChat Plugin Architecture Policy
 
-**Not a work item.** Plugins are not implemented. Do not start a plugin system unless an explicit work package authorizes it. This file only records the permission boundary if that ever happens.
+**Current (2026-09-12):** a **minimal in-process** contract exists (`src/runtime/`, `src/plugins/`, `src/adapters/dsh/`). It is not a marketplace, sandbox, Cordis, or DSH runtime. Permission rules below still apply to any future expansion.
 
 ---
 
@@ -8,7 +8,9 @@
 
 本文档定义 EchoChat 未来插件系统的架构原则和权限边界。
 
-**当前状态**：插件系统尚未实现。本文档仅建立架构原则，避免未来插件直接拥有整个 App 的权限。
+**当前状态**：仅有本地 `EchoPlugin` / `PluginRegistry` / `LocalPluginRuntime`。`createDshPluginRuntime()` 为预留位，调用即抛错。插件默认拿不到 API Key、Dexie、localStorage。 Builtin 列表为空。
+
+**底座决策（2026-09-12）：** DeepSeek Harness / Cordis **不是** EchoChat 的产品底座。见 [PRODUCT_BASE.md](PRODUCT_BASE.md)。插件只作为 `assembleTurnContext` 的最后一跳 `extraPrompt`，不要把应用改成 Harness profile。
 
 ## 核心原则
 
@@ -141,11 +143,11 @@ Plugin（插件，受限沙箱环境）
 
 ## 当前不做的事
 
-本文档**不**要求：
-- 现在实现插件系统
-- 现在实现 Plugin API
-- 现在实现插件沙箱
-- 现在开放插件市场
+当前最小实现**不**包含：
+- 插件沙箱 / Web Worker isolation
+- 插件市场 / 远程加载 / SDK
+- 依赖解析
+- 完整 DSH / Cordis / Agent Loop
 
 本文档只建立原则，确保未来实现插件系统时，不会出现"插件默认拥有整个 App 权限"的设计缺陷。
 

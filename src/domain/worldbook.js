@@ -280,7 +280,7 @@ export function buildWorldbookBlock(chat, messages, roleId, persona) {
     hit.sort((a, b) => (Number(a.priority) || 0) - (Number(b.priority) || 0));
     let body = hit.map((e) => String(e.content || "").trim()).filter(Boolean).join("\n\n");
     if (!body) return null;
-    let out = "---\nWorld Information:\n" + body;
+    let out = "---\nWorld Information (setting and lore, not facts about the user):\n" + body;
     if (out.length > HARD_CAP) out = out.slice(0, HARD_CAP);
     return out;
   } catch (e) {

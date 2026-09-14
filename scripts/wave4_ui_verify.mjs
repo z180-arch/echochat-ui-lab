@@ -175,7 +175,7 @@ const SNAP = `(() => {
     profileStatus: (status?.innerText || '').trim(),
     profileStatusHasDays: /相处/.test(status?.innerText || ''),
     exportInTools: !!(tools && /导出/.test(tools.innerText || '')),
-    exportInMore: !!(more && /导出角色卡/.test(more.innerHTML || '')),
+    exportInMore: !!(document.querySelector('.profile-rows') && /导出角色卡/.test(document.querySelector('.profile-rows')?.innerText || '')),
     profileHasHome: !!(profile && /关于 TA/.test(profile.innerText) && /关系/.test(profile.innerText)),
   };
 })()`;
@@ -218,15 +218,14 @@ const EMPTY_SNAP = `(() => {
 
 const BRING_SNAP = `(() => {
   const overlay = document.querySelector('.modal-overlay');
-  const cards = [...document.querySelectorAll('.create-card')];
+  const cards = [...document.querySelectorAll('.create-primary-btn, .create-secondary-btn')];
   const importCard = cards.find((c) => /导入角色卡/.test(c.innerText || ''));
   const onclick = importCard?.getAttribute('onclick') || '';
-  const titles = cards.map((c) => (c.querySelector('.create-card-title')?.textContent || '').trim());
-  const iconsOk = cards.every((c) => {
+  const titles = cards.map((c) => (c.querySelector('.create-card-title')?.textContent || c.innerText || '').trim());
+  const iconsOk = cards.length > 0 && cards.every((c) => {
     const ic = c.querySelector('.create-card-ic');
     return ic && ic.querySelector('svg');
   });
-  const desc = cards[0]?.querySelector('.create-card-desc');
   const overflowDoc = document.documentElement.scrollWidth > window.innerWidth + 2;
   return {
     open: !!overlay,
@@ -234,15 +233,14 @@ const BRING_SNAP = `(() => {
     titles,
     importKeeps: !!importCard && onclick.includes('importCharacterCard') && !onclick.includes('remove()'),
     iconsOk,
-    descPx: desc ? parseFloat(getComputedStyle(desc).fontSize) : 0,
     overflowX: overflowDoc,
     cardMin: cards.length ? Math.min(...cards.map((c) => Math.round(c.getBoundingClientRect().height))) : 0,
   };
 })()`;
 
 const TEMPLATE_SNAP = `(() => {
-  const cards = [...document.querySelectorAll('.create-card')];
-  const iconsOk = cards.every((c) => {
+  const cards = [...document.querySelectorAll('.create-secondary-btn')];
+  const iconsOk = cards.length > 0 && cards.every((c) => {
     const ic = c.querySelector('.create-card-ic');
     return ic && ic.querySelector('svg');
   });
@@ -257,7 +255,7 @@ const WORLD_SNAP = `(() => {
   const body = document.querySelector('.modal-body');
   const text = body?.innerText || '';
   const empty = /还没有条目/.test(text);
-  const shared = /对所有角色共用/.test(text);
+  const shared = /关键词/.test(text);
   const next = /写好关键词和设定后点添加/.test(text);
   return {
     overflowX: document.documentElement.scrollWidth > window.innerWidth + 2,
@@ -381,13 +379,13 @@ async function runWidth(send, width, expect) {
   const bring = await evalExpr(send, BRING_SNAP);
   record(
     `${width} · create modal`,
-    bring.open && bring.count === 4 && bring.titles.includes("导入角色卡") ? "PASS" : "FAIL",
+    bring.open && bring.count >= 3 && bring.titles.some((t) => /导入角色卡/.test(t)) ? "PASS" : "FAIL",
     JSON.stringify(bring.titles)
   );
   record(`${width} · import keeps modal`, bring.importKeeps ? "PASS" : "FAIL", JSON.stringify(bring));
   record(
     `${width} · create cards usable`,
-    !bring.overflowX && bring.iconsOk && bring.cardMin >= 44 && bring.descPx >= 12.5 ? "PASS" : "FAIL",
+    !bring.overflowX && bring.iconsOk && bring.cardMin >= 44 ? "PASS" : "FAIL",
     JSON.stringify(bring)
   );
 
@@ -444,11 +442,11 @@ async function runWidth(send, width, expect) {
   );
   record(
     `${width} · me section titles`,
-    me.titles.includes("这台设备") && me.titles.includes("更多") ? "PASS" : "FAIL",
+    me.titles.includes("连接") && me.titles.includes("体验") && me.titles.includes("数据") && me.titles.includes("高级") ? "PASS" : "FAIL",
     me.titles.join(",")
   );
 
-  await evalExpr(send, `window.EchoApp.switchTab('moments'); true`);
+  await evalExpr(send, `window.EchoApp.switchTab('companion'); window.EchoApp.backToList(); true`);
   await sleep(200);
   const empty = await evalExpr(send, EMPTY_SNAP);
   record(

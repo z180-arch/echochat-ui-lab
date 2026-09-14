@@ -53,6 +53,7 @@ const { getCharacterSlots, getActiveUserPersona } = await import(
   srcHref("src/domain/context-builder.js")
 );
 const { buildSystemPrompt } = await import(srcHref("src/domain/chat.js"));
+const { assembleTurnContext } = await import(srcHref("src/domain/turn-context.js"));
 
 let passed = 0;
 let failed = 0;
@@ -188,6 +189,23 @@ test("buildSystemPrompt includes slots, user persona, overlapping memory; no api
   assert.ok(prompt.includes("冰美式"));
   assert.ok(prompt.includes("说话很慢"));
   assert.ok(!/sk-|api[_-]?key|siliconflow\.cn\/v1\/chat/i.test(prompt));
+});
+
+test("assembleTurnContext is the composition root for the same prompt", () => {
+  resetAll();
+  const chat = {
+    id: "c_turn",
+    roleId: "role_turn",
+    name: "预览",
+    config: { persona: "会记住的人", scenario: "", mesExample: "", speakingStyle: "" },
+  };
+  addMemory(chat.roleId, "用户只喝冰美式", 7, "manual");
+  const assembled = assembleTurnContext(chat, { query: "来一杯冰美式" });
+  assert.equal(assembled.prompt, buildSystemPrompt(chat, { query: "来一杯冰美式" }));
+  assert.equal(assembled.slots.identity, "会记住的人");
+  assert.ok(Array.isArray(assembled.context.memory));
+  assert.ok(assembled.context.memory.some((m) => String(m.content).includes("冰美式")));
+  assert.equal(assembled.context.session.query, "来一杯冰美式");
 });
 
 console.log("\n=== V1.1 Context Results ===");

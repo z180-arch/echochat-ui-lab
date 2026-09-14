@@ -6,14 +6,12 @@
 
 import { store } from "../core/store.js";
 import { events, EVT } from "../core/events.js";
-import { getRoleId, getPersona, getRoleName } from "./persona.js";
+import { getRoleId, getRoleName } from "./persona.js";
 import { buildMessages, streamChat, needsApiSetup } from "./provider.js";
-import { retrieveMemoriesForTurn, noteRetrieveChat, maybeAutoSummary, isGapIdle } from "./memory.js";
-import { buildWorldbookBlock } from "./worldbook.js";
-import { recordChatTurn, getAffinity } from "./relations.js";
+import { maybeAutoSummary } from "./memory.js";
+import { recordChatTurn } from "./relations.js";
 import { messageStore } from "./message-store.js";
-import { listMoments } from "./moments.js";
-import { assembleBehaviorContext } from "./context-builder.js";
+import { assembleTurnContext } from "./turn-context.js";
 import { quietRememberUserText } from "./memory-candidates.js";
 import { cleanAssistantReply, MAX_USER_MESSAGE_CHARS } from "./reply-clean.js";
 import { getReplyPace, presentationDelayMs, waitPresentationDelay } from "./reply-pace.js";
@@ -63,30 +61,9 @@ function endSend(chatId) {
   events.emit("rerender");
 }
 
-// 构建系统提示词（slots + 本轮相关记忆 + 关系 brief + 世界书）
+// 构建系统提示词：单一 turn context（角色 / 记忆 / 关系 / 世界书 / 可选插件）
 export function buildSystemPrompt(chat, opts = {}) {
-  const roleId = getRoleId(chat);
-  const persona = getPersona(chat);
-  const query = opts.query != null ? String(opts.query) : "";
-  noteRetrieveChat(chat?.id);
-  const affinity = roleId ? getAffinity(roleId, { moments: listMoments(roleId) }) : null;
-  const retrieveOpts = { lastChatAt: affinity?.lastChatAt };
-  const memories = roleId ? retrieveMemoriesForTurn(roleId, query, undefined, retrieveOpts) : [];
-  const { behavior } = assembleBehaviorContext({
-    chat,
-    memories,
-    affinity,
-    gapReturn: isGapIdle(retrieveOpts),
-  });
-
-  const parts = [];
-  if (behavior) parts.push(behavior);
-
-  const history = messageStore.peekMessages(chat.id);
-  const wbBlock = buildWorldbookBlock(chat, history, roleId, persona);
-  if (wbBlock) parts.push(wbBlock);
-
-  return parts.join("\n\n");
+  return assembleTurnContext(chat, opts).prompt;
 }
 
 // 发送消息

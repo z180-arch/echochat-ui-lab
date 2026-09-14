@@ -277,6 +277,7 @@
   gap: 8px;
   margin: 0 var(--space-3) var(--space-2);
   padding: 6px 12px;
+  border: 0;
   border-radius: var(--radius-pill);
   background: var(--color-primary-soft);
   color: var(--color-text-secondary);
@@ -285,6 +286,13 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  max-width: calc(100% - 2 * var(--space-3));
+}
+.recall-chip:hover {
+  color: var(--color-text);
 }
 
 /* ---- 消息气泡 ---- */
@@ -349,6 +357,23 @@
   color: var(--color-text-tertiary);
   margin-top: 4px;
   padding: 0 4px;
+}
+.msg-kept {
+  margin-top: 2px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  font-family: inherit;
+  opacity: 0.8;
+}
+.msg-kept:hover,
+.msg-kept:focus-visible {
+  color: var(--color-primary);
+  opacity: 1;
 }
 .msg-me .msg-time {
   text-align: right;

@@ -166,7 +166,7 @@ const SNAP = `(() => {
     profileStatus: (status?.innerText || '').trim(),
     profileStatusHasDays: /相处/.test(status?.innerText || ''),
     exportInTools: !!(tools && /导出/.test(tools.innerText || '')),
-    exportInMore: !!(more && /导出角色卡/.test(more.innerHTML || '')),
+    exportInMore: !!(document.querySelector('.profile-rows') && /导出角色卡/.test(document.querySelector('.profile-rows')?.innerText || '')),
     profileHasHome: !!(profile && /关于 TA/.test(profile.innerText) && /关系/.test(profile.innerText)),
   };
 })()`;
@@ -302,11 +302,11 @@ async function runWidth(send, width, expect) {
   );
   record(
     `${width} · me section titles`,
-    me.titles.includes("这台设备") && me.titles.includes("更多") ? "PASS" : "FAIL",
+    me.titles.includes("连接") && me.titles.includes("体验") && me.titles.includes("数据") && me.titles.includes("高级") ? "PASS" : "FAIL",
     me.titles.join(",")
   );
 
-  await evalExpr(send, `window.EchoApp.switchTab('moments'); true`);
+  await evalExpr(send, `window.EchoApp.switchTab('companion'); window.EchoApp.backToList(); true`);
   await sleep(200);
   const empty = await evalExpr(send, EMPTY_SNAP);
   record(

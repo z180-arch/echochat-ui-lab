@@ -81,17 +81,74 @@ export function tokenizeForRetrieve(text) {
   for (let i = 0; i + 1 < cjk.length; i += 1) {
     tokens.add(cjk.slice(i, i + 2));
   }
+  expandRelatedTokens(tokens, s);
   return [...tokens];
 }
 
-function overlapScore(content, tokens) {
-  if (!tokens.length) return 0;
-  const hay = String(content || "").toLowerCase();
-  let hits = 0;
-  for (const t of tokens) {
-    if (t && hay.includes(t)) hits += t.length > 1 ? 2 : 1;
+/** Companion-owned aliases so related talk can find a stored fact. Not a general NLP stack. */
+const RELATED_TOKEN_GROUPS = [["摄影", "拍照", "照相"]];
+
+function expandRelatedTokens(tokens, raw) {
+  const blob = `${raw || ""} ${[...tokens].join(" ")}`;
+  for (const group of RELATED_TOKEN_GROUPS) {
+    const mentioned = group.some((g) => blob.includes(g));
+    const shooting = group.includes("摄影") && /拍[点些了张]|去拍|拍点|拍照/.test(blob);
+    if (mentioned || shooting) group.forEach((g) => tokens.add(g));
   }
-  return hits;
+}
+
+/** Low-information query tokens. They may appear in a stored fact (e.g. 最近)
+ *  but matching *only* on them must not retrieve. Content tokens still decide hits.
+ *  Weight is zero for the overlap filter — not a deleted vocabulary. */
+const GENERIC_RETRIEVE_TOKENS = new Set([
+  "最近",
+  "今天",
+  "今晚",
+  "明天",
+  "昨天",
+  "前天",
+  "后天",
+  "现在",
+  "刚才",
+  "今年",
+  "去年",
+  "这周",
+  "下周",
+  "上周",
+  "周末",
+  "早上",
+  "晚上",
+  "你好",
+  "在吗",
+  "还好",
+  "好吗",
+  "什么",
+  "怎么",
+  "怎样",
+  "如何",
+  "这个",
+  "那个",
+  "一个",
+  "一些",
+  "开始",
+]);
+
+function isGenericRetrieveToken(token) {
+  return GENERIC_RETRIEVE_TOKENS.has(token);
+}
+
+function overlapScore(content, tokens) {
+  if (!tokens.length) return { overlap: 0, contentOverlap: 0 };
+  const hay = String(content || "").toLowerCase();
+  let overlap = 0;
+  let contentOverlap = 0;
+  for (const t of tokens) {
+    if (!t || !hay.includes(t)) continue;
+    const w = t.length > 1 ? 2 : 1;
+    overlap += w;
+    if (!isGenericRetrieveToken(t)) contentOverlap += w;
+  }
+  return { overlap, contentOverlap };
 }
 
 let lastRetrieve = { roleId: null, chatId: null, items: [], hadHit: false, preview: "" };
@@ -143,7 +200,8 @@ export function retrieveMemoriesForTurn(roleId, query, limit, opts = {}) {
   const tokens = tokenizeForRetrieve(q);
   const now = Date.now();
   const ranked = all.map((m) => {
-    const overlap = q ? overlapScore(m.content, tokens) : 0;
+    const scored = q ? overlapScore(m.content, tokens) : { overlap: 0, contentOverlap: 0 };
+    const overlap = scored.contentOverlap;
     const recency = 1 / (1 + Math.max(0, now - (m.createdAt || 0)) / (14 * DAY_MS));
     const importance = Number(m.importance) || 0;
     const score = q ? overlap * 5 + importance * 0.35 + recency : importance + recency * 0.2;

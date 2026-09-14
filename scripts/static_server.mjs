@@ -22,8 +22,12 @@ createServer(async (req, res) => {
     const url = new URL(req.url, "http://localhost");
     let p = decodeURIComponent(url.pathname);
     if (p === "/") p = "/index.html";
-    const file = join(ROOT, normalize(p).replace(/^(\.\.[/\\])+/, ""));
-    const s = await stat(file).catch(() => null);
+    let file = join(ROOT, normalize(p).replace(/^(\.\.[/\\])+/, ""));
+    let s = await stat(file).catch(() => null);
+    if (s?.isDirectory()) {
+      file = join(file, "index.html");
+      s = await stat(file).catch(() => null);
+    }
     if (!s || !s.isFile()) {
       res.writeHead(404, { "content-type": "text/plain" });
       res.end("404");

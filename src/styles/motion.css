@@ -351,6 +351,43 @@
 }
 
 /* ---- 头像选择器 ---- */
+.create-presence {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  margin: 0 0 var(--space-4);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+.create-presence .avatar-picker {
+  margin: 0;
+  flex-shrink: 0;
+}
+.create-presence .avatar-picker-sub {
+  display: none;
+}
+.create-presence-copy {
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+}
+.create-presence-name {
+  font-size: var(--font-section);
+  font-weight: var(--weight-semibold);
+  font-style: normal;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+.create-presence-line {
+  margin-top: 4px;
+  font-size: var(--font-caption);
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}
+
 .avatar-picker {
   display: flex;
   flex-direction: column;
@@ -1120,6 +1157,7 @@
   .welcome-lead .lead-char,
   .welcome-screen h1,
   .welcome-actions,
+  .welcome-beats,
   .modal {
     animation: none !important;
   }
@@ -1128,8 +1166,13 @@
   }
   .welcome-lead .lead-char,
   .welcome-screen h1,
-  .welcome-actions {
+  .welcome-actions,
+  .welcome-beats {
     opacity: 1;
     transform: none;
+  }
+  .msg-streaming .msg-bubble::after {
+    animation: none !important;
+    opacity: 0.7;
   }
 }

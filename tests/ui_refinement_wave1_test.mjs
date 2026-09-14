@@ -71,8 +71,8 @@ test("hasHistory uses affinity stageLabel and days on one hub line", () => {
     true
   );
   assert.equal(p.label, "渐渐熟悉");
-  assert.equal(hubSecondaryLine(p), "渐渐熟悉 · 12 天");
-  assert.equal(hubShowsStageChip("渐渐熟悉 · 12 天", "渐渐熟悉"), false);
+  assert.equal(hubSecondaryLine(p), "渐渐熟悉 · 认识第12天");
+  assert.equal(hubShowsStageChip("渐渐熟悉 · 认识第12天", "渐渐熟悉"), false);
 });
 
 test("Hub chip is omitted when subtitle already carries the stage", () => {

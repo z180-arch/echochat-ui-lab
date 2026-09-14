@@ -6,32 +6,293 @@
 
 import { storage, KEYS } from "../core/storage.js";
 import { todayStr, dayDiff } from "../core/utils.js";
+import { getStorageHooks } from "../repository/test-hooks.js";
+import {
+  parseJsonSafe,
+  isEntityMigrated,
+  markEntityMigrated,
+  markEntityFailed,
+} from "../infrastructure/satellite-reconcile.js";
 
 const AFFINITY_THRESHOLD = 5;
 const PROACTIVE_CHANCE = 0.3;
 const DAY_MS = 86400000;
+const ENTITY = "relationships";
+const META_ID = "__echo_rel_meta";
+
+let cache = null;
+let persistChain = Promise.resolve();
+let usingCanonical = false;
+let mutationGen = 0;
 
 function defaultStore() {
   return { version: 2, checkIn: { lastDate: "", streak: 0 }, roles: {} };
 }
 
-export function loadRelations() {
+function ensureShape(data) {
+  const d = data && typeof data === "object" ? data : defaultStore();
+  if (!d.checkIn || typeof d.checkIn !== "object") d.checkIn = { lastDate: "", streak: 0 };
+  if (!d.roles || typeof d.roles !== "object") d.roles = {};
+  d.version = 2;
+  return d;
+}
+
+function snapshotIsPopulated(data) {
+  const d = ensureShape(data);
+  if (Object.keys(d.roles).length) return true;
+  if (d.checkIn.lastDate || Number(d.checkIn.streak) > 0) return true;
+  return false;
+}
+
+function toDexieRows(data) {
+  const d = ensureShape(data);
+  const rows = Object.entries(d.roles).map(([roleId, role]) => ({
+    id: `rel-${roleId}`,
+    characterId: roleId,
+    status: "active",
+    userId: "user",
+    roleName: role.roleName,
+    firstSeenAt: role.firstSeenAt,
+    lastChatAt: role.lastChatAt,
+    lastChatDay: role.lastChatDay,
+    streakDays: role.streakDays,
+    chatTurns: role.chatTurns,
+    lastProactiveAt: role.lastProactiveAt,
+    brief: role.brief,
+    events: Array.isArray(role.events) ? role.events : [],
+    lastStage: role.lastStage,
+    updatedAt: Number(role.lastChatAt || role.firstSeenAt || Date.now()),
+    createdAt: Number(role.firstSeenAt || Date.now()),
+  }));
+  rows.push({
+    id: META_ID,
+    characterId: META_ID,
+    status: "meta",
+    checkIn: d.checkIn,
+    version: 2,
+    updatedAt: Date.now(),
+    createdAt: Date.now(),
+  });
+  return rows;
+}
+
+function fromDexieRows(rows) {
+  const d = defaultStore();
+  for (const row of rows || []) {
+    if (!row) continue;
+    if (row.id === META_ID || row.characterId === META_ID || row.status === "meta") {
+      if (row.checkIn && typeof row.checkIn === "object") d.checkIn = row.checkIn;
+      continue;
+    }
+    const roleId = row.characterId || String(row.id || "").replace(/^rel-/, "");
+    if (!roleId || roleId === META_ID) continue;
+    d.roles[roleId] = {
+      roleName: row.roleName || "角色",
+      firstSeenAt: row.firstSeenAt || row.createdAt || Date.now(),
+      lastChatAt: row.lastChatAt || 0,
+      lastChatDay: row.lastChatDay || "",
+      streakDays: row.streakDays || 0,
+      chatTurns: row.chatTurns || row.interactionFrequency || 0,
+      lastProactiveAt: row.lastProactiveAt || 0,
+      brief: typeof row.brief === "string" ? row.brief : "",
+      events: Array.isArray(row.events) ? row.events : [],
+      lastStage: row.lastStage || "none",
+    };
+  }
+  return ensureShape(d);
+}
+
+function looksLossyRelationRows(rows) {
+  const roles = (rows || []).filter((r) => r && r.id !== META_ID && r.status !== "meta");
+  if (!roles.length) return false;
+  return roles.every((r) => r.events == null && r.brief == null && r.chatTurns == null);
+}
+
+function mergeRelations(canonical, legacy) {
+  const c = ensureShape(canonical);
+  const l = ensureShape(legacy);
+  const roles = { ...l.roles };
+  for (const [id, role] of Object.entries(c.roles)) {
+    const other = roles[id];
+    if (!other) {
+      roles[id] = role;
+      continue;
+    }
+    const cTurns = Number(role.chatTurns) || 0;
+    const lTurns = Number(other.chatTurns) || 0;
+    const pick = cTurns >= lTurns ? role : other;
+    const otherOne = pick === role ? other : role;
+    const seen = new Set((pick.events || []).map((e) => `${e.type}|${e.at}|${e.text}`));
+    const events = (pick.events || []).slice();
+    (otherOne.events || []).forEach((e) => {
+      const key = `${e.type}|${e.at}|${e.text}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        events.push(e);
+      }
+    });
+    roles[id] = {
+      ...otherOne,
+      ...pick,
+      events,
+      brief: pick.brief || otherOne.brief || "",
+    };
+  }
+  const cDate = c.checkIn.lastDate || "";
+  const lDate = l.checkIn.lastDate || "";
+  return ensureShape({
+    version: 2,
+    roles,
+    checkIn: cDate >= lDate ? c.checkIn : l.checkIn,
+  });
+}
+
+function parseLegacyRelations() {
   try {
-    const d = storage.get(KEYS.RELATIONS, null);
+    const raw = typeof localStorage !== "undefined" ? localStorage.getItem(KEYS.RELATIONS) : null;
+    const d = parseJsonSafe(raw, null);
     if (!d) return defaultStore();
-    if (!d.checkIn || typeof d.checkIn !== "object") d.checkIn = { lastDate: "", streak: 0 };
-    if (!d.roles || typeof d.roles !== "object") d.roles = {};
-    d.version = 2;
-    return d;
-  } catch (e) {
+    return ensureShape(d);
+  } catch {
     return defaultStore();
   }
 }
 
+async function canonicalAvailable() {
+  try {
+    const hooks = getStorageHooks();
+    return !!(hooks.relationship && typeof hooks.relationship.loadSnapshot === "function" && (await hooks.isAvailable()));
+  } catch {
+    return false;
+  }
+}
+
+async function loadCanonicalRelations() {
+  const rows = await getStorageHooks().relationship.loadSnapshot();
+  return fromDexieRows(rows || []);
+}
+
+async function replaceCanonicalRelations(data) {
+  await getStorageHooks().relationship.replaceSnapshot(toDexieRows(data));
+}
+
+async function flushPersist() {
+  const snapshot = cache || defaultStore();
+  if (await canonicalAvailable()) {
+    await replaceCanonicalRelations(snapshot);
+    usingCanonical = true;
+    return;
+  }
+  storage.set(KEYS.RELATIONS, snapshot);
+}
+
+function schedulePersist() {
+  persistChain = persistChain.then(flushPersist).catch((err) => {
+    console.warn("[relations] persist failed:", err && err.message ? err.message : err);
+    try {
+      storage.set(KEYS.RELATIONS, cache || defaultStore());
+    } catch {
+      // ignore
+    }
+  });
+  return persistChain;
+}
+
+export function loadRelations() {
+  if (cache) return cache;
+  cache = parseLegacyRelations();
+  return cache;
+}
+
 export function saveRelations(data) {
-  const d = data || loadRelations();
-  d.version = 2;
-  return storage.set(KEYS.RELATIONS, d);
+  const d = ensureShape(data || loadRelations());
+  cache = d;
+  mutationGen += 1;
+  if (usingCanonical) schedulePersist();
+  else storage.set(KEYS.RELATIONS, d);
+  return true;
+}
+
+export function resetRelationsRuntime() {
+  cache = null;
+  usingCanonical = false;
+  mutationGen = 0;
+  persistChain = Promise.resolve();
+}
+
+export function flushRelationsPersist() {
+  return persistChain;
+}
+
+export function deleteRelationsForRole(roleId) {
+  if (!roleId) return false;
+  const st = loadRelations();
+  if (!st.roles[roleId]) return false;
+  delete st.roles[roleId];
+  saveRelations(st);
+  return true;
+}
+
+export async function hydrateRelations() {
+  const startGen = mutationGen;
+  const legacy = parseLegacyRelations();
+  if (!(await canonicalAvailable())) {
+    cache = legacy;
+    usingCanonical = false;
+    return { reason: "no-dexie", wrote: false };
+  }
+  try {
+    const rows = await getStorageHooks().relationship.loadSnapshot();
+    const lossy = looksLossyRelationRows(rows);
+    const canonical = fromDexieRows(rows || []);
+    const destPop = snapshotIsPopulated(canonical);
+    const srcPop = snapshotIsPopulated(legacy);
+    const completed = isEntityMigrated(ENTITY);
+    let next;
+    let write = false;
+    let reason = "fresh";
+    if (!destPop && !srcPop) {
+      next = defaultStore();
+      reason = "fresh";
+    } else if (destPop && completed && !lossy) {
+      next = canonical;
+      reason = "dexie-only";
+    } else if (!destPop && srcPop) {
+      next = legacy;
+      write = true;
+      reason = "legacy-only";
+    } else if (destPop && !srcPop) {
+      next = canonical;
+      reason = "dexie-populated";
+    } else {
+      next = mergeRelations(canonical, legacy);
+      write = true;
+      reason = "reconcile";
+    }
+    next = ensureShape(next);
+    if (mutationGen !== startGen && cache) {
+      next = mergeRelations(next, cache);
+      write = true;
+    }
+    if (write) {
+      await replaceCanonicalRelations(next);
+      const readback = await loadCanonicalRelations();
+      const expectedIds = Object.keys(next.roles);
+      const got = new Set(Object.keys(readback.roles));
+      if (!expectedIds.every((id) => got.has(id))) throw new Error("relations migrate verify failed");
+      next = ensureShape(readback);
+    }
+    if (reason !== "fresh") markEntityMigrated(ENTITY, { roleCount: Object.keys(next.roles).length, reason });
+    cache = next;
+    usingCanonical = true;
+    return { reason, wrote: write, count: Object.keys(next.roles).length };
+  } catch (e) {
+    markEntityFailed(ENTITY, e);
+    console.warn("[relations] hydrate failed:", e && e.message ? e.message : e);
+    cache = cache || legacy;
+    usingCanonical = false;
+    return { reason: "failed", error: String(e && e.message ? e.message : e), wrote: false };
+  }
 }
 
 function ensureRole(st, roleId, roleName) {
@@ -64,7 +325,7 @@ function pushEvent(role, type, text, ts) {
   if (!Array.isArray(role.events)) role.events = [];
   role.events.push({ type, text, at: ts != null ? ts : Date.now() });
   if (role.events.length > 12) role.events = role.events.slice(-12);
-  role.brief = text;
+  if (type !== "memory") role.brief = text;
 }
 
 export function recordRelationshipEvent(roleId, { type = "note", text, at, roleName } = {}) {
@@ -260,6 +521,10 @@ export const EchoRelations = {
   markProactiveSent,
   momentEngagement,
   importRelations,
+  hydrateRelations,
+  resetRelationsRuntime,
+  flushRelationsPersist,
+  deleteRelationsForRole,
   todayStr,
   dayDiff,
 };

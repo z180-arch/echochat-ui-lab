@@ -7,7 +7,7 @@ import { store } from "../core/store.js";
 import { events, EVT } from "../core/events.js";
 import { peekMessages } from "./message-store.js";
 import { addMemory, getMemoryList } from "./memory.js";
-import { addMoment, parseSummaryAndMoment } from "./moments.js";
+import { addMoment, parseSummaryAndMoment, ingestSummaryDynamic } from "./moments.js";
 import { getRoleName } from "./persona.js";
 import { recordRelationshipEvent } from "./relations.js";
 
@@ -162,15 +162,23 @@ export function applyAutoSummaryResult(roleId, raw, { chatId } = {}) {
   const { summary } = parseSummaryAndMoment(raw);
   const candidates = candidatesFromSummary(summary, roleId);
   const actionable = candidates.filter((c) => !c.duplicate);
+  const chat =
+    (chatId && (store.getState().chats || []).find((c) => c.id === chatId)) ||
+    (store.getState().chats || []).find((c) => c.roleId === roleId);
+  const dynamic = ingestSummaryDynamic(roleId, raw, {
+    chatId: chatId || null,
+    roleName: chat ? getRoleName(chat) : "角色",
+    memories: getMemoryList(roleId),
+  });
   // Duplicate-only batches must not toast or block heuristic「从对话提取」.
-  if (!actionable.length) return { count: 0 };
+  if (!actionable.length) return { count: 0, momentId: dynamic.moment?.id || null };
   setPendingCandidates(roleId, candidates, chatId);
   events.emit(EVT.MEMORY_CANDIDATES_READY, {
     roleId,
     chatId: chatId || null,
     count: actionable.length,
   });
-  return { count: actionable.length };
+  return { count: actionable.length, momentId: dynamic.moment?.id || null };
 }
 
 export function extractMemoryCandidates(characterId, options = {}) {
@@ -255,6 +263,8 @@ export function confirmMemoryCandidates(characterId, candidates, options = {}) {
       content: `记下了。${created[0].content}`.slice(0, 80),
       source: "memory",
       relatedMemoryId: created[0].id,
+      chatId: options.chatId || null,
+      sourceKey: `memory:${created[0].id}`,
     });
   }
 

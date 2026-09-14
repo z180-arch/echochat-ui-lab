@@ -46,6 +46,9 @@ assertEq("relativeTime() 返回字符串", typeof relativeTime(Date.now()), "str
 assertEq("renderMarkdown() 处理纯文本", renderMarkdown("hello"), "hello");
 assertEq("renderMarkdown() 处理加粗", renderMarkdown("**bold**").includes("<strong>"), true);
 assertEq("renderMarkdown() 处理代码", renderMarkdown("`code`").includes("md-inline"), true);
+assertEq("renderMarkdown() 转义 HTML", renderMarkdown("<img src=x>").includes("<img"), false);
+assertEq("renderMarkdown() 行内代码转义", renderMarkdown("`<script>`").includes("<script>"), false);
+assertEq("renderMarkdown() 拒绝 javascript 链接", renderMarkdown("[x](javascript:alert(1))").includes("href="), false);
 console.groupEnd();
 
 // ============================================================

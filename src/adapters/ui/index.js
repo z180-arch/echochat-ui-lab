@@ -15,6 +15,7 @@ export const UI_SURFACES = {
   settings: "me-pane",
   character: "profile-pane",
   memory: "continuity-sheet",
+  moments: "moments-pane",
   worldbook: "settings-worldbook",
   mobileNav: "bottom-nav",
 };

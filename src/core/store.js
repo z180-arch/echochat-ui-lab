@@ -22,8 +22,8 @@ function defaultApiSeed() {
 }
 
 function normalizeUiTab(tab) {
-  if (tab === "messages" || tab === "characters" || tab === "chats" || tab === "moments") return "companion";
-  if (tab === "companion" || tab === "me") return tab;
+  if (tab === "messages" || tab === "characters" || tab === "chats") return "companion";
+  if (tab === "companion" || tab === "me" || tab === "moments") return tab;
   return "companion";
 }
 
@@ -54,6 +54,7 @@ function defaultState() {
       fontSize: "medium", // small | medium | large
       readReceipts: true,
       autoSummary: true,
+      extraNotes: "",
       ttsEnabled: false,
       sttEnabled: true,
       voice: "",
@@ -75,12 +76,13 @@ function defaultState() {
     chats: [], // [{id, roleId, name, avatar, createdAt, config:{persona,myAvatar,model,temperature}, messages:[{id,role,text,time,status}]}]
     currentChatId: null,
     ui: {
-      activeTab: "companion", // companion | me  (messages/characters/moments → companion)
+      activeTab: "companion", // companion | moments | me  (messages/characters/chats → companion)
       sidebarOpen: true,
       profileOpen: false,
       searchQuery: "",
       momentsFilter: "all",
       selectedCharacterId: null,
+      chatScroll: {},
     },
   };
 }
@@ -197,7 +199,12 @@ class Store {
         scenario: template.scenario || "",
         mesExample: template.mesExample || "",
         speakingStyle: template.speakingStyle || "",
+        likes: template.likes || "",
+        dislikes: template.dislikes || "",
+        rules: template.rules || "",
+        firstMessage: template.firstMessage || "",
         ...(template.replyPace ? { replyPace: template.replyPace } : {}),
+        ...(template.threadTitle ? { threadTitle: String(template.threadTitle).slice(0, 40) } : {}),
       },
       messages: template.firstMessage
         ? [{ id: uid(), role: "her", text: template.firstMessage, time: Date.now(), status: "sent" }]
@@ -213,11 +220,14 @@ class Store {
   }
 
   deleteChat(chatId) {
-    this.set((s) => ({
-      ...s,
-      chats: s.chats.filter((c) => c.id !== chatId),
-      currentChatId: s.currentChatId === chatId ? (s.chats[0]?.id || null) : s.currentChatId,
-    }));
+    this.set((s) => {
+      const chats = s.chats.filter((c) => c.id !== chatId);
+      return {
+        ...s,
+        chats,
+        currentChatId: s.currentChatId === chatId ? chats[0]?.id || null : s.currentChatId,
+      };
+    });
     events.emit(EVT.CHAT_DELETED, chatId);
   }
 
@@ -308,6 +318,25 @@ class Store {
 
   setMomentsFilter(filter) {
     this.set((s) => ({ ...s, ui: { ...s.ui, momentsFilter: filter || "all" } }));
+  }
+
+  /** Persist last chat scroll without re-rendering. Presentation only. */
+  setChatScroll(chatId, payload) {
+    if (!chatId) return;
+    const top = Number(payload?.top) || 0;
+    const nearBottom = !!payload?.nearBottom;
+    const prev = this._state.ui.chatScroll && typeof this._state.ui.chatScroll === "object" ? this._state.ui.chatScroll : {};
+    this._state = {
+      ...this._state,
+      ui: { ...this._state.ui, chatScroll: { ...prev, [chatId]: { top, nearBottom } } },
+    };
+    this._persist();
+  }
+
+  getChatScroll(chatId) {
+    const map = this._state.ui.chatScroll;
+    if (!chatId || !map || typeof map !== "object") return null;
+    return map[chatId] || null;
   }
 
   // 导出全量数据（备份）

@@ -148,11 +148,17 @@ await testAsync("sendMessage quietly keeps photography and later context can rec
 
 test("chat surfaces kept mark and recall chip without a memory admin table", () => {
   const views = readFileSync(join(__dirname, "../src/ui/views/index.js"), "utf8");
+  const present = readFileSync(join(__dirname, "../src/ui/present.js"), "utf8");
   const css = readFileSync(join(__dirname, "../src/styles/components.css"), "utf8");
   assert.ok(views.includes("msg-kept"));
   assert.ok(views.includes("记下了"));
   assert.ok(views.includes("userTextIsKept"));
   assert.ok(views.includes("recall-chip"));
+  assert.ok(present.includes("刚刚认识 · 打开相处中"));
+  assert.ok(views.includes("companionRitual"));
+  assert.ok(views.includes("fillComposer"));
+  assert.ok(views.includes("关于你的记忆"));
+  assert.ok(views.includes("不是聊天记录"));
   assert.ok(css.includes(".msg-kept"));
   assert.ok(!views.includes("记忆 1"));
   assert.ok(!/MemoryRow/.test(views.split("function renderMessage")[1]?.slice(0, 1200) || ""));

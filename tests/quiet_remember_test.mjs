@@ -100,7 +100,10 @@ test("durable first-person fact persists without confirm", () => {
   assert.equal(list[0].source, "auto");
   assert.ok(list[0].importance >= 7);
   const aff = getAffinity(ROLE_ID);
-  assert.equal(aff.brief, "记下了一件关于你的事");
+  const memoryEvents = (aff.events || []).filter((e) => e.type === "memory");
+  assert.equal(memoryEvents.length, 1);
+  assert.equal(memoryEvents[0].text, "记下了一件关于你的事");
+  assert.notEqual(aff.brief, "记下了一件关于你的事");
 });
 
 test("greetings questions and vents do not persist", () => {

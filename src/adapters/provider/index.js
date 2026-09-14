@@ -5,7 +5,7 @@
 
 import { getApiConfig } from "../../domain/provider.js";
 
-export { streamChat, buildMessages, needsApiSetup, getApiPresets, findPreset } from "../../domain/provider.js";
+export { streamChat, buildMessages, needsApiSetup, getApiPresets, findPreset, ProviderError } from "../../domain/provider.js";
 
 export function getPublicProviderInfo(chat) {
   const cfg = getApiConfig(chat);

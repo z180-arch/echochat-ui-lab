@@ -10,6 +10,7 @@
 import { pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadLocalSecrets } from "./load_local_secrets.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
@@ -69,9 +70,10 @@ const { messageStore } = await import(srcHref("src/domain/message-store.js"));
 const { buildMessages, chatCompletion, getApiConfig } = await import(srcHref("src/domain/provider.js"));
 
 const PHOTO = "我最近开始学习摄影";
-const API_KEY = String(process.env.ECHOCHAT_API_KEY || process.env.SILICONFLOW_API_KEY || "").trim();
-const BASE_URL = String(process.env.ECHOCHAT_BASE_URL || "https://api.siliconflow.cn/v1").trim();
-const MODEL = String(process.env.ECHOCHAT_MODEL || "Qwen/Qwen2.5-7B-Instruct").trim();
+const secrets = loadLocalSecrets();
+const API_KEY = String(process.env.ECHOCHAT_API_KEY || process.env.SILICONFLOW_API_KEY || secrets.apiKey || "").trim();
+const BASE_URL = String(process.env.ECHOCHAT_BASE_URL || secrets.baseUrl || "https://api.siliconflow.cn/v1").trim();
+const MODEL = String(process.env.ECHOCHAT_MODEL || secrets.model || "Qwen/Qwen2.5-7B-Instruct").trim();
 
 const LINXIA = {
   name: "林夏",

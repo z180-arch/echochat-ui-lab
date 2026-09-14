@@ -1,0 +1,17 @@
+# Documentation
+
+Source of truth is **running code**, then this folder.
+
+| File | Read when |
+|------|-----------|
+| [CURRENT_STATE.md](CURRENT_STATE.md) | What is shipped, storage names, PWA, tests, debt |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Layers and the turn-context door |
+| [architecture/PRODUCT_BASE.md](architecture/PRODUCT_BASE.md) | Why EchoChat is the host, not an agent OS |
+| [architecture/PLUGIN_POLICY.md](architecture/PLUGIN_POLICY.md) | Plugin = `extraPrompt` only |
+| [architecture/DATA_OWNERSHIP.md](architecture/DATA_OWNERSHIP.md) | User data vs code vs brand |
+| [design.md](design.md) | Morning Mint / Ripple — frozen in-app language |
+| [ROADMAP.md](ROADMAP.md) | CURRENT / NEXT / LATER |
+
+Root files: [README.md](../README.md), [AGENTS.md](../AGENTS.md), [THIRD_PARTY_SOURCES.md](../THIRD_PARTY_SOURCES.md), [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
+
+Do not reconstruct product decisions from git history snapshots or old stage names (Foundation, V1, V1.1).

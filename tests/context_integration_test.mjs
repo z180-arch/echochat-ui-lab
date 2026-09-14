@@ -45,12 +45,12 @@ if (typeof global.URL.createObjectURL !== "function") {
 }
 
 const { store } = await import(srcHref("src/core/store.js"));
-const { addMemory, getMemoryList } = await import(srcHref("src/domain/memory.js"));
+const { addMemory, getMemoryList, resetMemoriesRuntime } = await import(srcHref("src/domain/memory.js"));
 const { assembleTurnContext } = await import(srcHref("src/domain/turn-context.js"));
-const { recordChatTurn, recordRelationshipEvent, getAffinity } = await import(
+const { saveWorldbook, resetWorldbookRuntime } = await import(srcHref("src/domain/worldbook.js"));
+const { recordChatTurn, recordRelationshipEvent, getAffinity, resetRelationsRuntime } = await import(
   srcHref("src/domain/relations.js")
 );
-const { saveWorldbook } = await import(srcHref("src/domain/worldbook.js"));
 const { getPluginRegistry, resetPluginRegistry } = await import(srcHref("src/runtime/index.js"));
 const { FROZEN_USER_MEMORY_HEADER } = await import(srcHref("src/domain/behavior.js"));
 const { isQuietDurableFact } = await import(srcHref("src/domain/memory-candidates.js"));
@@ -81,6 +81,9 @@ function resetAll() {
   localStorage.clear();
   store.reset();
   resetPluginRegistry();
+  resetWorldbookRuntime();
+  resetRelationsRuntime();
+  resetMemoriesRuntime();
 }
 
 function chat() {

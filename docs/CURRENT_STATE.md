@@ -1,63 +1,68 @@
-# EchoChat Lite — Current State
+# EchoChat — Current State
 
-This is the current project-state document. If another Markdown file disagrees with **code + tests**, the code wins. Historical snapshots live in [docs/history/](history/).
+If another Markdown file disagrees with **code + tests**, the code wins.
 
-**Last reconciled:** 2026-09-14 (core context integration hardened; Live Utilization still needs `ECHOCHAT_API_KEY`)  
-**Canonical line:** GitHub `main` (production via Vercel)
-
-Entry split (`/` landing, `/app/` application) is shipped on `main`. Do not treat `docs/history/` snapshots as the live entry or storage layout.
+**Last reconciled:** 2026-09-15  
+**Canonical line:** GitHub `main` (Vercel static deploy)
 
 ---
 
-## Project
+## Product
 
-**EchoChat Lite** is a pure-frontend PWA: an AI character / companion that stays local-first and privacy-oriented.
+EchoChat is a **local-first AI companion PWA**. A character stays with the user across chat, memory, moments, and relationship — not a generic chatbot wrapper, agent OS, RAG demo, or character marketplace.
 
-- Zero build (HTML, CSS, native ES modules)
+- Zero-build: HTML, CSS, native ES modules
 - Chat completions leave the device only through the API the user configures
-- No `package.json` / npm app build; Node is used for tests and CI
+- No application bundler. `package.json` exists only to run `npm test`
+- License: PolyForm Noncommercial 1.0.0
+
+**Runtime foundation is frozen:** EchoChat Product Core. Do not migrate onto Chatbox, DeepSeek Harness, OpenAI Agents SDK, SillyTavern, LobeChat, or similar hosts. See [architecture/PRODUCT_BASE.md](architecture/PRODUCT_BASE.md).
 
 ---
 
-## Entry boundary
+## Entries
 
 ```text
-/                 → marketing landing (index.html / landing-v3.html)
-/app/             → EchoChat Lite application
-/app/index.html   → application HTML entry
+/                 → marketing landing (index.html, landing-v3.html)
+/app/             → application (app/index.html → src/main.js)
 ```
 
-Landing does not initialize application storage. It does not read or write `localStorage` / IndexedDB / Dexie application keys.
-
-The application continues to use existing storage keys and schemas. Changing the URL from `/` to `/app/` does not create new data keys.
+Landing does not initialize application storage and does not read or write `localStorage` / IndexedDB / Dexie keys.
 
 ---
 
-## Current architecture (implemented)
+## Architecture (implemented)
 
-| Area | Status in code |
-|------|----------------|
-| Character | Implemented as a first-class domain + Dexie `characters` table, with legacy fallback from chats |
-| Conversation | Implemented; a character can have more than one conversation |
-| Message | Dexie-backed message store with localStorage dual-write / fallback |
-| Memory | Quiet auto-write of durable facts (incl. “开始学习…”); chat shows **记下了**; related talk can surface a **想起了** chip; retrieval + idle anchors unchanged; prompt serialization frozen as user-owned background facts |
-| Worldbook | Implemented (global + character books); prompt slot is setting/lore, not user facts |
-| Relationship | Implemented (affinity plus brief/events) |
-| Moments | Implemented |
-| Reconstruction | Implemented (import existing chat into a character) |
-| In-app Welcome | Still exists inside the app for first-time users with no chats; this is not the marketing landing |
-| Plugin runtime | Minimal in-process hook on `assembleTurnContext`. No marketplace / DSH / sandbox. Builtin plugins: none |
-| Product base | EchoChat domain. Chatbox / DSH / SillyTavern / LobeChat / Letta were **not** adopted as a base ([PRODUCT_BASE.md](architecture/PRODUCT_BASE.md)) |
+```text
+UI  →  Domain  →  Repository  →  Dexie / Provider  →  OpenAI-compatible API
+```
 
-Do not treat old “Character is not first-class” language in history docs as current.
+`assembleTurnContext` (`src/domain/turn-context.js`) is the **only** turn-context door. Plugins may append `extraPrompt`. They are not a second runtime.
+
+| Area | Status |
+|------|--------|
+| Character | First-class Dexie `characters` + conversation config slots (Card V2 import/export) |
+| Conversation | One character, many threads; Dexie messages with tail window + virtual list |
+| Memory | Dexie `memories` canonical. Quiet auto-write of user facts. Schema and retrieval **frozen** |
+| Moments | Lived traces from conversation, not Memory |
+| Relationship | Affinity + brief/events; copy uses 认识第N天 — not a numeric meter |
+| Worldbook | Global + character books; lore/setting, not user facts |
+| Context Builder | Ordered prompt slots into `assembleTurnContext` |
+| Provider | OpenAI-compatible stream in `src/domain/provider.js`; settings in the app, not git |
+| Plugin | Builtin `extra-notes` as last-stage `extraPrompt` |
+| Reconstruction | Import an existing transcript into a character |
+| Voice | TTS: `speechSynthesis`. STT: Web Speech into the composer (not the chat Provider) |
+| Design | Morning Mint / Ripple **frozen**. Component-scope only |
+
+Do not change Memory schema, retrieval, `assembleTurnContext`, Provider architecture, or Dexie schema unless a dedicated work package says so.
 
 ---
 
-## Storage
+## Storage (names frozen)
 
 Confirmed from `src/core/storage.js`, `src/infrastructure/dexie-db.js`, `src/infrastructure/idb.js`.
 
-### localStorage keys (do not rename)
+### localStorage (do not rename)
 
 | Key | Role |
 |-----|------|
@@ -71,24 +76,20 @@ Confirmed from `src/core/storage.js`, `src/infrastructure/dexie-db.js`, `src/inf
 | `echodownload_ios_hint` | iOS install hint dismissed |
 | `echodownload_chat_drafts_v1` | Composer drafts |
 
-The `echodownload_*` prefix is a **compatibility name**. It is not a reason to migrate keys.
-
-localStorage schema version in code: `SCHEMA_VERSION = 2` (v1 → v2 roleId migration).
+`echodownload_*` is a **compatibility prefix**. It is not a reason to migrate keys. `SCHEMA_VERSION = 2`.
 
 ### IndexedDB
 
 | Database | Role |
 |----------|------|
-| `echochat` (Dexie) | Characters, conversations, messages, memories, relationships, moments, worldbook, assets metadata, migration log |
+| `echochat` (Dexie) | Characters, conversations, messages, memories, relationships, moments, worldbook, asset metadata, migration log |
 | `echodownload_assets` | Binary blobs (avatars / images) |
 
-Do not change these names or schemas unless a dedicated storage work package says so.
+Dexie is **canonical** for those entities. App state may cache. Dual-write to localStorage remains for compatibility.
 
 ---
 
 ## PWA
-
-From `manifest.webmanifest` and `src/main.js`:
 
 ```text
 manifest.id        = /app/
@@ -98,56 +99,60 @@ SW file            = /sw.js
 SW registration    = { scope: "/app/" }
 ```
 
-The service worker is written to leave `/`, `/index.html`, `/landing-v3.html`, and `/landing.html` unintercepted.
+The service worker leaves `/`, `/index.html`, `/landing-v3.html`, and `/landing.html` unintercepted.
 
 ---
 
-## Testing
+## Design
 
-Runnable from the repo root with Node 20+. CI (`.github/workflows/ci.yml`) runs:
+In-app language is **Morning Mint** (`src/styles/tokens.css`) plus quiet Ripple motion (`src/styles/motion.css`). Spec: [design.md](design.md).
 
-```text
-node tests/migration_atomicity_test.mjs
-node tests/foundation_test.mjs
-node tests/storage_cutover_test.mjs
-node tests/core_product_test.mjs
-node tests/reconstruction_test.mjs
-node tests/core_loop_test.mjs
-node tests/reply_clean_test.mjs
-node tests/chat_send_test.mjs
-node tests/theme_tokens_test.mjs
-node tests/ambient_policy_test.mjs
-node tests/v1_1_context_test.mjs
-node tests/memory_representation_test.mjs
-node tests/context_integration_test.mjs
-node tests/plugin_runtime_test.mjs
-node tests/lived_continuity_test.mjs
-node tests/lived_thread_test.mjs
-node tests/quiet_remember_test.mjs
-node tests/continuity_write_path_test.mjs
-node tests/continuity_perception_test.mjs
-node tests/retrieval_regression_test.mjs
-node tests/ui_refinement_wave1_test.mjs
-node tests/ui_refinement_wave2_test.mjs
-node tests/ui_refinement_wave3a_test.mjs
-node tests/ui_refinement_wave3b_test.mjs
-node tests/ui_refinement_wave4_test.mjs
-node --check on src/**/*.js
-node scripts/wave3a_ui_verify.mjs
-node scripts/wave3b_ui_verify.mjs
-node scripts/wave4_ui_verify.mjs
-node scripts/landing_cta_verify.mjs
-node scripts/continuity_ui_verify.mjs
+Do not add a new theme kit, animation system, component library, or particle-demo chat background.
+
+---
+
+## Shipped product loop
+
+- Create / import Character (templates, blank, Card V2 JSON)
+- Chat with streaming paint and a virtualized long transcript
+- Quiet Memory of user facts; retrieve-for-turn (photography aliases only — frozen)
+- Moments and Relationship as lived traces
+- Continuity sheet (记忆与痕迹) from real data only
+- First-run starters fill the composer; they do not auto-send
+- Reunion / resume copy from `lastMessageAt`, last preview, moments, memory, stage
+
+---
+
+## Tests
+
+Node 20+. From the repo root:
+
+```bash
+npm test
 ```
 
-There is no `npm test`. Historical pass counts (114/114, 142/142, …) belong in [docs/history/](history/), not here.
+That runs the Node suites listed in `.github/workflows/ci.yml` (no extra packages). Browser checks need Chrome and are the `scripts/*_verify.mjs` jobs in the same workflow.
 
-Representative verification after entry split: landing/app/CTA/storage/PWA/SW/1440/390 **25/25**; storage cutover **28/28**.
+Optional live model matrix (never logs the key):
+
+```bash
+node scripts/live_continuity_matrix.mjs
+```
+
+Credentials: env or gitignored `.echochat.local.json`. Do not commit keys.
 
 ---
 
 ## Deploy
 
-GitHub `main` deploys on Vercel as a static site. A push to `main` may trigger Production Deployment.
+`main` deploys on Vercel as a static site. Configure the model in-app: **我的 → API 与模型**.
 
-Configure the model in-app: **我的 → API 与模型**. Do not commit API keys.
+---
+
+## Technical debt (real)
+
+1. Message dual-write (store cache vs Dexie) is compatibility, not a missing chat shell
+2. `src/main.js` is a large orchestrator by design
+3. Plugin layer must not grow into a marketplace or agent OS
+4. Firefox has no Web Speech STT; iOS installed-PWA recognition is unreliable
+5. Some OpenAI-compatible models still mis-own user facts (e.g. photography). Retrieval stays frozen; do not “fix” that with new aliases

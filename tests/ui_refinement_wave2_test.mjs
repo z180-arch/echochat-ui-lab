@@ -143,6 +143,7 @@ test("error assistant row stays visible in grouping and can carry timestamp", ()
 });
 
 const viewsSrc = readFileSync(srcFile("src/ui/views/index.js"), "utf8");
+const presentSrc = readFileSync(srcFile("src/ui/present.js"), "utf8");
 const motionSrc = readFileSync(srcFile("src/styles/motion.css"), "utf8");
 const componentsSrc = readFileSync(srcFile("src/styles/components.css"), "utf8");
 
@@ -156,7 +157,7 @@ test("retry remains an inline error action, not a more-menu item", () => {
 
 test("recall remains an independent strip, not a message row", () => {
   assert.ok(viewsSrc.includes("recall-chip"));
-  assert.ok(viewsSrc.includes("想起了"));
+  assert.ok(presentSrc.includes("想起了"));
   assert.ok(componentsSrc.includes(".recall-chip"));
   assert.ok(!componentsSrc.includes(".recall-chip .msg-avatar"));
 });

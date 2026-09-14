@@ -1,202 +1,147 @@
 # EchoChat Product Base
 
-**Date:** 2026-09-12  
-**Status:** Chosen. This is the architecture decision after reconnaissance of Chatbox, DeepSeek Harness, SillyTavern, LobeChat, Letta, TavernAI, InternalBeyond, and EchoChat itself.
+**Reaffirmed:** 2026-09-15  
+**Status:** Current. EchoChat Product Core is the runtime foundation. No migration.
 
-Source of truth remains running code under `src/`. This file records **why the product base is EchoChat domain**, not a proposed rewrite.
+EchoChat is a **Companion** product: a character the user lives with.
+
+It is **not**:
+
+- a chatbot wrapper around a single completion API
+- an Agent OS / tool host / multi-agent runtime
+- a RAG demo
+- a character marketplace
+
+Source of truth is running code under `src/`, `app/index.html`, `sw.js`. This file is the architecture fact, not a proposal.
+
+---
+
+## EchoChat Runtime Foundation
+
+```text
+EchoChat Product Core
+├── /app                    application entry (PWA)
+├── src/ui                  Morning Mint shell
+├── src/domain              Character / Chat / Memory / Relationship /
+│                           Worldbook / Moments / Continuity / Provider / Voice
+├── src/core                store, events, storage keys
+├── src/repository          persistence ports
+├── src/infrastructure      Dexie + IDB blobs (Apache-2.0 Dexie vendored)
+├── src/runtime             in-process plugin hook (extraPrompt)
+├── src/plugins             local builtins (extra-notes)
+└── Provider layer          OpenAI-compatible adapter in src/domain/provider.js
+```
+
+```text
+UI
+ → Application / Domain
+ → Infrastructure
+ → Dexie / Provider
+```
+
+Plugin runtime is an **extension layer** on `assembleTurnContext`, not the application host.
+
+Landing `/` is marketing HTML. It does not load this runtime and must not init storage.
 
 ---
 
 ## Decision
 
-**EchoChat stays the product base.**
+**Current EchoChat Product Core is the official base. Do not migrate onto another project.**
 
-Mature foreign projects were evaluated as *bases*, not as mood boards. None of them can carry Character + Relationship + Memory + Worldbook + Moments + Lived Continuity as a local-first PWA without destroying the product, the license, or both.
+Re-checked 2026-09-15 against current code (Dexie satellites, Memory canonical persist, OpenAI-compatible Provider / SSE, TTS/STT) and against Chatbox, DeepSeek Harness, OpenAI Agents SDK, SillyTavern, LobeChat, LibreChat, Open WebUI, Letta.
+
+None of those can carry Character + Relationship + Memory + Worldbook + Moments + Continuity as a zero-build local-first PWA without:
+
+- destroying the product shape, or
+- relicensing away from PolyForm Noncommercial 1.0.0, or
+- becoming a fork of someone else's chat/agent OS.
 
 What we do **not** do:
 
 - Fork Chatbox and port EchoChat onto it
-- Boot DeepSeek Harness / Cordis as the application
+- Boot DeepSeek Harness / Cordis / OpenAI Agents SDK as the application
 - Replace Morning Mint with SillyTavern or a generic LLM client
-- Stack `mature base → adapter → old EchoChat → adapter → UI`
-
-What we do:
-
-- Keep EchoChat domain as Product Core
-- Assemble one **turn context** per chat turn (identity + memory + relationship + world + continuity + optional plugin append)
-- Keep Landing as marketing, App as the only runtime that owns storage
-- Leave Plugin Runtime as a last-stage hook, not a second operating system
+- Stack `foreign base → adapter → EchoChat domain → adapter → UI`
 
 ---
 
-## What is actually fragmented
+## Classification (use these words only)
 
-The previous pass added a minimal `src/runtime/` contract. That made the tree *look* like five products:
+| Kind | Meaning |
+|------|---------|
+| **Current** | Loaded at runtime and required for the product |
+| **Reference** | Studied. No runtime import. Not a dependency |
+| **Adapter** | A seat or facade EchoChat owns. EchoChat is not built on the foreign project |
+| **Planned** | Named, not implemented. Must not be described as current |
 
-```text
-Landing HTML
-  App shell (main.js)
-    Chat controller
-      Memory / Relations / Worldbook  (real domain)
-      EchoContext + PluginRuntime     (interface layer)
-      DSH adapter stub                (unused seat)
-```
+### Current
 
-The real product pipeline was already in `buildSystemPrompt`: retrieve memories, relationship brief, worldbook, lived-gap instruction, then stream. Runtime wrapped that after the fact.
+EchoChat Product Core as in the tree above. Vendored Dexie 4.0.10 (Apache-2.0).
 
-Landing is **intentionally** not on that pipeline. It must not init Dexie or `echodownload_*` keys. Sharing “product core” with `/` means shared brand and CTA, not a shared JS runtime.
+### Reference
+
+Chatbox CE, DeepSeek Harness, OpenAI Agents SDK, SillyTavern, TavernAI, LobeChat, LibreChat, Open WebUI, Letta, InternalBeyond.
+
+### Adapter
+
+- `src/adapters/provider/` — public info over EchoChat's own provider (no apiKey)
+- `src/adapters/ui/` — names EchoChat surfaces
+- `src/adapters/dsh/` — **Planned** seat; `createDshPluginRuntime()` throws. Not a DSH dependency
+
+SillyTavern **lorebook / character card JSON** is a data format EchoChat already imports. That is not a SillyTavern runtime.
+
+### Planned
+
+DSH / Cordis / marketplace / sandbox. Not scheduled as a base change.
 
 ---
 
-## Candidates
+## Candidates (rejected as a base)
 
-### A — EchoChat Product Core (chosen)
-
-**Base:** current zero-build PWA (`app/index.html` + `src/domain/` + Dexie + Morning Mint).
-
-| Keep | Replace | Migrate-in | Adapter |
-|------|---------|------------|---------|
-| Character, Conversation, Memory, Relationship, Worldbook, Moments, Lived Continuity | Nothing as a foreign base | None in this pass | Keep the existing in-process plugin hook only |
-
-**License:** PolyForm Noncommercial 1.0.0 (unchanged).
-
-**Cost:** low. Unify the turn path that already exists.
-
-**Risk:** dual persistence (Dexie + `echodownload_*`) remains; that is storage debt, not a reason to import Chatbox/IndexedDB from another app.
-
-**Gain:** one composition root; no GPL/AGPL relicensing; PWA and companion IA survive.
-
-### B — Chatbox Community Edition as base
-
-**Base:** Electron + React + TypeScript LLM client ([chatboxai/chatbox](https://github.com/chatboxai/chatbox)).
-
-Solves: generic conversation list, composer, multi-provider settings, desktop/mobile packaging.
-
-Does **not** solve: Character, Worldbook, Relationship, Moments, quiet memory, lived continuity, companion IA.
-
-**License:** GPLv3. Copying CE source into this repo while keeping PolyForm NC is not allowed. Adopting Chatbox as the real base would mean **relicensing EchoChat to GPL** and becoming a Chatbox fork. The public CE also lags the commercial app.
-
-**Cost:** rewrite packaging (npm, webpack, Electron). Throw away Morning Mint and zero-build PWA.
-
-**Verdict:** Candidate D in spirit — reference only. Wrong product shape. License change is not justified by a generic chat shell.
-
-### C — DeepSeek Harness / Cordis as base
-
-**Base:** MIT agent harness ([deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)). Everything is a plugin: session log, tools, sandbox, agent loop, LLM seam.
-
-Solves: plugin lifecycle, reversible effects, host/runtime separation — for **agents**.
-
-Does **not** solve: companion chat, character cards, relationship, PWA-without-Node.
-
-**License:** MIT (compatible). Still rejected: developer-preview APIs, Node/Electron profiles, sandboxes, tool loops. EchoChat is not an agent OS. Mounting DSH would replace the product with a Harness profile.
-
-**Verdict:** study only. `createDshPluginRuntime()` stays a throwing reserved seat.
-
-### D — Other mature projects
-
-| Project | License | Why not a base |
-|---------|---------|----------------|
-| SillyTavern | AGPL-3.0 | Closest *domain* (cards, World Info). Wrong UX (hobbyist kitchen sink), Node server, would force AGPL + kill Morning Mint. EchoChat already imports ST-format lorebooks. |
-| TavernAI 1.2.8 | MIT | Legacy ancestor of ST World Info. EchoChat worldbook already implements keyword + constant + depth + ST card import. Not worth vendoring 2022 jQuery UI. |
-| LobeChat | Apache / LobeHub Community (redistribution of modified derivatives restricted) | Next.js + Postgres agent client. Not a companion. Packaging explosion. |
-| LibreChat | MIT | MongoDB ChatGPT clone. |
+| Project | License vs PolyForm NC | Why not the base |
+|---------|------------------------|------------------|
+| Chatbox CE | GPLv3 — copyleft; cannot vendor into this repo | Generic LLM client. Wrong IA. Adopting it would relicense EchoChat to GPL and become a Chatbox fork. |
+| DeepSeek Harness | MIT (compatible) | Agent OS / Cordis / sandbox. EchoChat is a companion PWA, not a Harness profile. |
+| OpenAI Agents SDK (`openai-agents-js`) | MIT (compatible) | Multi-agent + tools + npm. Would replace companion domain with an agent loop. Zero-build PWA would be lost. |
+| SillyTavern | AGPL-3.0 | Closest *domain* (cards, World Info). Node kitchen-sink UX. AGPL would kill PolyForm NC. Format import already exists. |
+| LobeChat | Apache + community redistribution limits | Next.js + Postgres agent client. Not a companion. |
+| LibreChat | MIT | Server + Mongo ChatGPT clone. |
 | Open WebUI | BSD-derived with branding limits | RAG front-end, not companion. |
-| Letta / MemGPT | Apache-2.0 | Agent memory OS / MemFS. Server or coding-agent harness. Not a browser-local companion. |
-| InternalBeyond | PolyForm NC + CC BY-NC-SA assets | Atmosphere reference only. Not chat infrastructure. |
-| TavernDesk | MIT | Native Windows SQLite tavern. Not a PWA. |
+| Letta | Apache-2.0 | Server memory OS. Not browser-local companion. |
+| TavernAI 1.2.8 | MIT | Legacy jQuery ancestor. Worldbook already covers the needed subset. |
 
-No Candidate D project is a better **product base** than EchoChat itself.
-
----
-
-## What belongs in Product Core vs infrastructure
-
-**Product assets (keep, do not replace):**
-
-- Character schema and hub
-- Relationship affinity / events / brief
-- Memory retrieve + quiet lived facts
-- Worldbook semantics (global + character, ST-format import)
-- Moments
-- EchoChat prompt slot order (identity, scenario, examples, style, user persona, memories, relationship, gap-return)
-- Lived Continuity
-
-**Generic infrastructure (do not maintain a second copy *if* a compatible mature piece is better):**
-
-- Chat renderer, composer chrome, generic event bus, OpenAI-compatible SSE, Dexie wrapper
-
-Chatbox/LobeChat/LibreChat *do* have better generic chat clients — and they come with React, a bundler, and a different IA. EchoChat already has a working companion shell. Replacing it is a product rewrite, not a migration.
-
-Dexie is already the mature persistence library (Apache-2.0, vendored).
+Infrastructure we **already** took from a compatible mature library: **Dexie** (Apache-2.0, vendored). SSE line parsing follows eventsource-parser (MIT) as documented in `src/domain/sse-parse.js`. That is not a product-base swap.
 
 ---
 
-## Memory / Continuity
-
-Mature “memory OS” projects (Letta, LobeChat pgvector, Mem0) assume a server or an agent loop.
-
-EchoChat’s continuity is **character-scoped, local, quiet, and relationship-aware**. That pipeline already exists:
+## Code facts (2026-09-15)
 
 ```text
-user turn
-  → persist message
-  → quietRememberUserText
-  → retrieveMemoriesForTurn + relationship + worldbook + gap-return
-  → assembleTurnContext
-  → provider stream
-  → recordChatTurn
+main.js
+  → LocalPluginRuntime.start(builtinPlugins)
+  → domain chat / memory / worldbook / relations / provider / voice
+  → Dexie via repository hooks
+
+createDshPluginRuntime()  → throws (unused)
+Chatbox                    → no import
+OpenAI Agents SDK          → no import
+SillyTavern                → no runtime import (JSON format only)
 ```
 
-This pass makes `assembleTurnContext` the named composition root. It does **not** invent a new Memory UI or vendor Letta.
+---
+
+## License boundary
+
+EchoChat: **PolyForm Noncommercial 1.0.0**.
+
+GPL / AGPL source must not be copied here. MIT / Apache / BSD may be reused with notices. See [THIRD_PARTY_SOURCES.md](../../THIRD_PARTY_SOURCES.md).
 
 ---
 
-## Landing vs App
+## Remaining debt (not a reason to change base)
 
-```text
-/          marketing HTML (no storage init)
-/app/      only process that loads src/main.js
-             → domain turn context
-             → Dexie / echodownload_* keys
-```
-
-They share brand (Morning Mint, slogan, CTA). They do **not** share a JS runtime. Coupling Landing to Dexie would be a regression.
-
----
-
-## Storage
-
-No key or schema change in this pass.
-
-Frozen: `echodownload_*` localStorage keys, Dexie database `echochat`, blob db `echodownload_assets`. See [CURRENT_STATE.md](../CURRENT_STATE.md).
-
----
-
-## License / third-party boundary
-
-| Code in this repo from others | Status |
-|-------------------------------|--------|
-| Dexie 4.0.10 | Vendored, Apache-2.0, notices kept |
-| Chatbox | **No source copied** |
-| DSH / Cordis | **No source copied** |
-| SillyTavern | **No source copied** (ST *format* import already existed) |
-| LobeChat / LibreChat / Letta | **No source copied** |
-| InternalBeyond | **No source copied** |
-
-If a future task ever adopted a GPL/AGPL base, EchoChat would have to **relicense** — that would be an explicit product decision, not a silent vendor.
-
----
-
-## Remaining architecture debt
-
-1. Dual-write: in-memory `store.chats` vs Dexie message tables (compatibility, not a foreign-base problem)
-2. `src/main.js` is a large orchestrator (by design today)
-3. Plugin Runtime has no builtin plugins and must not grow a marketplace
-4. Worldbook stores ST fields (`regex`, `whole_word`, `secondary_keys`) that matching does not fully honor yet — complete against tests if evidence says users need it; do not copy SillyTavern AGPL
-5. First-session Memory is easy to miss in the UI (product gap, not missing infrastructure)
-
----
-
-## Next investment
-
-Make Memory / Continuity **visible after the first real chat**, on the existing domain. Do not start a Chatbox fork, DSH profile, or plugin OS.
+1. Message dual-write (store cache vs Dexie) is compatibility, not a missing foreign chat shell
+2. `src/main.js` is a large orchestrator by design
+3. Plugin layer must not grow into a marketplace or agent OS
+4. Firefox has no Web Speech STT; iOS installed-PWA recognition is unreliable

@@ -183,6 +183,8 @@ ol {
   .welcome-lead .lead-char,
   .welcome-screen h1,
   .welcome-actions,
+  .welcome-beats,
+  .msg-streaming .msg-bubble::after,
   .nav-rail-indicator,
   .bottom-nav-indicator,
   .typing-dot,

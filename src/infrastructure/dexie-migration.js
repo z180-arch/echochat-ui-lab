@@ -23,49 +23,7 @@
 import { legacyAdapter } from "../repository/legacy-adapter.js";
 import { dexieAdapter } from "./dexie-adapter.js";
 import { getDb, TABLES } from "./dexie-db.js";
-
-// ============================================================
-//  迁移状态标记（localStorage，小型数据）
-// ============================================================
-
-const MIGRATION_FLAG_KEY = "echodownload_dexie_migration";
-
-function getMigrationState() {
-  try {
-    return JSON.parse(localStorage.getItem(MIGRATION_FLAG_KEY)) || {};
-  } catch {
-    return {};
-  }
-}
-
-function setMigrationState(state) {
-  localStorage.setItem(MIGRATION_FLAG_KEY, JSON.stringify(state));
-}
-
-function isEntityMigrated(entityName) {
-  const state = getMigrationState();
-  return state[entityName]?.status === "completed";
-}
-
-function markEntityMigrated(entityName, stats = {}) {
-  const state = getMigrationState();
-  state[entityName] = {
-    status: "completed",
-    completedAt: Date.now(),
-    ...stats,
-  };
-  setMigrationState(state);
-}
-
-function markEntityFailed(entityName, error) {
-  const state = getMigrationState();
-  state[entityName] = {
-    status: "failed",
-    failedAt: Date.now(),
-    error: String(error),
-  };
-  setMigrationState(state);
-}
+import { isEntityMigrated, markEntityMigrated, markEntityFailed } from "./satellite-reconcile.js";
 
 // ============================================================
 //  数据转换函数
@@ -398,16 +356,8 @@ export async function migrateCharacters() {
  * Phase 7。当前只建立机制。
  */
 export async function migrateMemories() {
-  return migrateEntity(
-    "memories",
-    () => transformMemories(),
-    async (memories) => {
-      const db = await getDb();
-      await db.memories.bulkPut(memories);
-      return { memoryCount: memories.length };
-    },
-    (memories) => memories.every((m) => m.id && m.characterId && m.content)
-  );
+  const { hydrateMemories } = await import("../domain/memory.js");
+  return hydrateMemories();
 }
 
 /**
@@ -415,21 +365,8 @@ export async function migrateMemories() {
  * Phase 9。当前只建立机制。
  */
 export async function migrateRelationships() {
-  return migrateEntity(
-    "relationships",
-    () => transformRelationships(),
-    async ({ relationships, events }) => {
-      const db = await getDb();
-      await db.transaction("rw", db.relationships, db.relationship_events, async () => {
-        await db.relationships.bulkPut(relationships);
-        if (events.length > 0) {
-          await db.relationship_events.bulkPut(events);
-        }
-      });
-      return { relationshipCount: relationships.length, eventCount: events.length };
-    },
-    ({ relationships }) => relationships.every((r) => r.id && r.characterId)
-  );
+  const { hydrateRelations } = await import("../domain/relations.js");
+  return hydrateRelations();
 }
 
 /**
@@ -437,30 +374,8 @@ export async function migrateRelationships() {
  * Phase 11。当前只建立机制。
  */
 export async function migrateMoments() {
-  return migrateEntity(
-    "moments",
-    () => transformMoments(),
-    async ({ moments, comments, reactions }) => {
-      const db = await getDb();
-      await db.transaction(
-        "rw",
-        db.moments,
-        db.moment_comments,
-        db.moment_reactions,
-        async () => {
-          await db.moments.bulkPut(moments);
-          if (comments.length > 0) await db.moment_comments.bulkPut(comments);
-          if (reactions.length > 0) await db.moment_reactions.bulkPut(reactions);
-        }
-      );
-      return {
-        momentCount: moments.length,
-        commentCount: comments.length,
-        reactionCount: reactions.length,
-      };
-    },
-    ({ moments }) => moments.every((m) => m.id && m.characterId)
-  );
+  const { hydrateMoments } = await import("../domain/moments.js");
+  return hydrateMoments();
 }
 
 /**
@@ -468,19 +383,8 @@ export async function migrateMoments() {
  * Phase 8。当前只建立机制。
  */
 export async function migrateWorldbook() {
-  return migrateEntity(
-    "worldbook",
-    () => transformWorldbook(),
-    async ({ books, entries }) => {
-      const db = await getDb();
-      await db.transaction("rw", db.worldbook_books, db.worldbook_entries, async () => {
-        await db.worldbook_books.bulkPut(books);
-        if (entries.length > 0) await db.worldbook_entries.bulkPut(entries);
-      });
-      return { bookCount: books.length, entryCount: entries.length };
-    },
-    ({ books }) => books.every((b) => b.id && b.name)
-  );
+  const { hydrateWorldbook } = await import("../domain/worldbook.js");
+  return hydrateWorldbook();
 }
 
 // ============================================================

@@ -126,3 +126,28 @@ function reviewMarkup(draft, error) {
     `,
   };
 }
+
+export function importProgressMarkup({ done = 0, total = 0, percent = 0, error = "" } = {}) {
+  const safeTotal = Math.max(0, Number(total) || 0);
+  const safeDone = Math.min(Math.max(0, Number(done) || 0), safeTotal);
+  const pct = Math.max(0, Math.min(100, Number(percent) || (safeTotal ? Math.round((safeDone / safeTotal) * 100) : 0)));
+  return {
+    title: "正在写入聊天记录",
+    width: "400px",
+    content: `
+      <div class="import-progress" data-state="${error ? "error" : "loading"}">
+        <div class="import-progress-copy">
+          <strong>${safeDone.toLocaleString()} / ${safeTotal.toLocaleString()}</strong>
+          <span>${pct}%</span>
+        </div>
+        <div class="import-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}">
+          <div class="import-progress-fill" style="width:${pct}%"></div>
+        </div>
+        ${error ? `<p class="import-progress-error">${esc(error)}</p>` : `<p class="profile-muted">写入本机数据库。可取消；失败不会留下半截记录。</p>`}
+      </div>
+    `,
+    footer: error
+      ? `<button type="button" class="btn btn-primary" onclick="this.closest('.modal-overlay').remove()">知道了</button>`
+      : `<button type="button" class="btn btn-ghost import-progress-cancel" onclick="window.EchoApp.cancelBulkImport()">取消</button>`,
+  };
+}

@@ -15,6 +15,7 @@
  */
 
 import { getDb, TABLES } from "./dexie-db.js";
+import { Dexie } from "./vendor/dexie.mjs";
 
 // ============================================================
 //  通用 CRUD 辅助函数
@@ -47,6 +48,20 @@ async function bulkPut(name, records) {
   return records;
 }
 
+function normalizeMessageRecords(messages) {
+  return (messages || []).map((m) => ({
+    id: m.id || `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    conversationId: m.conversationId,
+    parentMessageId: m.parentMessageId || null,
+    role: m.role,
+    content: m.content,
+    createdAt: m.createdAt || Date.now(),
+    updatedAt: m.updatedAt || Date.now(),
+    status: m.status || "sent",
+    metadata: m.metadata || {},
+  }));
+}
+
 async function remove(name, id) {
   const t = await table(name);
   await t.delete(id);
@@ -66,40 +81,83 @@ export const dexieMessageAdapter = {
     return getById(TABLES.MESSAGES, id);
   },
 
+  /**
+   * Keyset tail read on [conversationId+createdAt].
+   * Does not load the whole conversation into JS.
+   */
+  async findTail(conversationId, options = {}) {
+    const limit = Math.max(1, Number(options.limit) || 80);
+    const before = options.before;
+    const beforeId = options.beforeId;
+    const t = await table(TABLES.MESSAGES);
+    const upper = before != null ? before : Dexie.maxKey;
+    const includeUpper = before == null;
+    let rows = await t
+      .where("[conversationId+createdAt]")
+      .between([conversationId, Dexie.minKey], [conversationId, upper], true, includeUpper)
+      .reverse()
+      .limit(beforeId ? limit + 8 : limit)
+      .toArray();
+    if (beforeId) rows = rows.filter((m) => m.id !== beforeId);
+    if (rows.length > limit) rows = rows.slice(0, limit);
+    rows.reverse();
+    return rows;
+  },
+
   async findByConversationId(conversationId, options = {}) {
     const { page = 1, pageSize = 50, before, after } = options;
     const t = await table(TABLES.MESSAGES);
+    const total = await t.where("conversationId").equals(conversationId).count();
 
-    let coll = t.where("conversationId").equals(conversationId);
-
-    if (before) {
-      coll = coll.and((m) => m.createdAt < before);
-    }
-    if (after) {
-      coll = coll.and((m) => m.createdAt > after);
-    }
-
-    const total = await coll.count();
-    const chronological = await coll.sortBy("createdAt");
-    if (page === 1 && pageSize >= total) {
+    if (after != null) {
+      const chronological = await t
+        .where("[conversationId+createdAt]")
+        .between([conversationId, after], [conversationId, Dexie.maxKey], false, true)
+        .toArray();
+      const start = (page - 1) * pageSize;
+      const items = chronological.slice(start, start + pageSize);
       return {
-        items: chronological,
+        items,
+        total: chronological.length,
+        page,
+        pageSize,
+        hasMore: start + pageSize < chronological.length,
+      };
+    }
+
+    if (page === 1 && (!pageSize || pageSize >= total) && before == null) {
+      const items = await t
+        .where("[conversationId+createdAt]")
+        .between([conversationId, Dexie.minKey], [conversationId, Dexie.maxKey])
+        .toArray();
+      return { items, total, page, pageSize: pageSize || total || 50, hasMore: false };
+    }
+
+    const newest = await this.findTail(conversationId, {
+      limit: pageSize,
+      before,
+    });
+    if (page > 1 && !before) {
+      const skip = (page - 1) * pageSize;
+      const more = await this.findTail(conversationId, {
+        limit: skip + pageSize,
+      });
+      const slice = more.slice(0, Math.max(0, more.length - skip));
+      return {
+        items: slice.slice(-pageSize),
         total,
         page,
         pageSize,
-        hasMore: false,
+        hasMore: skip + pageSize < total,
       };
     }
-    const newestFirst = chronological.slice().reverse();
-    const start = (page - 1) * pageSize;
-    const items = newestFirst.slice(start, start + pageSize).reverse();
 
     return {
-      items,
+      items: newest,
       total,
       page,
       pageSize,
-      hasMore: start + pageSize < total,
+      hasMore: (before != null && newest.length >= pageSize) || page * pageSize < total,
     };
   },
 
@@ -144,13 +202,8 @@ export const dexieMessageAdapter = {
   },
 
   async findLatest(conversationId) {
-    const t = await table(TABLES.MESSAGES);
-    const msgs = await t
-      .where("conversationId")
-      .equals(conversationId)
-      .reverse()
-      .sortBy("createdAt");
-    return msgs[0] || null;
+    const rows = await this.findTail(conversationId, { limit: 1 });
+    return rows[0] || null;
   },
 
   async findBranches(parentMessageId) {
@@ -158,19 +211,60 @@ export const dexieMessageAdapter = {
     return t.where("parentMessageId").equals(parentMessageId).toArray();
   },
 
-  async bulkCreate(messages) {
-    const records = messages.map((m) => ({
-      id: m.id || `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      conversationId: m.conversationId,
-      parentMessageId: m.parentMessageId || null,
-      role: m.role,
-      content: m.content,
-      createdAt: m.createdAt || Date.now(),
-      updatedAt: m.updatedAt || Date.now(),
-      status: m.status || "sent",
-      metadata: m.metadata || {},
-    }));
-    await bulkPut(TABLES.MESSAGES, records);
+  async bulkCreate(messages, options = {}) {
+    const records = normalizeMessageRecords(messages);
+    if (!records.length) return records;
+    const mode = options.mode === "put" ? "put" : "add";
+    const t = await table(TABLES.MESSAGES);
+    if (mode === "put") await t.bulkPut(records);
+    else {
+      try {
+        await t.bulkAdd(records);
+      } catch {
+        await t.bulkPut(records);
+      }
+    }
+    return records;
+  },
+
+  /**
+   * Chunked bulk write with progress + abort. Caller rolls back the
+   * conversation on failure — this method does not delete leftovers.
+   */
+  async bulkCreateChunked(messages, options = {}) {
+    const records = normalizeMessageRecords(messages);
+    const total = records.length;
+    if (!total) return records;
+    const chunkSize = Math.max(1, Number(options.chunkSize) || 5000);
+    const mode = options.mode === "put" ? "put" : "add";
+    const signal = options.signal;
+    const onProgress = options.onProgress;
+    const db = await getDb();
+    const write = (chunk) => (mode === "put" ? db.messages.bulkPut(chunk) : db.messages.bulkAdd(chunk));
+    const abortIfNeeded = () => {
+      if (!signal?.aborted) return;
+      const err = new Error("aborted");
+      err.name = "AbortError";
+      throw err;
+    };
+    abortIfNeeded();
+    if (!signal) {
+      await write(records);
+      onProgress?.({ done: total, total, percent: 100 });
+      return records;
+    }
+    await db.transaction("rw", db.messages, async () => {
+      for (let i = 0; i < total; i += chunkSize) {
+        abortIfNeeded();
+        await write(records.slice(i, i + chunkSize));
+        const done = Math.min(i + chunkSize, total);
+        onProgress?.({
+          done,
+          total,
+          percent: total ? Math.round((done / total) * 100) : 100,
+        });
+      }
+    });
     return records;
   },
 
@@ -308,6 +402,11 @@ export const dexieCharacterAdapter = {
   },
 
   async permanentDelete(id) {
+    const convs = await dexieConversationAdapter.findByCharacterId(id).catch(() => []);
+    for (const conv of convs || []) {
+      await dexieMessageAdapter.deleteByConversationId(conv.id).catch(() => {});
+      await dexieConversationAdapter.delete(conv.id).catch(() => {});
+    }
     await remove(TABLES.CHARACTERS, id);
   },
 };
@@ -386,6 +485,20 @@ export const dexieMemoryAdapter = {
     const t = await table(TABLES.MEMORIES);
     return t.where("characterId").equals(characterId).count();
   },
+
+  async findAllRecords() {
+    return getAll(TABLES.MEMORIES);
+  },
+
+  async replaceAll(records) {
+    const db = await getDb();
+    const rows = Array.isArray(records) ? records : [];
+    await db.transaction("rw", db.memories, async () => {
+      await db.memories.clear();
+      if (rows.length) await db.memories.bulkPut(rows);
+    });
+    return rows;
+  },
 };
 
 // ============================================================
@@ -443,6 +556,20 @@ export const dexieRelationshipAdapter = {
       affinity: 0, trust: 0, familiarity: 0, intimacy: 0, tension: 0,
       interactionFrequency: 0, streakDays: 0,
     });
+  },
+
+  async loadSnapshot() {
+    return getAll(TABLES.RELATIONSHIPS);
+  },
+
+  async replaceSnapshot(rows) {
+    const db = await getDb();
+    const list = Array.isArray(rows) ? rows : [];
+    await db.transaction("rw", db.relationships, async () => {
+      await db.relationships.clear();
+      if (list.length) await db.relationships.bulkPut(list);
+    });
+    return list;
   },
 };
 
@@ -550,6 +677,20 @@ export const dexieMomentAdapter = {
 
   async delete(id) {
     await remove(TABLES.MOMENTS, id);
+  },
+
+  async findAllRecords() {
+    return getAll(TABLES.MOMENTS);
+  },
+
+  async replaceAll(records) {
+    const db = await getDb();
+    const rows = Array.isArray(records) ? records : [];
+    await db.transaction("rw", db.moments, async () => {
+      await db.moments.clear();
+      if (rows.length) await db.moments.bulkPut(rows);
+    });
+    return rows;
   },
 };
 
@@ -702,6 +843,25 @@ export const dexieWorldbookAdapter = {
 
   async deleteEntry(bookId, entryId) {
     await remove(TABLES.WORLDBOOK_ENTRIES, entryId);
+  },
+
+  async loadSnapshot() {
+    const books = await getAll(TABLES.WORLDBOOK_BOOKS);
+    const entries = await getAll(TABLES.WORLDBOOK_ENTRIES);
+    return { books, entries };
+  },
+
+  async replaceSnapshot({ books, entries } = {}) {
+    const db = await getDb();
+    const bookRows = Array.isArray(books) ? books : [];
+    const entryRows = Array.isArray(entries) ? entries : [];
+    await db.transaction("rw", db.worldbook_books, db.worldbook_entries, async () => {
+      await db.worldbook_books.clear();
+      await db.worldbook_entries.clear();
+      if (bookRows.length) await db.worldbook_books.bulkPut(bookRows);
+      if (entryRows.length) await db.worldbook_entries.bulkPut(entryRows);
+    });
+    return { books: bookRows, entries: entryRows };
   },
 
   async matchEntries(characterId, text) {

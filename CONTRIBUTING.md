@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-EchoChat Lite 处于活跃开发。当前状态：[`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md)。
+EchoChat 是冻结底座上的 companion PWA。当前状态：[`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md)。不要把应用迁到 agent / chat-client 框架上。不要改 Morning Mint 壳层，除非任务明确要求。
 
 提交贡献前请理解：
 

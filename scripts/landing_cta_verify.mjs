@@ -142,10 +142,13 @@ try {
     if (ready) break;
     await sleep(200);
   }
-  const dest = await evalExpr(send, `({ href: location.href, app: !!window.EchoApp, errors: (window.__errors || []).length })`);
+  const dest = await evalExpr(
+    send,
+    `({ href: location.href, app: !!window.EchoApp, errors: (window.__errors || []).length, detail: window.__errors || [] })`
+  );
   record("CTA → /app/", /\/app\//.test(dest.href) ? "PASS" : "FAIL", dest.href);
   record("app boot", dest.app ? "PASS" : "FAIL");
-  record("app console", dest.errors === 0 ? "PASS" : "FAIL", String(dest.errors));
+  record("app console", dest.errors === 0 ? "PASS" : "FAIL", dest.errors ? JSON.stringify(dest.detail) : "0");
   ws.close();
 } finally {
   chrome.kill();

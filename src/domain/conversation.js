@@ -20,17 +20,37 @@ import { getRoleId, getPersona, getRoleName } from "./persona.js";
 import { messageStore } from "./message-store.js";
 import { ConversationRepository } from "../repository/conversation.js";
 import { getStorageHooks } from "../repository/test-hooks.js";
+import { deleteMomentsForChat } from "./moments.js";
 
 // ============================================================
 //  创建 Conversation
 // ============================================================
 
+export function getThreadTitle(chat, siblings) {
+  if (!chat) return "日常相处";
+  const custom = String(chat.config?.threadTitle || "").trim();
+  if (custom) return custom;
+  const list = (siblings || getConversationsByCharacter(chat.roleId || ""))
+    .filter((c) => !c.archivedAt)
+    .slice()
+    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0) || String(a.id).localeCompare(String(b.id)));
+  if (list.length <= 1) return "日常相处";
+  const idx = Math.max(0, list.findIndex((c) => c.id === chat.id));
+  return idx <= 0 ? "日常相处" : `相处线 ${idx + 1}`;
+}
+
+export function nextThreadTitle(characterId) {
+  const n = getConversationsByCharacter(characterId).filter((c) => !c.archivedAt).length + 1;
+  return `相处线 ${n}`;
+}
+
 /**
  * 为指定 Character 创建新的 Conversation
  * @param {string} characterId - 角色 ID（roleId）
  * @param {Object} [config] - 会话配置
- * @param {string} [config.title] - 会话标题
- * @param {Object} [config.persona] - 覆盖角色人设
+ * @param {string} [config.title] - 相处线标题（不覆盖角色名）
+ * @param {string} [config.threadTitle] - 相处线标题
+ * @param {string} [config.persona] - 覆盖角色人设
  * @param {string} [config.model] - AI 模型
  * @param {number} [config.temperature] - 温度
  * @returns {Object} 创建的 chat
@@ -38,19 +58,27 @@ import { getStorageHooks } from "../repository/test-hooks.js";
 export function createConversationForCharacter(characterId, config = {}) {
   // 查找已有角色的配置
   const existingChat = store.getState().chats.find((c) => c.roleId === characterId);
-  const basePersona = config.persona || (existingChat?.config?.persona) || "";
+  const basePersona = config.persona || existingChat?.config?.persona || "";
   const baseAvatar = config.avatar || existingChat?.avatar || "";
-  const baseName = config.name || existingChat?.name || "新对话";
+  const characterName = config.name || existingChat?.name || "新对话";
+  const baseCfg = existingChat?.config || {};
+  const explicitTitle = String(config.threadTitle || config.title || "").trim();
+  const threadTitle =
+    explicitTitle && explicitTitle !== characterName ? explicitTitle.slice(0, 40) : String(config.threadTitle || "").trim().slice(0, 40);
 
   const chat = store.createChat({
     roleId: characterId, // 复用已有角色 ID
-    name: config.title || baseName,
+    name: characterName,
     avatar: baseAvatar,
     persona: basePersona,
-    model: config.model || existingChat?.config?.model || "",
-    temperature: config.temperature ?? existingChat?.config?.temperature ?? 1.0,
+    model: config.model || baseCfg.model || "",
+    temperature: config.temperature ?? baseCfg.temperature ?? 1.0,
     firstMessage: config.firstMessage || "",
-    replyPace: config.replyPace || existingChat?.config?.replyPace,
+    scenario: config.scenario || baseCfg.scenario || "",
+    mesExample: config.mesExample || baseCfg.mesExample || "",
+    speakingStyle: config.speakingStyle || baseCfg.speakingStyle || "",
+    replyPace: config.replyPace || baseCfg.replyPace,
+    threadTitle,
   });
 
   ConversationRepository.create({
@@ -132,9 +160,18 @@ export function getAllCharacters() {
  * @param {string} newName
  */
 export function renameConversation(chatId, newName) {
-  store.updateChat(chatId, { name: newName });
-  ConversationRepository.update(chatId, { title: newName }).catch(() => {});
-  events.emit(EVT.TOAST, { message: "对话已重命名", type: "success" });
+  const title = String(newName || "").trim().slice(0, 40);
+  if (!title) {
+    events.emit(EVT.TOAST, { message: "先写个名字", type: "warning" });
+    return false;
+  }
+  const chat = store.getState().chats.find((c) => c.id === chatId);
+  if (!chat) return false;
+  const config = { ...(chat.config || {}), threadTitle: title };
+  store.updateChat(chatId, { config });
+  ConversationRepository.update(chatId, { config }).catch(() => {});
+  events.emit(EVT.TOAST, { message: "相处线已改名", type: "success" });
+  return true;
 }
 
 /**
@@ -206,21 +243,18 @@ export function searchConversations(query) {
  * @param {boolean} [confirm=false] - 是否需要确认
  */
 export async function deleteConversation(chatId, confirm = false) {
+  void confirm;
   const chat = store.getState().chats.find((c) => c.id === chatId);
-  if (!chat) {
-    await ConversationRepository.delete(chatId);
-    events.emit(EVT.CHAT_DELETED, chatId);
-    return;
+  if (chat) {
+    const remaining = store.getState().chats.filter((c) => c.roleId === chat.roleId && c.id !== chatId);
+    if (remaining.length === 0) {
+      console.log(`[Conversation] Deleting last conversation for character ${chat.roleId}`);
+    }
+    await messageStore.deleteAllMessages(chatId);
+    deleteMomentsForChat(chatId);
   }
-
-  const remaining = store.getState().chats.filter((c) => c.roleId === chat.roleId && c.id !== chatId);
-  if (remaining.length === 0) {
-    console.log(`[Conversation] Deleting last conversation for character ${chat.roleId}`);
-  }
-
-  await messageStore.deleteAllMessages(chatId);
   await ConversationRepository.delete(chatId);
-  events.emit(EVT.CHAT_DELETED, chatId);
+  store.deleteChat(chatId);
 }
 
 /**
@@ -329,6 +363,8 @@ export const Conversation = {
   createCharacterAndConversation,
   getConversationsByCharacter,
   getAllCharacters,
+  getThreadTitle,
+  nextThreadTitle,
   renameConversation,
   archiveConversation,
   unarchiveConversation,

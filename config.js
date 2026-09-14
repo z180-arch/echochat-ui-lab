@@ -105,6 +105,21 @@ window.ECHOCHAT_CONFIG = {
       note: "聚合多家模型；免费档带 :free 后缀。默认 Gemma 4 26B MoE 免费版，可在模型名里换其他免费模型。国内需翻墙。",
     },
     {
+      id: "qwen",
+      name: "Qwen 通义（兼容接口）",
+      tag: "国内·OpenAI 兼容",
+      baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      model: "qwen-plus",
+      apiKey: "",
+      keyUrl: "https://bailian.console.aliyun.com/",
+      keySteps: [
+        "打开阿里云百炼控制台并登录",
+        "创建 API Key",
+        "粘贴到下方 API Key 输入框",
+      ],
+      note: "DashScope OpenAI 兼容模式。也可在自定义里填其他 Qwen 兼容地址。",
+    },
+    {
       id: "deepseek",
       name: "DeepSeek",
       tag: "付费·便宜·质量高",

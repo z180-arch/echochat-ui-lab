@@ -302,7 +302,7 @@ async function runWidth(send, width, expect) {
   );
   record(
     `${width} · me section titles`,
-    me.titles.includes("连接") && me.titles.includes("体验") && me.titles.includes("数据") && me.titles.includes("高级") ? "PASS" : "FAIL",
+    me.titles.includes("对话") && me.titles.includes("体验") && me.titles.includes("数据") && me.titles.includes("高级") ? "PASS" : "FAIL",
     me.titles.join(",")
   );
 

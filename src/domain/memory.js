@@ -1,6 +1,9 @@
 // ============================================================
 //  EchoChat Rebuild · Long-term Memory
 //  长期记忆管理 + 自动摘要 + 记忆注入
+//  Persist: Dexie `memories` via bulkPut + satellite-reconcile
+//  (same crash-safe detect/merge/write/verify/mark as other satellites).
+//  Retrieval / quiet remember / prompt header are unchanged.
 // ============================================================
 
 import { store } from "../core/store.js";
@@ -9,12 +12,187 @@ import { uid } from "../core/utils.js";
 import { getRoleId, getPersona, getRoleName } from "./persona.js";
 import { chatCompletion } from "./provider.js";
 import { peekMessages } from "./message-store.js";
+import { getStorageHooks } from "../repository/test-hooks.js";
+import {
+  isEntityMigrated,
+  reconcileAndCommit,
+  markEntityFailed,
+  mergeById,
+} from "../infrastructure/satellite-reconcile.js";
 
+const ENTITY = "memories";
+let cache = {};
+let persistChain = Promise.resolve();
+let usingCanonical = false;
+let mutationGen = 0;
+let persistGen = 0;
 let summaryRunning = false;
 
+function emptyBucket() {
+  return { roleName: "", memories: [] };
+}
+
+function normalizeMemory(partial, roleId) {
+  const p = partial || {};
+  return {
+    id: p.id || uid(),
+    content: String(p.content || "").trim(),
+    importance: Number(p.importance) || 5,
+    createdAt: Number(p.createdAt) || Date.now(),
+    source: p.source || "auto",
+    characterId: roleId || p.characterId || p.roleId || "",
+    roleName: p.roleName || "",
+  };
+}
+
+function flattenSnapshot(snap) {
+  const items = [];
+  for (const [roleId, bucket] of Object.entries(snap || {})) {
+    if (!roleId || !bucket || !Array.isArray(bucket.memories)) continue;
+    for (const m of bucket.memories) {
+      const n = normalizeMemory({ ...m, roleName: bucket.roleName }, roleId);
+      if (!n.id || !n.content || !n.characterId) continue;
+      items.push(n);
+    }
+  }
+  return items;
+}
+
+function groupSnapshot(items) {
+  const snap = {};
+  for (const m of items || []) {
+    const roleId = m.characterId || m.roleId;
+    if (!roleId) continue;
+    if (!snap[roleId]) snap[roleId] = { roleName: m.roleName || "", memories: [] };
+    if (m.roleName && !snap[roleId].roleName) snap[roleId].roleName = m.roleName;
+    snap[roleId].memories.push({
+      id: m.id,
+      content: m.content,
+      importance: m.importance,
+      createdAt: m.createdAt,
+      source: m.source,
+    });
+  }
+  return snap;
+}
+
+function toDexieMemory(m) {
+  const n = normalizeMemory(m, m.characterId);
+  return {
+    id: n.id,
+    characterId: n.characterId,
+    type: "long_term",
+    content: n.content,
+    importance: n.importance,
+    source: n.source,
+    confidence: 1,
+    tags: [],
+    roleName: n.roleName || "",
+    createdAt: n.createdAt,
+    updatedAt: n.createdAt,
+  };
+}
+
+function fromDexieMemory(row) {
+  if (!row) return null;
+  return normalizeMemory(
+    {
+      id: row.id,
+      content: row.content,
+      importance: row.importance,
+      createdAt: row.createdAt,
+      source: row.source,
+      roleName: row.roleName,
+    },
+    row.characterId
+  );
+}
+
+function parseLegacyMemories() {
+  try {
+    return groupSnapshot(flattenSnapshot(store.getState().longTermMemory || {}));
+  } catch {
+    return {};
+  }
+}
+
+async function canonicalAvailable() {
+  try {
+    const hooks = getStorageHooks();
+    return !!(hooks.memory && typeof hooks.memory.findAllRecords === "function" && (await hooks.isAvailable()));
+  } catch {
+    return false;
+  }
+}
+
+async function loadCanonicalMemories() {
+  const rows = await getStorageHooks().memory.findAllRecords();
+  return (rows || []).map(fromDexieMemory).filter((m) => m && m.id && m.characterId && m.content);
+}
+
+async function replaceCanonicalMemories(items) {
+  await getStorageHooks().memory.replaceAll((items || []).map(toDexieMemory));
+}
+
+async function flushPersist() {
+  const gen = persistGen;
+  const items = flattenSnapshot(cache);
+  if (await canonicalAvailable()) {
+    if (gen !== persistGen) return;
+    await replaceCanonicalMemories(items);
+    if (gen !== persistGen) return;
+    usingCanonical = true;
+  }
+}
+
+function schedulePersist() {
+  persistChain = persistChain.then(flushPersist).catch((err) => {
+    console.warn("[memory] persist failed:", err && err.message ? err.message : err);
+  });
+  return persistChain;
+}
+
+function writeSnapshot(snap) {
+  cache = snap || {};
+  mutationGen += 1;
+  if (usingCanonical) schedulePersist();
+  else {
+    store.set((s) => ({ ...s, longTermMemory: { ...cache } }));
+  }
+}
+
+function writeRole(roleId, bucket) {
+  const next = { ...exportMemorySnapshot(), [roleId]: bucket };
+  writeSnapshot(next);
+}
+
+export function exportMemorySnapshot() {
+  if (usingCanonical) return JSON.parse(JSON.stringify(cache));
+  return JSON.parse(JSON.stringify(store.getState().longTermMemory || {}));
+}
+
+export function replaceMemorySnapshot(snap, mode = "replace") {
+  const incoming = snap && typeof snap === "object" ? snap : {};
+  if (mode === "merge") {
+    const cur = exportMemorySnapshot();
+    const merged = groupSnapshot(mergeById(flattenSnapshot(cur), flattenSnapshot(incoming)));
+    writeSnapshot(merged);
+    return merged;
+  }
+  writeSnapshot(groupSnapshot(flattenSnapshot(incoming)));
+  return exportMemorySnapshot();
+}
+
+export function loadMemories() {
+  if (usingCanonical) return cache;
+  return parseLegacyMemories();
+}
+
 export function getMemory(roleId) {
-  const s = store.getState();
-  return s.longTermMemory[roleId] || { roleName: "", memories: [] };
+  if (!roleId) return emptyBucket();
+  if (usingCanonical) return cache[roleId] || emptyBucket();
+  const fromStore = store.getState().longTermMemory[roleId];
+  return fromStore && Array.isArray(fromStore.memories) ? fromStore : emptyBucket();
 }
 
 export function getMemoryList(roleId, limit) {
@@ -26,41 +204,86 @@ export function getMemoryList(roleId, limit) {
 export function addMemory(roleId, content, importance = 5, source = "auto") {
   if (!roleId || !content?.trim()) return null;
   const mem = { id: uid(), content: content.trim(), importance, createdAt: Date.now(), source };
-  store.set((s) => {
-    const existing = s.longTermMemory[roleId] || { roleName: "", memories: [] };
-    const memories = [...existing.memories, mem].slice(-s.memoryCfg.maxPerRole);
-    return {
-      ...s,
-      longTermMemory: { ...s.longTermMemory, [roleId]: { ...existing, memories } },
-    };
-  });
+  const existing = getMemory(roleId);
+  const maxPerRole = store.getState().memoryCfg.maxPerRole;
+  const memories = [...existing.memories, mem].slice(-maxPerRole);
+  writeRole(roleId, { ...existing, memories });
   events.emit(EVT.MEMORY_ADDED, { roleId, memory: mem });
   return mem;
 }
 
 export function deleteMemory(roleId, memoryId) {
-  store.set((s) => {
-    const existing = s.longTermMemory[roleId];
-    if (!existing) return s;
-    return {
-      ...s,
-      longTermMemory: {
-        ...s.longTermMemory,
-        [roleId]: { ...existing, memories: existing.memories.filter((m) => m.id !== memoryId) },
-      },
-    };
+  const existing = getMemory(roleId);
+  if (!existing.memories.some((m) => m.id === memoryId)) return;
+  writeRole(roleId, {
+    ...existing,
+    memories: existing.memories.filter((m) => m.id !== memoryId),
   });
 }
 
 export function clearMemory(roleId) {
+  if (!roleId) return;
+  if (usingCanonical) {
+    if (!cache[roleId]) return;
+    const next = { ...cache };
+    delete next[roleId];
+    writeSnapshot(next);
+    return;
+  }
+  const existing = store.getState().longTermMemory[roleId];
+  if (!existing) return;
   store.set((s) => {
-    const existing = s.longTermMemory[roleId];
-    if (!existing) return s;
-    return {
-      ...s,
-      longTermMemory: { ...s.longTermMemory, [roleId]: { ...existing, memories: [] } },
-    };
+    const all = { ...s.longTermMemory };
+    delete all[roleId];
+    return { ...s, longTermMemory: all };
   });
+}
+
+export function resetMemoriesRuntime() {
+  cache = {};
+  usingCanonical = false;
+  mutationGen = 0;
+  persistGen += 1;
+  persistChain = Promise.resolve();
+}
+
+export function flushMemoriesPersist() {
+  return persistChain;
+}
+
+export async function hydrateMemories() {
+  const startGen = mutationGen;
+  const legacy = flattenSnapshot(parseLegacyMemories());
+  if (!(await canonicalAvailable())) {
+    cache = groupSnapshot(legacy);
+    usingCanonical = false;
+    return { reason: "no-dexie", count: legacy.length, wrote: false };
+  }
+  try {
+    const canonical = await loadCanonicalMemories();
+    const result = await reconcileAndCommit({
+      entityName: ENTITY,
+      canonicalItems: canonical,
+      legacyItems: legacy,
+      completed: isEntityMigrated(ENTITY),
+      replaceCanonical: replaceCanonicalMemories,
+      loadCanonical: loadCanonicalMemories,
+    });
+    let items = result.items;
+    if (mutationGen !== startGen) {
+      items = mergeById(items, flattenSnapshot(cache));
+      await replaceCanonicalMemories(items);
+    }
+    cache = groupSnapshot(items);
+    usingCanonical = true;
+    return { ...result, count: items.length };
+  } catch (e) {
+    markEntityFailed(ENTITY, e);
+    console.warn("[memory] hydrate failed:", e && e.message ? e.message : e);
+    cache = groupSnapshot(legacy);
+    usingCanonical = false;
+    return { reason: "failed", error: String(e && e.message ? e.message : e), wrote: false };
+  }
 }
 
 export function searchMemories(roleId, query) {
@@ -248,28 +471,19 @@ export function noteRetrieveChat(chatId) {
 }
 
 export function updateMemoryImportance(roleId, memoryId, importance) {
-  store.set((s) => {
-    const existing = s.longTermMemory[roleId];
-    if (!existing) return s;
-    return {
-      ...s,
-      longTermMemory: {
-        ...s.longTermMemory,
-        [roleId]: {
-          ...existing,
-          memories: existing.memories.map((m) => (m.id === memoryId ? { ...m, importance } : m)),
-        },
-      },
-    };
+  const existing = getMemory(roleId);
+  if (!existing.memories.some((m) => m.id === memoryId)) return;
+  writeRole(roleId, {
+    ...existing,
+    memories: existing.memories.map((m) => (m.id === memoryId ? { ...m, importance } : m)),
   });
 }
 
 // 构建记忆注入文本
 export function buildMemoryBlock(roleId) {
-  const s = store.getState();
-  const mem = s.longTermMemory[roleId];
+  const mem = getMemory(roleId);
   if (!mem || !mem.memories.length) return null;
-  const injectMax = s.memoryCfg.injectMax || 10;
+  const injectMax = store.getState().memoryCfg.injectMax || 10;
   const top = mem.memories
     .slice()
     .sort((a, b) => b.importance - a.importance || b.createdAt - a.createdAt)
@@ -345,6 +559,11 @@ export const Memory = {
   buildMemoryBlock,
   rememberMessage,
   maybeAutoSummary,
+  hydrateMemories,
+  resetMemoriesRuntime,
+  flushMemoriesPersist,
+  exportMemorySnapshot,
+  replaceMemorySnapshot,
   applyAutoSummaryResult: async (roleId, raw, options) => {
     const { applyAutoSummaryResult } = await import("./memory-candidates.js");
     return applyAutoSummaryResult(roleId, raw, options);

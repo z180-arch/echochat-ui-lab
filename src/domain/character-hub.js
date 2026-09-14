@@ -5,7 +5,7 @@
 
 import { store } from "../core/store.js";
 import { getLastMessagePreview } from "./message-store.js";
-import { createConversationForCharacter, getConversationsByCharacter } from "./conversation.js";
+import { createConversationForCharacter, getConversationsByCharacter, getThreadTitle, nextThreadTitle } from "./conversation.js";
 import { getCharacterById } from "./character.js";
 
 const DEFAULT_AVATAR = "assets/avatars/default.svg";
@@ -59,12 +59,14 @@ export function listCharactersForHub() {
 }
 
 export function listActiveConversations(characterId) {
-  return getConversationsByCharacter(characterId)
+  const all = getConversationsByCharacter(characterId);
+  return all
     .filter((c) => !c.archivedAt)
     .map((c) => {
       const preview = getLastMessagePreview(c.id);
       return {
         ...c,
+        threadTitle: getThreadTitle(c, all),
         lastPreview: preview?.text || "",
         lastAt: preview?.time || c.createdAt || 0,
       };
@@ -84,6 +86,15 @@ export function continueCharacter(characterId) {
   return chat;
 }
 
+function slotText(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "object") {
+    return String(value.notes || value.text || value.style || value.description || "").trim();
+  }
+  return String(value).trim();
+}
+
 export async function startConversationForCharacter(characterId) {
   const char = await getCharacterById(characterId);
   const existing = getConversationsByCharacter(characterId)[0];
@@ -95,8 +106,12 @@ export async function startConversationForCharacter(characterId) {
     name: char?.name || existing?.name || "新对话",
     avatar: char?.avatar || existing?.avatar || "",
     persona,
-    firstMessage: char?.personality?.firstMessage || "",
-    title: char?.name || existing?.name || "新对话",
+    firstMessage: "",
+    threadTitle: nextThreadTitle(characterId),
+    scenario: char?.personality?.scenario || existing?.config?.scenario || "",
+    mesExample: char?.personality?.mesExample || existing?.config?.mesExample || "",
+    speakingStyle: slotText(char?.speakingStyle) || existing?.config?.speakingStyle || "",
+    replyPace: existing?.config?.replyPace,
   });
   store.setActiveTab("messages");
   return chat;

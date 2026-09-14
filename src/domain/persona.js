@@ -10,6 +10,7 @@ import { uid, esc } from "../core/utils.js";
 import { Character } from "./character.js";
 import { ConversationRepository } from "../repository/conversation.js";
 import { messageStore } from "./message-store.js";
+import { importLorebookForRole, normalizeCharacterBook } from "./worldbook.js";
 
 const CFG = window.ECHOCHAT_CONFIG || {};
 
@@ -67,6 +68,9 @@ export async function createFromTemplate(tpl) {
     scenario: tpl.scenario || "",
     mesExample: tpl.mesExample || "",
     speakingStyle: tpl.speakingStyle || "",
+    likes: tpl.likes || "",
+    dislikes: tpl.dislikes || "",
+    rules: tpl.rules || "",
   });
   try {
     await Character.createCharacter({
@@ -82,7 +86,12 @@ export async function createFromTemplate(tpl) {
       },
       appearance: { avatar: tpl.avatar || null },
       speakingStyle: typeof tpl.speakingStyle === "string" ? { notes: tpl.speakingStyle } : tpl.speakingStyle || {},
-      preferences: tpl.preferences || {},
+      preferences: {
+        ...(tpl.preferences || {}),
+        likes: tpl.likes || "",
+        dislikes: tpl.dislikes || "",
+        rules: tpl.rules || "",
+      },
       source: tpl.source || "user_created",
     });
   } catch (e) {
@@ -110,18 +119,29 @@ export function getSystemTemplates(gender) {
 // 构建角色卡 JSON（兼容 SillyTavern 格式）
 export function buildCharacterCard(chat) {
   const persona = getPersona(chat);
+  const cfg = chat?.config || {};
+  const speaking =
+    typeof cfg.speakingStyle === "string"
+      ? cfg.speakingStyle
+      : cfg.speakingStyle && typeof cfg.speakingStyle === "object"
+        ? String(cfg.speakingStyle.notes || cfg.speakingStyle.text || "")
+        : "";
+  const peek = messageStore.peekMessages(chat.id) || [];
+  const defined = String(cfg.firstMessage || "").trim();
+  const firstHer = peek.find((m) => m.role === "her");
+  const greeting = defined || (firstHer ? String(firstHer.text || "").trim() : "");
   return {
     spec: "chara_card_v2",
     spec_version: "2.0",
     data: {
       name: getRoleName(chat),
       description: persona,
-      personality: "",
-      scenario: "",
-      first_mes: messageStore.peekMessages(chat.id)?.[0]?.text || "",
-      mes_example: "",
+      personality: String(speaking || "").trim(),
+      scenario: String(cfg.scenario || "").trim(),
+      first_mes: greeting,
+      mes_example: String(cfg.mesExample || "").trim(),
       creator_notes: "Exported from EchoChat",
-      system_prompt: "",
+      system_prompt: String(cfg.rules || "").trim(),
       post_history_instructions: "",
       alternate_greetings: [],
       tags: [],
@@ -132,6 +152,9 @@ export function buildCharacterCard(chat) {
           roleId: getRoleId(chat),
           avatar: chat.avatar || "",
           exportedAt: Date.now(),
+          likes: String(cfg.likes || "").trim(),
+          dislikes: String(cfg.dislikes || "").trim(),
+          rules: String(cfg.rules || "").trim(),
         },
       },
     },
@@ -146,23 +169,29 @@ export function parseCharacterCard(json) {
     if (!obj || typeof obj !== "object") return null;
     if (obj.data && typeof obj.data === "object") {
       const d = obj.data;
+      const description = String(d.description || d.background || "").trim();
+      const personality = String(d.personality || "").trim();
       return {
         name: String(d.name || "导入角色").trim() || "导入角色",
-        persona: String(d.description || d.personality || "").trim(),
+        persona: description || personality,
         firstMessage: String(d.first_mes || "").trim(),
         avatar: String(d.extensions?.echochat?.avatar || d.avatar || "").trim(),
         worldbook: d.character_book || null,
         sourceRoleId: d.extensions?.echochat?.roleId || null,
         scenario: String(d.scenario || "").trim(),
-        mesExample: String(d.mes_example || "").trim(),
+        mesExample: String(d.mes_example || d.mesExample || "").trim(),
         speakingStyle: String(
-          d.personality && d.description && String(d.personality) !== String(d.description) ? d.personality : ""
+          d.extensions?.echochat?.speakingStyle ||
+            (description && personality && personality !== description ? personality : "")
         ).trim(),
+        likes: String(d.extensions?.echochat?.likes || d.extensions?.likes || "").trim(),
+        dislikes: String(d.extensions?.echochat?.dislikes || d.extensions?.dislikes || "").trim(),
+        rules: String(d.extensions?.echochat?.rules || d.system_prompt || d.post_history_instructions || "").trim(),
       };
     }
     return {
       name: String(obj.name || "导入角色").trim() || "导入角色",
-      persona: String(obj.description || obj.persona || "").trim(),
+      persona: String(obj.description || obj.background || obj.persona || "").trim(),
       firstMessage: String(obj.first_mes || obj.firstMessage || "").trim(),
       avatar: String(obj.avatar || "").trim(),
       worldbook: obj.character_book || null,
@@ -170,6 +199,9 @@ export function parseCharacterCard(json) {
       scenario: String(obj.scenario || "").trim(),
       mesExample: String(obj.mes_example || obj.mesExample || "").trim(),
       speakingStyle: String(obj.personality || obj.speakingStyle || "").trim(),
+      likes: String(obj.likes || obj.extensions?.likes || "").trim(),
+      dislikes: String(obj.dislikes || obj.extensions?.dislikes || "").trim(),
+      rules: String(obj.rules || obj.system_prompt || "").trim(),
     };
   } catch (e) {
     return null;
@@ -192,12 +224,19 @@ export async function importCharacter(input) {
     scenario: parsed.scenario || "",
     mesExample: parsed.mesExample || "",
     speakingStyle: parsed.speakingStyle || "",
+    likes: parsed.likes || "",
+    dislikes: parsed.dislikes || "",
+    rules: parsed.rules || "",
   });
   const characterId = getRoleId(chat);
   try {
     await Character.updateCharacter(characterId, { source: "imported" });
   } catch (e) {
     /* character create is already best-effort */
+  }
+  if (parsed.worldbook) {
+    const lore = normalizeCharacterBook(parsed.worldbook);
+    if (lore?.entries?.length) importLorebookForRole(characterId, lore, lore.name);
   }
   return { ok: true, chat, characterId };
 }

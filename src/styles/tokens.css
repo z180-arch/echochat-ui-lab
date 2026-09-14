@@ -74,13 +74,15 @@
   --space-10: 40px;
 
   /* ---- 阴影 ---- */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
-  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.16);
+  --shadow-sm: 0 1px 2px color-mix(in srgb, var(--color-text) 6%, transparent), 0 8px 16px color-mix(in srgb, var(--color-text) 4%, transparent);
+  --shadow-md: 0 8px 24px color-mix(in srgb, var(--color-text) 8%, transparent);
+  --shadow-lg: 0 16px 40px color-mix(in srgb, var(--color-text) 10%, transparent);
+  --shadow-xl: 0 24px 56px color-mix(in srgb, var(--color-text) 12%, transparent);
+  --shadow-glow: 0 0 28px color-mix(in srgb, var(--color-mint) 28%, transparent);
 
   /* ---- 动画 ---- */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in: cubic-bezier(0.55, 0.055, 0.675, 0.19);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --dur-fast: 150ms;

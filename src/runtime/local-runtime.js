@@ -1,6 +1,6 @@
 /**
- * Local in-process plugin runtime.
- * Future DSH runtime should implement the same PluginRuntimeAdapter shape.
+ * Local in-process plugin runtime (EchoChat Product Core).
+ * A DSH host is Planned only — see src/adapters/dsh/. Do not import DSH here.
  */
 
 import { createPluginContext } from "./plugin.js";

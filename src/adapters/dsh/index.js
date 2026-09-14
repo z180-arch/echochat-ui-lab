@@ -1,6 +1,6 @@
 /**
- * Future DeepSeek Harness adapter seat.
- * Current product uses LocalPluginRuntime only.
+ * Planned DSH adapter seat. Not a runtime dependency.
+ * Current product uses LocalPluginRuntime only. This function throws.
  *
  * @typedef {Object} PluginRuntimeAdapter
  * @property {(plugin: object) => void|Promise<void>} register

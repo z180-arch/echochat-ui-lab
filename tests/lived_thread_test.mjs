@@ -44,7 +44,7 @@ global.URL = { createObjectURL: () => "blob:mock", revokeObjectURL: () => {} };
 
 const { store } = await import(srcHref("src/core/store.js"));
 const { addMemory } = await import(srcHref("src/domain/memory.js"));
-const { recordChatTurn, recordRelationshipEvent, getAffinity } = await import(
+const { recordChatTurn, recordRelationshipEvent, getAffinity, resetRelationsRuntime } = await import(
   srcHref("src/domain/relations.js")
 );
 const { buildBehaviorContext } = await import(srcHref("src/domain/behavior.js"));
@@ -75,6 +75,7 @@ function test(name, fn) {
 function resetAll() {
   localStorage.clear();
   store.reset();
+  resetRelationsRuntime();
 }
 
 function gapReturnChat() {

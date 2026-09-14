@@ -18,7 +18,10 @@ import { store } from "../core/store.js";
 import { events, EVT } from "../core/events.js";
 import { uid } from "../core/utils.js";
 import { CharacterRepository } from "../repository/character.js";
-import { legacyAdapter } from "../repository/legacy-adapter.js";
+import { deleteBooksForCharacter } from "./worldbook.js";
+import { deleteMomentsForRole } from "./moments.js";
+import { deleteRelationsForRole } from "./relations.js";
+import { clearMemory, getMemoryList } from "./memory.js";
 
 // ============================================================
 //  Character 实体定义
@@ -246,27 +249,17 @@ export async function restoreCharacter(id) {
  * @param {string} id
  */
 export async function permanentDeleteCharacter(id) {
-  // 1. 删除所有关联 Conversation + Messages
+  const { deleteConversation } = await import("./conversation.js");
   const chats = store.getState().chats.filter((c) => c.roleId === id);
   for (const chat of chats) {
-    store.deleteChat(chat.id);
+    await deleteConversation(chat.id);
   }
 
-  // 2. 删除 Memories
-  const allMemory = store.getState().longTermMemory || {};
-  delete allMemory[id];
-  store.set((s) => ({ ...s, longTermMemory: allMemory }));
+  deleteMomentsForRole(id);
+  deleteBooksForCharacter(id);
+  deleteRelationsForRole(id);
+  clearMemory(id);
 
-  // 3. 删除 Relationship（通过 Legacy Adapter）
-  const relations = legacyAdapter.getAllRelations();
-  delete relations.roles[id];
-  legacyAdapter.setAllRelations(relations);
-
-  // 4. 删除 Moments（通过 Legacy Adapter）
-  const moments = legacyAdapter.getAllMoments().filter((m) => m.roleId !== id);
-  legacyAdapter.setAllMoments(moments);
-
-  // 5. 从 Dexie 删除（通过 Repository，如果可用）
   try {
     await CharacterRepository.permanentDelete(id);
   } catch (e) {
@@ -288,7 +281,7 @@ export async function permanentDeleteCharacter(id) {
 export async function getCharacterStats(id) {
   const chats = store.getState().chats.filter((c) => c.roleId === id);
   const totalMessages = chats.reduce((sum, c) => sum + (c.messages?.length || 0), 0);
-  const memories = (store.getState().longTermMemory?.[id]?.memories || []).length;
+  const memories = getMemoryList(id).length;
 
   return {
     characterId: id,

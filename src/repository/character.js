@@ -180,12 +180,25 @@ export const CharacterRepository = {
     delete allMemory[id];
     legacyAdapter.setStateKey("longTermMemory", allMemory);
 
-    const relations = legacyAdapter.getAllRelations();
-    delete relations.roles[id];
-    legacyAdapter.setAllRelations(relations);
+    try {
+      const { clearMemory } = await import("../domain/memory.js");
+      clearMemory(id);
+    } catch {
+      // domain cascade already ran
+    }
 
-    const moments = legacyAdapter.getAllMoments().filter((m) => m.roleId !== id);
-    legacyAdapter.setAllMoments(moments);
+    try {
+      const { deleteMomentsForRole } = await import("../domain/moments.js");
+      deleteMomentsForRole(id);
+    } catch {
+      // domain cascade already ran for UI deletes
+    }
+    try {
+      const { deleteRelationsForRole } = await import("../domain/relations.js");
+      deleteRelationsForRole(id);
+    } catch {
+      // domain cascade already ran for UI deletes
+    }
   },
 
   async countChats(id) {

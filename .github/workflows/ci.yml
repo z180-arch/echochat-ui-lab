@@ -43,6 +43,36 @@ jobs:
       - name: Chat Send
         run: node tests/chat_send_test.mjs
 
+      - name: Chat Actions
+        run: node tests/chat_actions_test.mjs
+
+      - name: Stream Paint
+        run: node tests/stream_paint_test.mjs
+
+      - name: Virtual List
+        run: node tests/virtual_list_test.mjs
+
+      - name: Message Window
+        run: node tests/message_window_test.mjs
+
+      - name: Message Import
+        run: node tests/message_import_test.mjs
+
+      - name: Lived Moments
+        run: node tests/lived_moment_test.mjs
+
+      - name: Character Voice Slots
+        run: node tests/character_voice_slots_test.mjs
+
+      - name: Provider
+        run: node tests/provider_test.mjs
+
+      - name: Voice TTS
+        run: node tests/voice_test.mjs
+
+      - name: Voice STT
+        run: node tests/stt_test.mjs
+
       - name: Theme Tokens
         run: node tests/theme_tokens_test.mjs
 
@@ -55,11 +85,26 @@ jobs:
       - name: Memory Representation
         run: node tests/memory_representation_test.mjs
 
+      - name: Memory Persist
+        run: node tests/memory_persist_test.mjs
+
       - name: Context Integration
         run: node tests/context_integration_test.mjs
 
       - name: Plugin Runtime
         run: node tests/plugin_runtime_test.mjs
+
+      - name: Product Loop
+        run: node tests/product_loop_test.mjs
+
+      - name: Moments Product
+        run: node tests/moments_product_test.mjs
+
+      - name: Character Worldbook
+        run: node tests/character_worldbook_test.mjs
+
+      - name: Storage Satellite
+        run: node tests/storage_satellite_test.mjs
 
       - name: Lived Continuity
         run: node tests/lived_continuity_test.mjs
@@ -94,6 +139,9 @@ jobs:
       - name: UI Refinement Wave 4
         run: node tests/ui_refinement_wave4_test.mjs
 
+      - name: Companion UX presentation
+        run: node tests/companion_ux_test.mjs
+
       - name: Syntax check (src)
         run: |
           set -euo pipefail
@@ -127,5 +175,55 @@ jobs:
 
       - name: Continuity UI browser verify
         run: node scripts/continuity_ui_verify.mjs
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+
+      - name: Moments and Worldbook UI browser verify
+        run: node scripts/moments_worldbook_ui_verify.mjs
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+
+      - name: Storage lifecycle browser verify
+        run: node scripts/storage_lifecycle_verify.mjs
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+
+      - name: Memory and chat lifecycle browser verify
+        run: node scripts/memory_chat_lifecycle_verify.mjs
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+
+      - name: STT and conversation browser verify
+        run: node scripts/stt_conversation_verify.mjs
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+
+      - name: First-run experience browser verify
+        run: node scripts/first_run_verify.mjs
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+
+      - name: Chat actions browser verify
+        run: node scripts/chat_actions_verify.mjs
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+
+      - name: Stream paint browser verify
+        run: node scripts/stream_paint_verify.mjs
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+
+      - name: Long chat browser verify
+        run: node scripts/long_chat_verify.mjs
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+
+      - name: Bulk import browser verify
+        run: node scripts/bulk_import_verify.mjs
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+
+      - name: Provider lifecycle browser verify
+        run: node scripts/provider_lifecycle_verify.mjs
         env:
           CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}

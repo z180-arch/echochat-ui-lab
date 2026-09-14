@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-截至本文件更新时，EchoChat **没有 npm / pnpm 产品依赖**（无 `package.json` 应用构建）。
+截至本文件更新时，EchoChat **没有 npm 产品依赖**。根目录 `package.json` 只用于 `npm test`（Node 跑现有 `tests/*.mjs`），不含 `dependencies`。
 
 项目使用纯原生 Web 技术构建：
 
@@ -15,7 +15,7 @@
 - 原生 HTML
 - 浏览器原生 API（localStorage、Service Worker、IndexedDB 等）
 
-无 npm 依赖。页面会加载 Google Fonts（Noto Sans SC）。IndexedDB 访问通过 **vendored Dexie**。
+无 npm 产品依赖。页面会加载 Google Fonts（Noto Sans SC）。IndexedDB 访问通过 **vendored Dexie**。
 
 ---
 
@@ -35,9 +35,7 @@
 
 ### 仓库内未引用资源
 
-| 名称 | 版本 | 来源 | 许可证 | 用途 |
-|------|------|------|--------|------|
-| three.min.js / three-text-extras / helvetiker | unknown | `assets/` leftover from landing experiments | **LICENSE REVIEW REQUIRED** (Three.js is MIT; confirm the exact copy) | **Not referenced** by current `index.html` / `app/index.html` / `src/` |
+无。Landing 实验留下的 Three.js / helvetiker 文件已移除。
 
 ### 图标
 

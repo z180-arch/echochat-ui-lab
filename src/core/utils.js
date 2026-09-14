@@ -93,23 +93,36 @@ export const dayDiff = (a, b) => {
   return Math.round((tb - ta) / 86400000);
 };
 
-// 轻量 Markdown 渲染（行内 + 代码块 + 列表）
-export function renderMarkdown(text, opts = {}) {
+function safeHref(href) {
+  const raw = String(href || "").trim();
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw) || raw.startsWith("/")) return raw;
+  return "";
+}
+
+// 轻量 Markdown 渲染（行内 + 代码块）。先抽出代码块，其余一律转义。
+export function renderMarkdown(text) {
   if (!text) return "";
   let t = String(text);
-  // 代码块
-  t = t.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
-    return `<pre class="md-pre"><code class="md-code">${esc(code.trim())}</code></pre>`;
+  const blocks = [];
+  t = t.replace(/```(\w*)\n([\s\S]*?)```/g, (_, _lang, code) => {
+    const token = `@@MD_BLOCK_${blocks.length}@@`;
+    blocks.push(`<pre class="md-pre"><button type="button" class="md-copy" onclick="window.EchoApp.copyCodeBlock(this)">复制</button><code class="md-code">${esc(code.trim())}</code></pre>`);
+    return token;
   });
-  // 行内代码
+  t = esc(t);
   t = t.replace(/`([^`]+)`/g, '<code class="md-inline">$1</code>');
-  // 粗体/斜体
   t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   t = t.replace(/\*([^*]+)\*/g, "<em>$1</em>");
-  // 链接
-  t = t.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-  // 换行
+  t = t.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, href) => {
+    const safe = safeHref(href.replace(/&amp;/g, "&"));
+    if (!safe) return label;
+    return `<a href="${escAttr(safe)}" target="_blank" rel="noopener">${label}</a>`;
+  });
   t = t.replace(/\n/g, "<br>");
+  blocks.forEach((html, i) => {
+    t = t.replace(`@@MD_BLOCK_${i}@@`, html);
+  });
   return t;
 }
 

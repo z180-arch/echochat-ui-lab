@@ -1,71 +1,48 @@
-# EchoChat Lite
+# EchoChat
+
+Local-first AI Companion PWA.
 
 > 念念不忘，必有回响。
 
-Local-first AI character companion: chat, long-term memory, relationship, moments, and worldbook. Pure frontend PWA (HTML / CSS / ES modules). Data stays on the device except messages sent to the API the user configures.
+EchoChat is a character you live with in the browser. Chat, memory, moments, and relationship stay on the device except for messages sent to the API you configure.
+
+It is **not** a generic chatbot wrapper, an agent framework, a RAG demo, or a character marketplace.
+
+License: [PolyForm Noncommercial 1.0.0](LICENSE).
 
 ---
 
-## Current status
+## Capabilities
 
-**Active development.** The live product is a working companion app plus a separate marketing landing.
-
-Do not treat Foundation / Stage 0–13 language, or files under `docs/history/`, as unfinished work or as the current spec.
-
----
-
-## What it is
-
-- Pure frontend PWA (no app bundler, no `package.json` for the product)
-- AI Character / AI Companion
-- Local-first; user-owned data in the browser
-
----
-
-## Current product model
-
-| Area | State |
-|------|--------|
-| Character | Implemented |
-| Conversation | Implemented |
-| Memory | Implemented |
-| Worldbook | Implemented |
-| Relationship | Implemented |
-| Moments | Implemented |
-
-In progress / planned work is **not** a checked-in backlog. See [docs/ROADMAP.md](docs/ROADMAP.md).
+- **Character continuity** — a first-class character, Card V2 import/export, more than one conversation thread
+- **Memory** — user facts, quietly kept, retrieved for the current turn
+- **Moments** — lived traces from conversation, not a chat log
+- **Relationship** — how the two of you relate, without a numeric meter
+- **Worldbook** — setting and lore, separate from user memory
+- **Local-first storage** — Dexie + IndexedDB in the browser; no EchoChat server
 
 ---
 
 ## Architecture
 
 ```text
-/
-└── Landing          index.html, landing-v3.html
-
-/app/
-└── Application      app/index.html → src/main.js
-
-src/                 application source
-sw.js                registered with scope /app/
-manifest.webmanifest PWA id / start_url / scope = /app/
+UI  →  Domain  →  Repository  →  Dexie / Provider  →  OpenAI-compatible API
 ```
 
-Landing does not access application storage. Existing localStorage / IndexedDB keys and schemas stay as they are.
+`assembleTurnContext` is the only turn-context door. Plugins may append `extraPrompt`. They do not own the app.
+
+```text
+/        marketing landing
+/app/    application PWA (src/main.js)
+```
+
+Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/architecture/PRODUCT_BASE.md](docs/architecture/PRODUCT_BASE.md).
 
 ---
 
-## Data
+## Run locally
 
-Application data remains local (`echodownload_*` localStorage keys, Dexie database `echochat`, blob DB `echodownload_assets`). Those names are compatibility keys — do not rename them.
-
-Landing does not initialize application storage.
-
----
-
-## Development
-
-No `npm install`. Serve the repo root as static files.
+No application bundler. Serve the repository root as static files.
 
 ```bash
 git clone https://github.com/z180-arch/echochat-ui-lab.git
@@ -75,74 +52,61 @@ python3 -m http.server 8080
 
 - Landing: http://127.0.0.1:8080/
 - App: http://127.0.0.1:8080/app/
-- Windows helper for landing: `preview-landing.bat`
 
-If port 8080 is taken, use another port.
+Windows landing helper: `preview-landing.bat`. If port 8080 is taken, use another port.
 
-Configure the model in the app: **我的 → API 与模型**. Do not commit API keys. Do not put keys in `config.js`, `.env`, docs, or tests.
+---
 
-OpenAI-compatible providers (SiliconFlow / DeepSeek / Moonshot / 智谱 / custom).
+## Provider
+
+In the app: **我的 → API 与模型**.
+
+OpenAI-compatible endpoints (SiliconFlow, DeepSeek, Qwen-compatible, Gemini / Groq / OpenRouter, or a custom base URL).
+
+Do not commit API keys. Do not put keys in `config.js`, `.env`, docs, or tests. Optional local probe file `.echochat.local.json` is gitignored.
+
+---
+
+## Design
+
+In-app UI is **Morning Mint** with quiet Ripple motion. The system is frozen: no new theme kit, animation engine, or component library.
+
+See [docs/design.md](docs/design.md).
+
+---
+
+## Current status
+
+Shipped companion loop on Product Core. Storage names and Memory/retrieval/`assembleTurnContext`/Provider/Dexie schema are frozen unless a dedicated task says otherwise.
+
+Facts: [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md). Intent: [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ---
 
 ## Tests
 
-CI runs the Node suites in `.github/workflows/ci.yml`. From the repo root, examples:
-
 ```bash
-node tests/storage_cutover_test.mjs
-node tests/foundation_test.mjs
-node tests/core_loop_test.mjs
+npm test
 ```
 
-Browser UI checks (need Chrome): `scripts/wave3a_ui_verify.mjs`, `wave3b_ui_verify.mjs`, `wave4_ui_verify.mjs`. Those scripts open `/app/`.
-
-There is no `npm test`.
+`package.json` only runs Node suites (no product dependencies). Browser checks need Chrome; CI runs them from `.github/workflows/ci.yml`.
 
 ---
 
-## Verification
+## Roadmap
 
-Entry split shipped on `main`: `/` marketing landing, `/app/` application, PWA scoped to `/app/`.  
-Representative checks: storage cutover Node suite; landing/app entry browser check (2026-09-05).
-
-Historical milestone counts belong in `docs/history/`.
+See [docs/ROADMAP.md](docs/ROADMAP.md). Next work should come from production evidence, not from old stage lists.
 
 ---
 
-## Documentation
+## Docs
 
 | File | Role |
 |------|------|
-| [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md) | Current product / storage / PWA / test facts |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Current layering and entry split |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | CURRENT / NEXT / LATER |
+| [docs/README.md](docs/README.md) | Map |
+| [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md) | Shipped facts |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layers |
 | [AGENTS.md](AGENTS.md) | Agent working agreement |
-| [docs/history/](docs/history/) | Historical only — not the current spec |
-| [docs/architecture/DATA_OWNERSHIP.md](docs/architecture/DATA_OWNERSHIP.md) | User data vs code vs brand |
-| [docs/design.md](docs/design.md) | In-app Morning Mint language (shipped) |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contributions |
 
-Governance: [LICENSE](LICENSE), [COPYRIGHT.md](COPYRIGHT.md), [TRADEMARKS.md](TRADEMARKS.md), [CONTRIBUTING.md](CONTRIBUTING.md), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-`docs/history/` contains historical documents and must not be treated as the current implementation specification.
-
----
-
-## AI / Agent Context
-
-Before modifying code:
-
-1. Read README.md.
-2. Read docs/CURRENT_STATE.md.
-3. Read docs/ARCHITECTURE.md.
-4. Check git status.
-5. Inspect current source before trusting historical docs.
-6. Treat docs/history/ as historical context only.
-
-Do not infer current architecture from old V1/V1.1 documents.  
-Do not resurrect superseded IA or UI decisions.  
-Do not modify product architecture merely because historical documents describe another design.
-
----
-
-*EchoChat Lite · 2026*
+Governance: [LICENSE](LICENSE), [COPYRIGHT.md](COPYRIGHT.md), [TRADEMARKS.md](TRADEMARKS.md), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), [THIRD_PARTY_SOURCES.md](THIRD_PARTY_SOURCES.md).

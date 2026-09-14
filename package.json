@@ -1,0 +1,9 @@
+{
+  "name": "echochat",
+  "private": true,
+  "type": "module",
+  "description": "Local-first AI companion PWA. This file only runs tests; the app has no bundler and no npm runtime dependencies.",
+  "scripts": {
+    "test": "node scripts/run_node_tests.mjs"
+  }
+}

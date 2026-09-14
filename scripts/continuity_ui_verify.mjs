@@ -80,6 +80,18 @@ async function evalExpr(send, expression) {
   return r.result?.value;
 }
 
+async function waitApp(send) {
+  for (let i = 0; i < 50; i++) {
+    const ready = await evalExpr(
+      send,
+      `!!window.EchoApp && window.EchoApp._storageReady ? window.EchoApp._storageReady.then(() => true) : Promise.resolve(!!window.EchoApp)`
+    );
+    if (ready) return;
+    await sleep(200);
+  }
+  throw new Error("EchoApp not ready");
+}
+
 const FLOW = `(() => (async () => {
   localStorage.clear();
   try {
@@ -97,6 +109,7 @@ const FLOW = `(() => (async () => {
   const { sendMessage } = await import('/src/domain/chat.js');
   const { assembleTurnContext } = await import('/src/domain/turn-context.js');
   const { getMemoryList } = await import('/src/domain/memory.js');
+  await (window.EchoApp._storageReady || Promise.resolve());
   store.reset();
   store.updateSettings({ apiKey: '', baseUrl: 'https://api.example.com/v1', model: 'x' });
   const chat = await createFromTemplate({ name: '林晚', persona: '温柔的陪伴者', firstMessage: '你好' });
@@ -152,10 +165,7 @@ try {
   ]) {
     await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile });
     await send("Page.navigate", { url: `${BASE}?c=${Date.now()}&w=${width}` });
-    for (let i = 0; i < 40; i++) {
-      if (await evalExpr(send, "!!window.EchoApp")) break;
-      await sleep(200);
-    }
+    await waitApp(send);
     const snap = await evalExpr(send, FLOW);
     record(`${width} · kept mark`, snap.kept === "记下了" ? "PASS" : "FAIL", snap.kept);
     record(`${width} · recall chip`, /摄影/.test(snap.recall) ? "PASS" : "FAIL", snap.recall);

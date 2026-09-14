@@ -37,6 +37,7 @@ const motion = readFileSync(srcFile("src/styles/motion.css"), "utf8");
 const responsive = readFileSync(srcFile("src/styles/responsive.css"), "utf8");
 const tokens = readFileSync(srcFile("src/styles/tokens.css"), "utf8");
 const viewsSrc = readFileSync(srcFile("src/ui/views/index.js"), "utf8");
+const presentSrc = readFileSync(srcFile("src/ui/present.js"), "utf8");
 
 let passed = 0;
 let failed = 0;
@@ -112,13 +113,14 @@ test("Worldbook settings has entry form without admin intro", () => {
   assert.ok(mainSrc.includes("wb-keys"));
 });
 
-test("Voice input is not a fake tappable setting", () => {
+test("Voice input is a real setting, not a fake row", () => {
   const start = mainSrc.indexOf('section === "voice"');
   const end = mainSrc.indexOf("openModal({ title: titles[section]", start);
   const voice = mainSrc.slice(start, end);
-  assert.ok(voice.includes("即将支持"));
-  assert.ok(!voice.includes("toggleSTT"));
+  assert.ok(!voice.includes("即将支持"));
   assert.ok(!voice.includes("开发中"));
+  assert.ok(voice.includes("toggleSttEnabled"));
+  assert.ok(voice.includes("sttSupportNote"));
 });
 
 test("Memory extract empty uses EmptyState and a close action", () => {
@@ -189,6 +191,20 @@ test("Wave 3B hub/profile/settings markers stay in place", () => {
   assert.ok(viewsSrc.includes("StageChip({ label: presented.label, stage: presented.stage })"));
   assert.ok(/\.settings-group-title\s*\{[^}]*--font-label/.test(components));
   assert.ok(!/\.settings-group-title\s*\{[^}]*text-transform:\s*uppercase/.test(components));
+});
+
+test("First-run empty and companion cues are in the shell", () => {
+  assert.ok(viewsSrc.includes("先有一个角色，才能开始聊天。"));
+  assert.ok(viewsSrc.includes("fillComposer"));
+  assert.ok(presentSrc.includes("刚刚认识 · 打开相处中"));
+  assert.ok(viewsSrc.includes("companionRitual"));
+  assert.ok(viewsSrc.includes("关于你的记忆"));
+  assert.ok(viewsSrc.includes("一起经历过的片段会留在这里，不是聊天记录。"));
+  assert.ok(viewsSrc.includes("记忆条数"));
+  assert.ok(mainSrc.includes("记下了一件关于你的事"));
+  assert.ok(mainSrc.includes("你们刚刚留下了一条相处痕迹"));
+  assert.ok(mainSrc.includes("openBring()"));
+  assert.ok(layouts.includes(".chat-starters"));
 });
 
 console.log(`\nUI Refinement Wave 4: ${passed} passed, ${failed} failed`);

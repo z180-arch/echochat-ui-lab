@@ -36,6 +36,9 @@ export function buildBehaviorContext({ persona, slots, userPersona, memories, af
   if (slots?.scenario) parts.push(`---\nScenario:\n${slots.scenario}`);
   if (slots?.examples) parts.push(`---\nExample dialogue:\n${slots.examples}`);
   if (slots?.speakingStyle) parts.push(`---\nSpeaking style:\n${slots.speakingStyle}`);
+  if (slots?.likes) parts.push(`---\nThe character likes:\n${slots.likes}`);
+  if (slots?.dislikes) parts.push(`---\nThe character dislikes:\n${slots.dislikes}`);
+  if (slots?.rules) parts.push(`---\nHow to be with this character (not world lore, not user facts):\n${slots.rules}`);
 
   const user = typeof userPersona === "string" ? userPersona.trim() : "";
   if (user) parts.push(`---\nAbout how the user wants to be seen:\n${user}`);

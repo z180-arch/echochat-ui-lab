@@ -15,9 +15,13 @@ export function applyPluginContext(context) {
   let next = context;
   for (const plugin of getPluginRegistry().getPlugins()) {
     if (typeof plugin.extendContext !== "function") continue;
-    const result = plugin.extendContext(next);
-    if (isThenable(result) || !result) continue;
-    next = result;
+    try {
+      const result = plugin.extendContext(next);
+      if (isThenable(result) || !result) continue;
+      next = result;
+    } catch (err) {
+      console.warn(`[plugin ${plugin.id}] extendContext failed:`, err && err.message ? err.message : err);
+    }
   }
   return next;
 }

@@ -127,6 +127,9 @@
   .chat-back-btn {
     display: flex;
   }
+  .continuity-legend {
+    grid-template-columns: minmax(0, 1fr);
+  }
 
   /* 会话列表：全屏覆盖 */
   .list-pane {
@@ -190,6 +193,10 @@
   .welcome-lead {
     font-size: 14px;
     max-width: none;
+  }
+  .welcome-beats {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 280px;
   }
   .onboard-grid {
     grid-template-columns: 1fr 1fr;

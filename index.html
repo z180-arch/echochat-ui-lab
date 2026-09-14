@@ -509,9 +509,37 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
 /* Serif italic accent — humanistic editorial contrast */
 .serif-italic {
   font-family: var(--font-serif);
-  font-style: italic;
+  font-style: normal;
   font-weight: 600;
   letter-spacing: 0;
+}
+
+.hero-beats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  list-style: none;
+  margin: 22px 0 0;
+  padding: 0;
+  max-width: 36rem;
+}
+.hero-beats li {
+  min-width: 0;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-landing);
+  border-radius: 12px;
+  font-size: 13px;
+  color: var(--text-sub);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.hero-beats strong {
+  display: block;
+  font-style: normal;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 2px;
 }
 
 /* ============================================================
@@ -803,13 +831,14 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
     background: linear-gradient(180deg, transparent 56%, rgba(77,179,147,0.22) 56%);
     background-repeat: no-repeat; padding: 0 3px; border-radius: 2px;
   }
-  .hero-sub { order: 3; text-align: left; font-size: 0.9375rem; line-height: 1.75; margin-bottom: 22px; max-width: 100%; width: 100%; }
+  .hero-sub { order: 3; text-align: left; font-size: 0.9375rem; line-height: 1.75; margin-bottom: 14px; max-width: 100%; width: 100%; }
   .hero-sub .sub-full { display: none; }
   .hero-sub .sub-short { display: inline; }
+  .hero-beats { order: 4; grid-template-columns: minmax(0, 1fr); max-width: 100%; margin: 0 0 18px; }
 
   /* One real button + one subordinate text link */
   .hero-actions {
-    order: 4; flex-direction: column; align-items: stretch; gap: 4px; margin-bottom: 24px; width: 100%;
+    order: 5; flex-direction: column; align-items: stretch; gap: 4px; margin-bottom: 24px; width: 100%;
   }
   .hero-actions .btn-primary {
     justify-content: center; width: 100%; min-height: 48px; padding: 14px 28px; font-size: 15.5px; border-radius: 16px;
@@ -823,11 +852,11 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
   .hero-actions .btn-secondary::after { content: "↓"; font-size: 13px; line-height: 1; transition: transform var(--dur-micro) var(--ease); }
   .hero-actions .btn-secondary:hover { background: none; border: none; color: var(--brand-primary); transform: none; }
   .hero-actions .btn-secondary:hover::after { transform: translateY(2px); }
-  .hero-meta { order: 6; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 14px; font-size: 11.5px; margin-top: 2px; }
+  .hero-meta { order: 7; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 14px; font-size: 11.5px; margin-top: 2px; }
 
   /* Compact interactive demo — visual between CTA and meta (OD mobile order craft) */
   .hero-visual {
-    order: 5; display: block; width: 100%; max-width: 100%;
+    order: 6; display: block; width: 100%; max-width: 100%;
     margin: 0 0 24px; perspective: none;
   }
   .hero-phone { transform: none; border-radius: 22px; box-shadow: var(--shadow-md); }
@@ -1007,6 +1036,11 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
           <span class="sub-full">普通 AI 聊天工具只记住最近几条消息。EchoChat 的角色有独立的性格，会真正记住你说过的话，并在每一次对话中与你建立更深的关系。</span>
           <span class="sub-short">它有独立的性格，会真正记住你说过的话，在一次次对话中与你建立更深的关系。</span>
         </p>
+        <ul class="hero-beats" aria-label="产品差异">
+          <li><strong>角色</strong>一个会说话的陪伴对象</li>
+          <li><strong>记忆</strong>关于你的长期事实</li>
+          <li><strong>相处</strong>关系会慢慢靠近</li>
+        </ul>
 
         <div class="hero-actions" id="heroActions" data-od-id="hero-actions">
           <a href="/app/" class="btn-primary" id="heroCta" data-od-id="hero-cta">

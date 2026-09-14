@@ -14,7 +14,8 @@ import { extractStructured, composeIdentity } from "./extract.js";
 import { createFromTemplate, getRoleName } from "../persona.js";
 import { addMemory } from "../memory.js";
 import { recordChatTurn } from "../relations.js";
-import { peekMessages } from "../message-store.js";
+import { addMoment } from "../moments.js";
+import { messageStore, peekMessages } from "../message-store.js";
 import { store } from "../../core/store.js";
 
 export { parseChatTranscript, messagesFromEchoChat } from "./parse.js";
@@ -93,6 +94,35 @@ export function setDraftCharacterSpeaker(draft, characterName) {
   };
 }
 
+export function transcriptTurns(messages, speakers = {}) {
+  const characterName = speakers.characterName;
+  const userName = speakers.userName;
+  const turns = [];
+  for (const m of messages || []) {
+    const text = String(m.text || "").trim();
+    if (!text) continue;
+    if (characterName && m.speaker === characterName) {
+      turns.push({ role: "her", text });
+    } else if (userName && m.speaker === userName) {
+      turns.push({ role: "me", text });
+    }
+  }
+  return turns;
+}
+
+export async function writeTranscriptToChat(chatId, messages, speakers, options = {}) {
+  const turns = transcriptTurns(messages, speakers);
+  if (!chatId || !turns.length) return { ok: true, count: 0 };
+  const imported = await messageStore.bulkImportMessages(chatId, turns, {
+    replace: true,
+    signal: options.signal,
+    onProgress: options.onProgress,
+    chunkSize: options.chunkSize,
+  });
+  if (!imported.ok) return { ok: false, count: 0, error: imported.error, aborted: imported.aborted };
+  return { ok: true, count: imported.imported };
+}
+
 export function setDraftName(draft, name) {
   if (!draft) return draft;
   const trimmed = String(name || "").trim();
@@ -115,7 +145,7 @@ export function editFindingText(draft, findingId, text) {
   };
 }
 
-export async function confirmReconstruction(draft) {
+export async function confirmReconstruction(draft, options = {}) {
   if (!draft || !draft.messages?.length) return { ok: false, error: "no-draft" };
   const accepted = (draft.findings || []).filter((f) => f.accepted && f.text);
   const identity = composeIdentity(accepted);
@@ -141,12 +171,30 @@ export async function confirmReconstruction(draft) {
   if (accepted.some((f) => f.dimension === "relationshipClues")) {
     recordChatTurn(characterId, name);
   }
+  const written = await writeTranscriptToChat(chat.id, draft.messages, draft.speakers, options);
+  if (!written.ok) {
+    try {
+      const { permanentDeleteCharacter } = await import("../character.js");
+      await permanentDeleteCharacter(characterId);
+    } catch {
+      // leave no half-imported conversation either way
+    }
+    return { ok: false, error: written.error || "import-failed", aborted: written.aborted };
+  }
+  addMoment({
+    roleId: characterId,
+    roleName: name,
+    content: `从一段聊天记录里重新认识了${name}`,
+    source: "reconstruction",
+    sourceKey: `reconstruction:${characterId}`,
+  });
 
   return {
     ok: true,
     characterId,
     chatId: chat.id,
     acceptedCount: accepted.length,
+    messageCount: written.count,
     insufficient: !draft.sufficiency?.sufficient,
   };
 }

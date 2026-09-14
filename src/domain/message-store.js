@@ -10,14 +10,22 @@
  */
 
 import { store } from "../core/store.js";
+import { uid } from "../core/utils.js";
 import { getStorageHooks } from "../repository/test-hooks.js";
+import { cleanAssistantReply } from "./reply-clean.js";
+
+export const UI_WINDOW = 80;
+export const OLDER_PAGE = 50;
+export const IMPORT_CHUNK = 5000;
 
 const runtimeCache = new Map();
 const previews = new Map();
+const olderFlags = new Map();
 
 export function resetRuntime() {
   runtimeCache.clear();
   previews.clear();
+  olderFlags.clear();
 }
 
 function setCache(chatId, messages) {
@@ -64,6 +72,18 @@ async function dexieReady() {
   }
 }
 
+function messageMetadata(msg) {
+  const meta = { ...(msg.metadata || {}) };
+  if (msg.errorKind) {
+    meta.errorKind = msg.errorKind;
+    meta.errorText = msg.errorText || "";
+  } else {
+    delete meta.errorKind;
+    delete meta.errorText;
+  }
+  return meta;
+}
+
 function toDexieMessage(msg, chatId) {
   return {
     id: msg.id,
@@ -74,11 +94,12 @@ function toDexieMessage(msg, chatId) {
     createdAt: msg.time || Date.now(),
     updatedAt: msg.updatedAt || msg.time || Date.now(),
     status: msg.status || "sent",
-    metadata: msg.metadata || {},
+    metadata: messageMetadata(msg),
   };
 }
 
 function toV1Message(msg) {
+  const meta = msg.metadata || {};
   return {
     id: msg.id,
     role: msg.role === "user" ? "me" : msg.role === "assistant" ? "her" : msg.role,
@@ -86,7 +107,9 @@ function toV1Message(msg) {
     time: msg.createdAt ?? msg.time,
     status: msg.status,
     parentMessageId: msg.parentMessageId,
-    metadata: msg.metadata,
+    metadata: meta,
+    errorKind: meta.errorKind,
+    errorText: meta.errorText,
   };
 }
 
@@ -120,14 +143,13 @@ export async function migrateChatMessages(chatId) {
 
   const list = chat.messages || [];
   if (list.length) {
-    let lastTs = 0;
-    const records = list.map((m) => {
-      let t = m.time || Date.now();
-      if (t <= lastTs) t = lastTs + 1;
-      lastTs = t;
-      return toDexieMessage({ ...m, time: t }, chatId);
+    const imported = await bulkImportMessages(chatId, list, {
+      keepInStore: true,
+      skipMeta: true,
     });
-    await hooks.message.bulkCreate(records);
+    if (!imported.ok) {
+      throw new Error(imported.error || "migrate-import-failed");
+    }
   }
 
   try {
@@ -197,6 +219,172 @@ export async function addMessage(chatId, message) {
   return msg;
 }
 
+function isAbortError(e) {
+  if (!e) return false;
+  if (e.name === "AbortError") return true;
+  if (e.inner && e.inner.name === "AbortError") return true;
+  return /abort/i.test(String(e.message || e));
+}
+
+export function importProgress({ done = 0, total = 0 } = {}) {
+  const t = Math.max(0, Number(total) || 0);
+  const d = Math.min(Math.max(0, Number(done) || 0), t || Number(done) || 0);
+  return {
+    done: d,
+    total: t,
+    percent: t ? Math.round((d / t) * 100) : 100,
+  };
+}
+
+function yieldToUi() {
+  return new Promise((resolve) => {
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => resolve());
+    else setTimeout(resolve, 0);
+  });
+}
+
+function normalizeImportTurns(turns) {
+  const v1 = [];
+  let lastTs = 0;
+  for (const m of turns || []) {
+    let t = Number(m.time || m.createdAt) || Date.now();
+    if (t <= lastTs) t = lastTs + 1;
+    lastTs = t;
+    const role = m.role === "user" ? "me" : m.role === "assistant" ? "her" : m.role || "me";
+    v1.push({
+      id: m.id || uid(),
+      role,
+      text: m.text || m.content || "",
+      time: t,
+      status: m.status || "sent",
+      parentMessageId: m.parentMessageId || null,
+      metadata: m.metadata || {},
+    });
+  }
+  return v1;
+}
+
+function applyImportedWindow(chatId, v1) {
+  const tail = v1.slice(-UI_WINDOW);
+  setCache(chatId, tail);
+  olderFlags.set(chatId, v1.length > UI_WINDOW);
+  try {
+    store.updateChat(chatId, { messages: tail });
+  } catch {
+    // tests without this chat in store
+  }
+}
+
+/**
+ * Chunked bulk write. Domain reports progress via callback; UI paints it.
+ * On abort/error Dexie rows for this conversation are deleted so a half
+ * import cannot linger. keepInStore=true leaves the in-memory copy on
+ * failure (migrate path).
+ */
+export async function bulkImportMessages(chatId, turns, options = {}) {
+  const {
+    signal,
+    onProgress,
+    chunkSize = IMPORT_CHUNK,
+    replace = false,
+    keepInStore = false,
+    skipMeta = false,
+  } = options;
+  if (!chatId) return { ok: false, error: "no-chat", imported: 0 };
+  const v1 = normalizeImportTurns(turns);
+  const total = v1.length;
+  if (!total) {
+    onProgress?.(importProgress({ done: 0, total: 0 }));
+    return { ok: true, imported: 0 };
+  }
+
+  if (replace) {
+    await deleteAllMessages(chatId);
+  }
+
+  const report = (done) => onProgress?.(importProgress({ done, total }));
+  report(0);
+
+  try {
+    if (signal?.aborted) {
+      const err = new Error("aborted");
+      err.name = "AbortError";
+      throw err;
+    }
+    if (await dexieReady()) {
+      const hooks = getStorageHooks();
+      const records = v1.map((m) => toDexieMessage(m, chatId));
+      const size = Math.max(1, Number(chunkSize) || IMPORT_CHUNK);
+      if (typeof hooks.message.bulkCreateChunked === "function") {
+        await hooks.message.bulkCreateChunked(records, {
+          chunkSize: size,
+          signal,
+          mode: "add",
+          onProgress: (p) => report(p.done),
+        });
+      } else {
+        for (let i = 0; i < records.length; i += size) {
+          if (signal?.aborted) {
+            const err = new Error("aborted");
+            err.name = "AbortError";
+            throw err;
+          }
+          await hooks.message.bulkCreate(records.slice(i, i + size));
+          report(Math.min(i + size, total));
+          await yieldToUi();
+        }
+      }
+      if (!skipMeta) await bumpConversationMeta(chatId, v1[v1.length - 1], total);
+    } else if (!keepInStore) {
+      store.set((s) => ({
+        ...s,
+        chats: s.chats.map((c) =>
+          c.id === chatId
+            ? { ...c, messages: replace ? v1 : [...(c.messages || []), ...v1] }
+            : c
+        ),
+      }));
+      report(total);
+    } else {
+      report(total);
+    }
+
+    if (await dexieReady()) applyImportedWindow(chatId, v1);
+    else {
+      const all = peekMessages(chatId);
+      setCache(chatId, all.length ? all : v1);
+      olderFlags.set(chatId, false);
+    }
+    report(total);
+    return { ok: true, imported: total };
+  } catch (e) {
+    try {
+      if (await dexieReady()) {
+        await getStorageHooks().message.deleteByConversationId(chatId);
+      }
+    } catch {
+      // best-effort Dexie rollback
+    }
+    if (!keepInStore) {
+      try {
+        store.updateChat(chatId, { messages: [] });
+      } catch {
+        // ignore
+      }
+      setCache(chatId, []);
+      olderFlags.set(chatId, false);
+    }
+    const aborted = isAbortError(e);
+    return {
+      ok: false,
+      error: aborted ? "aborted" : String(e?.message || e),
+      imported: 0,
+      aborted,
+      cause: e,
+    };
+  }
+}
+
 export async function updateMessage(chatId, messageId, patch) {
   store.updateMessage(chatId, messageId, patch);
   if (runtimeCache.has(chatId)) {
@@ -213,6 +401,10 @@ export async function updateMessage(chatId, messageId, patch) {
       if (patch.role !== undefined) {
         dexiePatch.role =
           patch.role === "me" ? "user" : patch.role === "her" ? "assistant" : patch.role;
+      }
+      if (patch.metadata !== undefined || patch.errorKind !== undefined || patch.errorText !== undefined) {
+        const cur = peekMessages(chatId).find((m) => m.id === messageId);
+        dexiePatch.metadata = messageMetadata({ ...cur, ...patch });
       }
       if (Object.keys(dexiePatch).length > 0) {
         dexiePatch.updatedAt = Date.now();
@@ -243,6 +435,76 @@ export async function deleteMessage(chatId, messageId) {
 /**
  * Canonical read: Dexie first. Does not use a full localStorage dump when Dexie has data.
  * Default (no pageSize) returns the full conversation so UI/chat never silently truncate.
+ */
+export function peekHasOlder(chatId) {
+  return !!olderFlags.get(chatId);
+}
+
+export function peekMessageById(chatId, messageId) {
+  if (!chatId || !messageId) return null;
+  return peekMessages(chatId).find((m) => m.id === messageId) || null;
+}
+
+function sliceNewest(messages, limit) {
+  const all = Array.isArray(messages) ? messages : [];
+  const cap = Math.max(1, Number(limit) || UI_WINDOW);
+  if (all.length <= cap) return { items: all.slice(), hasOlder: false };
+  return { items: all.slice(-cap), hasOlder: true };
+}
+
+async function readTail(chatId, { limit = UI_WINDOW, before, beforeId } = {}) {
+  const hooks = getStorageHooks();
+  if (await dexieReady()) {
+    try {
+      if (typeof hooks.message.findTail === "function") {
+        const rows = await hooks.message.findTail(chatId, { limit, before, beforeId });
+        return (rows || []).map(toV1Message);
+      }
+      const result = await hooks.message.findByConversationId(chatId, {
+        page: 1,
+        pageSize: limit,
+        before,
+      });
+      return (result.items || []).map(toV1Message);
+    } catch (e) {
+      console.error("[MessageStore] tail read failed:", e);
+    }
+  }
+  const chat = store.getState().chats.find((c) => c.id === chatId);
+  let list = chat?.messages || [];
+  if (before != null) {
+    list = list.filter((m) => (m.time || 0) < before && m.id !== beforeId);
+  }
+  return sliceNewest(list, limit).items;
+}
+
+export async function loadOlderMessages(chatId) {
+  if (!chatId || !olderFlags.get(chatId)) return 0;
+  const current = peekMessages(chatId);
+  const oldest = current[0];
+  if (!oldest) {
+    olderFlags.set(chatId, false);
+    return 0;
+  }
+  const older = await readTail(chatId, {
+    limit: OLDER_PAGE,
+    before: oldest.time,
+    beforeId: oldest.id,
+  });
+  const seen = new Set(current.map((m) => m.id));
+  const prepend = older.filter((m) => m.id && !seen.has(m.id));
+  if (!prepend.length) {
+    olderFlags.set(chatId, false);
+    return 0;
+  }
+  setCache(chatId, prepend.concat(current));
+  if (prepend.length < OLDER_PAGE) olderFlags.set(chatId, false);
+  return prepend.length;
+}
+
+/**
+ * Canonical read: Dexie first. Does not use a full localStorage dump when Dexie has data.
+ * Default (no pageSize) returns the full conversation so export/tests never silently truncate.
  */
 export async function getMessages(chatId, options = {}) {
   const hooks = getStorageHooks();
@@ -398,7 +660,29 @@ export async function deleteAllMessages(chatId) {
 
 export async function hydrateChat(chatId) {
   if (!chatId) return [];
-  return getMessages(chatId);
+  const count = await getMessageCount(chatId);
+  if (count > UI_WINDOW) {
+    const msgs = await readTail(chatId, { limit: UI_WINDOW });
+    setCache(chatId, msgs);
+    olderFlags.set(chatId, count > msgs.length);
+    if (await dexieReady()) {
+      try {
+        store.updateChat(chatId, { messages: msgs });
+      } catch {
+        // tests without this chat in store
+      }
+    }
+  } else {
+    await getMessages(chatId);
+    olderFlags.set(chatId, false);
+  }
+  for (const m of peekMessages(chatId)) {
+    if (m.role !== "her" || m.status !== "streaming") continue;
+    const cleaned = cleanAssistantReply(m.text || "");
+    if (!cleaned) await deleteMessage(chatId, m.id);
+    else await updateMessage(chatId, m.id, { text: cleaned, status: "sent" });
+  }
+  return peekMessages(chatId);
 }
 
 export async function hydrateList() {
@@ -455,16 +739,48 @@ export async function bootstrapStorage(currentChatId) {
   } catch (e) {
     console.warn("[MessageStore] hydrate skipped:", e.message);
   }
+  try {
+    const { hydrateMoments } = await import("./moments.js");
+    await hydrateMoments();
+  } catch (e) {
+    console.warn("[MessageStore] moments hydrate skipped:", e.message);
+  }
+  try {
+    const { hydrateWorldbook } = await import("./worldbook.js");
+    await hydrateWorldbook();
+  } catch (e) {
+    console.warn("[MessageStore] worldbook hydrate skipped:", e.message);
+  }
+  try {
+    const { hydrateRelations } = await import("./relations.js");
+    await hydrateRelations();
+  } catch (e) {
+    console.warn("[MessageStore] relations hydrate skipped:", e.message);
+  }
+  try {
+    const { hydrateMemories } = await import("./memory.js");
+    await hydrateMemories();
+  } catch (e) {
+    console.warn("[MessageStore] memory hydrate skipped:", e.message);
+  }
 }
 
 export const messageStore = {
   addMessage,
+  bulkImportMessages,
+  importProgress,
   updateMessage,
   deleteMessage,
   getMessages,
   getMessageCount,
   searchMessages,
   getMessagesPaginated,
+  loadOlderMessages,
+  peekHasOlder,
+  peekMessageById,
+  UI_WINDOW,
+  OLDER_PAGE,
+  IMPORT_CHUNK,
   truncateMessages,
   deleteAllMessages,
   migrateChatMessages,

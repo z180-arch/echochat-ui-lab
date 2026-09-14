@@ -392,6 +392,10 @@ await testAsync("confirm writes CharacterRepository + conversation via existing 
   assert.equal(chats.length, 1);
   const hub = listCharactersForHub();
   assert.ok(hub.some((h) => h.id === result.characterId));
+  const msgs = messageStore.peekMessages(result.chatId);
+  assert.ok(msgs.some((m) => m.role === "me"));
+  assert.ok(msgs.some((m) => m.role === "her"));
+  assert.ok(msgs.length >= 4);
 });
 
 await testAsync("confirm respects rejected findings and renamed character", async () => {

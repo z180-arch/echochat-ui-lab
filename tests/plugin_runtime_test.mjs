@@ -45,9 +45,9 @@ const {
   resetPluginRegistry,
   getLocalPluginRuntime,
   createPluginContext,
-  createDshPluginRuntime,
 } = await import(srcHref("src/runtime/index.js"));
-const { builtinPlugins } = await import(srcHref("src/plugins/index.js"));
+const { createDshPluginRuntime } = await import(srcHref("src/adapters/dsh/index.js"));
+const { extraNotesPlugin, builtinPlugins } = await import(srcHref("src/plugins/index.js"));
 const { getPublicProviderInfo } = await import(srcHref("src/adapters/provider/index.js"));
 const { UI_SURFACES } = await import(srcHref("src/adapters/ui/index.js"));
 const { buildSystemPrompt } = await import(srcHref("src/domain/chat.js"));
@@ -234,9 +234,51 @@ test("UI adapter points at EchoChat surfaces, not a Chatbox fork", () => {
   assert.ok(UI_SURFACES.memory);
 });
 
-test("builtin plugin list is empty (reserved)", () => {
+test("throwing plugin does not block later extraPrompt", () => {
+  resetPluginRegistry();
+  getPluginRegistry().register({
+    id: "boom",
+    name: "Boom",
+    version: "1",
+    extendContext() {
+      throw new Error("plugin exploded");
+    },
+  });
+  getPluginRegistry().register({
+    id: "ok",
+    name: "Ok",
+    version: "1",
+    extendContext(ctx) {
+      return { ...ctx, session: { ...ctx.session, extraPrompt: "SURVIVED" } };
+    },
+  });
+  const next = applyPluginContext(createEchoContext({ session: { extraPrompt: "" } }));
+  assert.equal(next.session?.extraPrompt, "SURVIVED");
+  resetPluginRegistry();
+});
+
+test("builtin extra-notes plugin contributes extraPrompt without writing memory", () => {
+  resetPluginRegistry();
+  store.updateSettings({ extraNotes: "PLUGIN_NOTE_KEEP_SHORT", apiKey: "sk-secret-notes" });
+  getPluginRegistry().register(extraNotesPlugin);
+  const chat = {
+    id: "c_notes",
+    roleId: "role_notes",
+    name: "店员",
+    config: { persona: "温柔店员" },
+  };
+  const prompt = buildSystemPrompt(chat, { query: "你好" });
+  assert.ok(prompt.includes("PLUGIN_NOTE_KEEP_SHORT"));
+  assert.ok(/Additional notes \(not user memory\)/.test(prompt));
+  assert.ok(!prompt.includes("sk-secret-notes"));
+  resetPluginRegistry();
+  store.updateSettings({ extraNotes: "", apiKey: "" });
+});
+
+test("builtin plugin list is extra-notes only", () => {
   assert.ok(Array.isArray(builtinPlugins));
-  assert.equal(builtinPlugins.length, 0);
+  assert.equal(builtinPlugins.length, 1);
+  assert.equal(builtinPlugins[0].id, "extra-notes");
 });
 
 test("DSH plugin runtime is reserved and not implemented", () => {

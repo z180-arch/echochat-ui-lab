@@ -6,7 +6,7 @@
  * read path without inventing a second architecture.
  */
 
-import { dexieAdapter, dexieCharacterAdapter } from "../infrastructure/dexie-adapter.js";
+import { dexieAdapter, dexieCharacterAdapter, dexieMomentAdapter, dexieWorldbookAdapter } from "../infrastructure/dexie-adapter.js";
 import { isDbAvailable } from "../infrastructure/dexie-db.js";
 
 function productionHooks() {
@@ -15,6 +15,10 @@ function productionHooks() {
     message: dexieAdapter.message,
     conversation: dexieAdapter.conversation,
     character: dexieCharacterAdapter,
+    moment: dexieMomentAdapter,
+    worldbook: dexieWorldbookAdapter,
+    relationship: dexieAdapter.relationship,
+    memory: dexieAdapter.memory,
   };
 }
 

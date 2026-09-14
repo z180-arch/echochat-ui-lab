@@ -124,6 +124,7 @@ const SEED = `(() => (async () => {
   store.setActiveTab('companion');
   store.setProfileOpen(window.innerWidth >= 1280);
   await messageStore.addMessage(chat.id, { role: 'her', text: '第二段', status: 'sent' });
+  await messageStore.addMessage(chat.id, { role: 'her', text: '还在', status: 'sent' });
   await messageStore.addMessage(chat.id, { role: 'me', text: '我在听', status: 'sent' });
   await messageStore.addMessage(chat.id, { role: 'her', text: ${JSON.stringify(LONG_CJK)}, status: 'sent' });
   storage.setRaw(KEYS.ONBOARD_DONE, '1');
@@ -272,6 +273,7 @@ const VOICE_SNAP = `(() => {
   return {
     overflowX: document.documentElement.scrollWidth > window.innerWidth + 2,
     voicePending: !!(voice && /即将支持/.test(voice.innerText || '')),
+    voiceNote: !!(voice && /聊天模型|浏览器没有语音识别|点麦克风/.test(document.querySelector('.modal-body')?.innerText || '')),
     voiceClickable: !!(voice && voice.getAttribute('onclick')),
     ttsClickable: !!(tts && tts.getAttribute('onclick')),
     voiceH: voice ? Math.round(voice.getBoundingClientRect().height) : 0,
@@ -411,8 +413,8 @@ async function runWidth(send, width, expect) {
   await sleep(200);
   const voice = await evalExpr(send, VOICE_SNAP);
   record(
-    `${width} · voice pending`,
-    voice.voicePending && !voice.voiceClickable && voice.ttsClickable && voice.voiceH >= 44 && !voice.overflowX
+    `${width} · voice stt`,
+    !voice.voicePending && voice.voiceNote && voice.ttsClickable && voice.voiceH >= 44 && !voice.overflowX
       ? "PASS"
       : "FAIL",
     JSON.stringify(voice)
@@ -442,7 +444,7 @@ async function runWidth(send, width, expect) {
   );
   record(
     `${width} · me section titles`,
-    me.titles.includes("连接") && me.titles.includes("体验") && me.titles.includes("数据") && me.titles.includes("高级") ? "PASS" : "FAIL",
+    me.titles.includes("对话") && me.titles.includes("体验") && me.titles.includes("数据") && me.titles.includes("高级") ? "PASS" : "FAIL",
     me.titles.join(",")
   );
 

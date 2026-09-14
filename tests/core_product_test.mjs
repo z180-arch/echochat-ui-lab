@@ -60,8 +60,8 @@ const {
 const { addMemory, getMemoryList, searchMemories, clearMemory } = await import(
   srcHref("src/domain/memory.js")
 );
-const { recordChatTurn, getAffinity } = await import(srcHref("src/domain/relations.js"));
-const { addMoment, listMoments } = await import(srcHref("src/domain/moments.js"));
+const { recordChatTurn, getAffinity, resetRelationsRuntime } = await import(srcHref("src/domain/relations.js"));
+const { addMoment, listMoments, resetMomentsRuntime } = await import(srcHref("src/domain/moments.js"));
 const { sendMessage, buildSystemPrompt } = await import(srcHref("src/domain/chat.js"));
 const { buildBehaviorContext } = await import(srcHref("src/domain/behavior.js"));
 const { listCharactersForHub, continueCharacter, resolveAvatarSrc } = await import(
@@ -243,6 +243,8 @@ function resetAll() {
   store.reset();
   resetStorageTestHooks();
   installStorageTestHooks(createMemoryBackends());
+  resetMomentsRuntime();
+  resetRelationsRuntime();
 }
 
 resetAll();

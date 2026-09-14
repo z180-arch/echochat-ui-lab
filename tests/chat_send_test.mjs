@@ -46,7 +46,7 @@ const { installStorageTestHooks, resetStorageTestHooks } = await import(
 );
 const { messageStore } = await import(srcHref("src/domain/message-store.js"));
 const { createFromTemplate } = await import(srcHref("src/domain/persona.js"));
-const { sendMessage, stopGeneration, isSending, retryLastMessage } = await import(srcHref("src/domain/chat.js"));
+const { sendMessage, stopGeneration, isSending, retryLastMessage, getStreamingPreview } = await import(srcHref("src/domain/chat.js"));
 const { MAX_USER_MESSAGE_CHARS } = await import(srcHref("src/domain/reply-clean.js"));
 const {
   getReplyPace,
@@ -331,6 +331,7 @@ await testAsync("does not persist partial assistant text while generating", asyn
   await new Promise((r) => setTimeout(r, 20));
   const mid = messageStore.peekMessages(chat.id).filter((m) => m.role === "her");
   assert.ok(!mid.some((m) => (m.text || "").includes("第一")));
+  assert.ok(getStreamingPreview(chat.id).includes("第一"));
   await pending;
   assert.equal(isSending(), false);
   const last = messageStore.peekMessages(chat.id).filter((m) => m.role === "her").pop();
@@ -428,6 +429,38 @@ await testAsync("new conversation inherits character replyPace", async () => {
   setReplyPaceForCharacter(chat.roleId, "slow");
   const next = createConversationForCharacter(chat.roleId, { title: "另一条" });
   assert.equal(getReplyPace(next), "slow");
+});
+
+await testAsync("rapid second send while generating does not insert another user turn", async () => {
+  resetAll();
+  store.updateSettings({ apiKey: "sk-test-key", baseUrl: "https://api.example.com/v1" });
+  const chat = await makeChat();
+  installFetchStream("", { hangUntilAbort: true });
+  const pending = sendMessage("第一句");
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(isSending(), true);
+  await sendMessage("第二句");
+  const me = messageStore.peekMessages(chat.id).filter((m) => m.role === "me").map((m) => m.text);
+  assert.ok(me.includes("第一句"));
+  assert.ok(!me.includes("第二句"));
+  stopGeneration();
+  await pending;
+});
+
+await testAsync("reload scrubs leftover streaming rows", async () => {
+  resetAll();
+  store.updateSettings({ apiKey: "sk-test-key", baseUrl: "https://api.example.com/v1" });
+  const chat = await makeChat();
+  const empty = await messageStore.addMessage(chat.id, { role: "her", text: "", status: "streaming" });
+  const partial = await messageStore.addMessage(chat.id, { role: "her", text: "半段回复", status: "streaming" });
+  await messageStore.hydrateChat(chat.id);
+  const msgs = messageStore.peekMessages(chat.id);
+  assert.ok(!msgs.some((m) => m.id === empty.id));
+  const kept = msgs.find((m) => m.id === partial.id);
+  assert.ok(kept);
+  assert.equal(kept.status, "sent");
+  assert.equal(kept.text, "半段回复");
+  assert.equal(msgs.filter((m) => m.status === "streaming").length, 0);
 });
 
 console.log(`\nChat Send: ${passed} passed, ${failed} failed`);

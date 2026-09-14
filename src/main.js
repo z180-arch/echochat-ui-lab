@@ -8,14 +8,25 @@ import { events, EVT } from "./core/events.js";
 import { runMigrations, storage, KEYS } from "./core/storage.js";
 import { uid, esc, downloadFile, readFileAsText } from "./core/utils.js";
 import { APP_VERSION } from "./core/version.js";
-import { sendMessage, stopGeneration, retryLastMessage, regenerate, editMessage, deleteMessage, copyMessage, isSending, buildSystemPrompt } from "./domain/chat.js";
+import { sendMessage, stopGeneration, retryLastMessage, regenerate, editMessage, readUserMessage, deleteMessageById, copyMessage, isSending, getStreamingPreview, buildSystemPrompt } from "./domain/chat.js";
 import { createFromTemplate, getSystemTemplates, buildCharacterCard, importCharacter, getRoleId } from "./domain/persona.js";
 import { rememberMessage, addMemory, deleteMemory } from "./domain/memory.js";
-import { listMoments, toggleLike, addComment } from "./domain/moments.js";
-import { listBooks, addEntry, deleteEntry } from "./domain/worldbook.js";
+import { toggleLike, addComment, deleteMoment } from "./domain/moments.js";
+import {
+  listBooks,
+  addEntry,
+  updateEntry,
+  deleteEntry,
+  ensureCharacterBook,
+  getBook,
+  toggleEntryEnabled,
+} from "./domain/worldbook.js";
 import { getApiPresets, findPreset } from "./domain/provider.js";
-import { continueCharacter as continueCharacterHub, startConversationForCharacter } from "./domain/character-hub.js";
+import { speakAssistantMessage, speakText, stopSpeech } from "./domain/voice.js";
+import { isSttSupported, isDictating, startDictation, stopDictation, joinDictation, sttErrorMessage, sttSupportNote } from "./domain/stt.js";
+import { continueCharacter as continueCharacterHub, startConversationForCharacter, listCharactersForHub } from "./domain/character-hub.js";
 import { Character } from "./domain/character.js";
+import { peekMessages, peekHasOlder, loadOlderMessages } from "./domain/message-store.js";
 import {
   renderLanding,
   renderOnboarding,
@@ -25,8 +36,20 @@ import {
   renderContinuitySheetContent,
   renderPreferencesSheetContent,
   renderProfileMoreContent,
+  renderWorldbookEditorHtml,
+  renderMessage,
+  renderCharacterShareCard,
 } from "./ui/views/index.js";
-import { showToast, openModal, closeModal, openConfirm, Icons, SettingRow, Segmented, Avatar } from "./ui/components/index.js";
+import {
+  streamingMarkdown,
+  shouldPaintNow,
+  STREAM_PAINT_MIN_MS,
+  followStreamScroll,
+  findStreamingBubble,
+  patchStreamingBubble,
+  streamSignature,
+} from "./ui/stream-paint.js";
+import { showToast, openModal, closeModal, openConfirm, Icons, SettingRow, Segmented, Avatar, CharacterAvatar } from "./ui/components/index.js";
 import { Ambient } from "./ui/ambient.js";
 import { resolveAmbientPolicy } from "./ui/ambient-policy.js";
 import {
@@ -40,14 +63,14 @@ import {
 } from "./ui/theme.js";
 import { needsApiSetup } from "./domain/provider.js";
 import { MAX_USER_MESSAGE_CHARS } from "./domain/reply-clean.js";
-import { composerCountVisible, PROFILE_PERSIST_MIN_WIDTH } from "./ui/present.js";
+import { composerCountVisible, PROFILE_PERSIST_MIN_WIDTH, clipPreview } from "./ui/present.js";
 import {
   getReplyPace,
   setReplyPaceForCharacter,
   REPLY_PACE_OPTIONS,
 } from "./domain/reply-pace.js";
 import { loadChatDraft, saveChatDraft, clearChatDraft } from "./domain/chat-draft.js";
-import { reconstructionModalMarkup } from "./ui/views/reconstruction.js";
+import { reconstructionModalMarkup, importProgressMarkup } from "./ui/views/reconstruction.js";
 import { memoryReviewMarkup } from "./ui/views/memory-review.js";
 import {
   extractMemoryCandidates,
@@ -67,6 +90,7 @@ import {
 } from "./domain/reconstruction/index.js";
 import { getLocalPluginRuntime } from "./runtime/index.js";
 import { builtinPlugins } from "./plugins/index.js";
+import { exportProductBackup, importProductBackup, resetProductData } from "./domain/backup.js";
 
 // 应用状态
 const App = {
@@ -77,8 +101,14 @@ const App = {
   _meScrollTop: 0,
   _lastRenderedView: null,
   _sendPulse: false,
+  _pinChatToBottom: false,
+  _savedChatScroll: null,
   _chatDraft: "",
   _draftChatId: null,
+  _streamPaintAt: 0,
+  _streamPaintText: "",
+  _streamPaintRaf: 0,
+  _streamPaintTimer: 0,
 
   // 初始化
   async init() {
@@ -122,6 +152,19 @@ const App = {
     store.subscribe(() => this.render());
     events.on(EVT.STATE_CHANGE, () => this.render());
     events.on(EVT.TOAST, (payload) => showToast(payload));
+    events.on(EVT.MESSAGE_RECEIVED, ({ message, chatId } = {}) => {
+      if (chatId && store.getState().currentChatId !== chatId) return;
+      speakAssistantMessage(message);
+    });
+    events.on(EVT.STREAM_ABORT, () => {
+      stopSpeech();
+      stopDictation();
+    });
+    events.on(EVT.CHAT_SELECTED, () => {
+      stopSpeech();
+      stopDictation();
+      this.cancelStreamPaint();
+    });
     events.on(EVT.MEMORY_CANDIDATES_READY, ({ roleId, chatId, count }) => {
       if (!count) return;
       showToast({
@@ -134,13 +177,48 @@ const App = {
         },
       });
     });
+    events.on(EVT.MEMORY_ADDED, ({ roleId, memory } = {}) => {
+      if (memory?.source !== "auto") return;
+      if (this._quietMemoryHint) return;
+      this._quietMemoryHint = true;
+      const chatId = store.getCurrentChat()?.id;
+      showToast({
+        message: "记下了一件关于你的事",
+        type: "info",
+        duration: 5000,
+        action: {
+          label: "看看",
+          handler: () => this.openContinuitySheet(roleId, chatId),
+        },
+      });
+    });
+    events.on(EVT.MOMENT_ADDED, ({ roleId } = {}) => {
+      if (this._momentHint) return;
+      this._momentHint = true;
+      showToast({
+        message: "你们刚刚留下了一条相处痕迹",
+        type: "info",
+        duration: 5000,
+        action: {
+          label: "看看",
+          handler: () => this.openMomentsFeed(roleId),
+        },
+      });
+    });
     events.on("rerender", () => this.render());
+    events.on(EVT.STREAM_DELTA, ({ chatId, text } = {}) => {
+      if (store.getState().currentChatId !== chatId) return;
+      if (this.paintStreamingDelta(chatId, text)) return;
+      this.render();
+    });
+    events.on(EVT.STREAM_DONE, () => this.cancelStreamPaint());
+    events.on(EVT.STREAM_ABORT, () => this.cancelStreamPaint());
 
     // 6. 全局事件委托
     this.bindGlobalEvents();
     this.initialized = true;
 
-    // 6.5 Minimal local plugin runtime (empty builtin list; DSH adapter is a stub)
+    // 6.5 Local plugin runtime (builtin extra-notes). DSH is a Planned adapter, not the host.
     this._pluginRuntime = getLocalPluginRuntime();
     this._pluginRuntime.start(builtinPlugins).catch((e) => {
       console.warn("[App] plugin runtime skipped:", e.message);
@@ -224,6 +302,14 @@ const App = {
     // 保存「我的」页滚动位置：innerHTML 替换会把它清零
     const meScroll = document.getElementById("me-scroll");
     if (meScroll) this._meScrollTop = meScroll.scrollTop;
+    const liveMsgs = document.getElementById("chat-messages");
+    if (liveMsgs) {
+      this._savedChatScroll = {
+        chatId: this._draftChatId || store.getState().currentChatId,
+        top: liveMsgs.scrollTop,
+        nearBottom: liveMsgs.scrollHeight - liveMsgs.scrollTop - liveMsgs.clientHeight < 120,
+      };
+    }
     this._openProfileFolds = [...document.querySelectorAll("details.profile-fold[open]")].map(
       (d) => d.querySelector("summary")?.textContent.trim()
     );
@@ -267,14 +353,97 @@ const App = {
     this.bindRippleButtons();
   },
 
+  cancelStreamPaint() {
+    if (this._streamPaintRaf && typeof cancelAnimationFrame === "function") {
+      cancelAnimationFrame(this._streamPaintRaf);
+    }
+    if (this._streamPaintTimer) clearTimeout(this._streamPaintTimer);
+    this._streamPaintRaf = 0;
+    this._streamPaintTimer = 0;
+  },
+
+  paintStreamingDelta(chatId, text) {
+    const box = document.getElementById("chat-messages");
+    if (!box || this.view !== "app") return false;
+    const raw = text || getStreamingPreview(chatId) || "";
+    if (!String(raw).trim()) return true;
+    let bubble = findStreamingBubble(document);
+    if (!bubble) {
+      if (!this.appendStreamingRow(chatId, raw)) return false;
+      bubble = findStreamingBubble(document);
+      if (!bubble) return false;
+      this._streamPaintAt = Date.now();
+      this._streamPaintText = raw;
+      followStreamScroll(box);
+      return true;
+    }
+    this._streamPaintText = raw;
+    if (this._streamPaintTimer || this._streamPaintRaf) return true;
+    const wait = shouldPaintNow(this._streamPaintAt)
+      ? 0
+      : STREAM_PAINT_MIN_MS - (Date.now() - this._streamPaintAt);
+    const flush = () => {
+      this._streamPaintRaf = 0;
+      this._streamPaintTimer = 0;
+      this.flushStreamPaint();
+    };
+    if (wait > 0) {
+      this._streamPaintTimer = setTimeout(flush, wait);
+    } else if (typeof requestAnimationFrame === "function") {
+      this._streamPaintRaf = requestAnimationFrame(flush);
+    } else {
+      flush();
+    }
+    return true;
+  },
+
+  flushStreamPaint() {
+    const bubble = findStreamingBubble(document);
+    if (!bubble) return;
+    const raw = this._streamPaintText || "";
+    this._streamPaintAt = Date.now();
+    patchStreamingBubble(bubble, streamingMarkdown(raw), streamSignature(raw));
+    followStreamScroll(document.getElementById("chat-messages"));
+  },
+
+  appendStreamingRow(chatId, raw) {
+    const box = document.getElementById("chat-messages");
+    const chat = store.getCurrentChat();
+    if (!box || !chat || chat.id !== chatId) return false;
+    const messages = peekMessages(chatId);
+    let idx = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].status === "streaming") {
+        idx = i;
+        break;
+      }
+    }
+    if (idx < 0) return false;
+    const html = renderMessage({ ...messages[idx], text: raw || messages[idx].text }, idx, chat, messages);
+    if (!html) return false;
+    box.insertAdjacentHTML("beforeend", html);
+    this.bindMessageGestures();
+    return !!findStreamingBubble(document);
+  },
+
   afterRenderApp() {
     // 智能滚动：仅当用户接近底部时自动滚动到底部
     const msgBox = document.getElementById("chat-messages");
     if (msgBox) {
-      const nearBottom = msgBox.scrollHeight - msgBox.scrollTop - msgBox.clientHeight < 120;
-      if (nearBottom || msgBox.scrollTop === 0) {
+      const chatId = store.getState().currentChatId;
+      const saved = this._savedChatScroll;
+      const sameChat = saved && saved.chatId === chatId;
+      const persisted = store.getChatScroll(chatId);
+      if (this._pinChatToBottom) {
+        msgBox.scrollTop = msgBox.scrollHeight;
+      } else if (sameChat) {
+        msgBox.scrollTop = saved.nearBottom ? msgBox.scrollHeight : saved.top;
+      } else if (persisted && !persisted.nearBottom) {
+        msgBox.scrollTop = persisted.top;
+      } else {
         msgBox.scrollTop = msgBox.scrollHeight;
       }
+      this._pinChatToBottom = false;
     }
 
     // 「我的」页回到离开时的位置，避免每次重渲染都跳回顶部
@@ -301,6 +470,7 @@ const App = {
     }
 
     this.bindMessageGestures();
+    this.bindChatWindow();
 
     document.querySelectorAll("details.profile-fold").forEach((d) => {
       const t = d.querySelector("summary")?.textContent.trim();
@@ -358,6 +528,58 @@ const App = {
       msg.addEventListener("touchend", clear, { passive: true });
       msg.addEventListener("touchmove", clear, { passive: true });
     });
+  },
+
+  bindChatWindow() {
+    const box = document.getElementById("chat-messages");
+    if (!box || box.dataset.windowBound) return;
+    box.dataset.windowBound = "1";
+    box.addEventListener(
+      "scroll",
+      () => {
+        this.onChatWindowScroll(box);
+      },
+      { passive: true }
+    );
+  },
+
+  onChatWindowScroll(box) {
+    if (!box) return;
+    const chat = store.getCurrentChat();
+    if (!chat) return;
+    if (this._scrollSaveTimer) clearTimeout(this._scrollSaveTimer);
+    this._scrollSaveTimer = setTimeout(() => {
+      const live = document.getElementById("chat-messages");
+      const current = store.getCurrentChat();
+      if (!live || !current) return;
+      store.setChatScroll(current.id, {
+        top: live.scrollTop,
+        nearBottom: live.scrollHeight - live.scrollTop - live.clientHeight < 120,
+      });
+    }, 320);
+    if (this._loadingOlder) return;
+    if (box.scrollTop < 96 && peekHasOlder(chat.id)) {
+      this._loadingOlder = true;
+      const prevH = box.scrollHeight;
+      const prevTop = box.scrollTop;
+      loadOlderMessages(chat.id)
+        .then((added) => {
+          this._loadingOlder = false;
+          if (!added) return;
+          this.render();
+          const next = document.getElementById("chat-messages");
+          if (next) next.scrollTop = next.scrollHeight - prevH + prevTop;
+        })
+        .catch(() => {
+          this._loadingOlder = false;
+        });
+    }
+  },
+
+  indexByMessageId(messageId) {
+    const chat = store.getCurrentChat();
+    if (!chat || !messageId) return -1;
+    return peekMessages(chat.id).findIndex((m) => m.id === messageId);
   },
 
   toggleMessageActions(btn) {
@@ -420,6 +642,16 @@ const App = {
       }
     });
     this.bindVisualViewport();
+    window.addEventListener("pagehide", () => {
+      stopSpeech();
+      stopDictation();
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        stopSpeech();
+        stopDictation();
+      }
+    });
   },
 
   bindVisualViewport() {
@@ -456,6 +688,9 @@ const App = {
       store.selectChat(null);
       store.setActiveTab("companion");
       this.render();
+      if (!(store.getState().chats || []).filter((c) => !c.archivedAt).length) {
+        this.openBring();
+      }
     });
   },
 
@@ -474,27 +709,28 @@ const App = {
     showToast({ message: "把聊天记录粘过来，就能认出 TA。", type: "info" });
   },
   importBackup() {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".json,application/json";
-    input.onchange = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      try {
-        const text = await readFileAsText(file);
-        const data = JSON.parse(text);
-        store.importAll(data, "merge");
-        import("./domain/message-store.js")
-          .then(({ messageStore }) => messageStore.bootstrapStorage(store.getState().currentChatId))
-          .catch(() => {});
-        showToast({ message: "备份导入成功", type: "success" });
-        this.view = "app";
-        this.render();
-      } catch (err) {
-        showToast({ message: "导入失败：文件格式错误", type: "error" });
-      }
-    };
-    input.click();
+    this.importAll();
+  },
+  previewTemplate(name) {
+    const tpl = getSystemTemplates().find((t) => t.name === name);
+    if (!tpl) return;
+    document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+    const hello = String(tpl.firstMessage || "").trim();
+    const persona = String(tpl.persona || tpl.tag || "").trim();
+    openModal({
+      title: `认识 ${tpl.name}`,
+      width: "400px",
+      content: `
+        <div class="share-card">
+          ${CharacterAvatar({ src: tpl.avatar || "", size: "lg", alt: tpl.name, name: tpl.name })}
+          <div class="share-card-name">${esc(tpl.name)}</div>
+          <p class="share-card-note">这是人设开场，还没有你们的记忆。</p>
+          ${persona ? `<p class="meet-identity">${esc(clipPreview(persona, 72))}</p>` : ""}
+          ${hello ? `<blockquote class="meet-hello">${esc(hello)}</blockquote>` : ""}
+        </div>`,
+      footer: `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openTemplatePicker()">返回</button>
+        <button class="btn btn-primary" onclick="window.EchoApp.selectTemplate('${esc(tpl.name)}')">开始相处</button>`,
+    });
   },
   async selectTemplate(name) {
     const tpl = getSystemTemplates().find((t) => t.name === name);
@@ -510,6 +746,7 @@ const App = {
       }
       this.render();
       showToast({ message: `「${tpl.name}」已加入，可以开始聊了`, type: "success" });
+      queueMicrotask(() => document.getElementById("chat-input")?.focus());
     } catch (err) {
       showToast({ message: "创建失败", type: "error" });
     }
@@ -540,7 +777,17 @@ const App = {
       store.setProfileOpen(false);
     }
   },
+  _persistLiveChatScroll() {
+    const live = document.getElementById("chat-messages");
+    const chatId = this._savedChatScroll?.chatId || store.getState().currentChatId;
+    if (!live || !chatId) return;
+    store.setChatScroll(chatId, {
+      top: live.scrollTop,
+      nearBottom: live.scrollHeight - live.scrollTop - live.clientHeight < 120,
+    });
+  },
   selectCharacter(id) {
+    this._persistLiveChatScroll();
     store.setSelectedCharacter(id);
     this.continueCharacter(id);
   },
@@ -548,6 +795,7 @@ const App = {
     store.setSelectedCharacter(null);
   },
   continueCharacter(id) {
+    this._persistLiveChatScroll();
     const chat = continueCharacterHub(id);
     if (chat?.id) {
       import("./domain/message-store.js")
@@ -557,6 +805,7 @@ const App = {
     }
   },
   startNewConversation(id) {
+    this._persistLiveChatScroll();
     startConversationForCharacter(id).then((chat) => {
       if (chat?.id) {
         import("./domain/message-store.js")
@@ -607,6 +856,45 @@ const App = {
     downloadFile(`${chat.name || "character"}.json`, JSON.stringify(card, null, 2));
     showToast({ message: "角色卡已导出", type: "success" });
   },
+  previewCharacterCard(characterId) {
+    const chat = store.getState().chats.find((c) => c.roleId === characterId) || store.getCurrentChat();
+    if (!chat) {
+      showToast({ message: "没有可预览的角色", type: "info" });
+      return;
+    }
+    const card = buildCharacterCard(chat);
+    document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+    openModal({
+      title: "角色预览",
+      width: "400px",
+      content: renderCharacterShareCard(card),
+      footer: `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openProfileMoreSheet('${esc(characterId)}')">返回</button>
+        <button class="btn btn-secondary" onclick="window.EchoApp.copyCharacterCard('${esc(characterId)}')">复制 JSON</button>
+        <button class="btn btn-primary" onclick="window.EchoApp.exportCharacterCard('${esc(characterId)}');this.closest('.modal-overlay').remove()">导出角色卡</button>`,
+    });
+  },
+  async copyCharacterCard(characterId) {
+    const chat = store.getState().chats.find((c) => c.roleId === characterId) || store.getCurrentChat();
+    if (!chat) {
+      showToast({ message: "没有可复制的角色", type: "info" });
+      return;
+    }
+    const text = JSON.stringify(buildCharacterCard(chat), null, 2);
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+      else {
+        const area = document.createElement("textarea");
+        area.value = text;
+        document.body.appendChild(area);
+        area.select();
+        document.execCommand("copy");
+        area.remove();
+      }
+      showToast({ message: "角色卡已复制，不含记忆", type: "success" });
+    } catch {
+      showToast({ message: "复制失败，试试导出文件", type: "warning" });
+    }
+  },
   _charDraftAvatar: null,
   editCharacter(characterId) {
     this._charDraftAvatar = null;
@@ -634,6 +922,9 @@ const App = {
     const speaking =
       document.getElementById("edit-char-style")?.value ??
       (typeof chat?.config?.speakingStyle === "string" ? chat.config.speakingStyle : chat?.config?.speakingStyle?.notes || "");
+    const likes = document.getElementById("edit-char-likes")?.value ?? chat?.config?.likes ?? "";
+    const dislikes = document.getElementById("edit-char-dislikes")?.value ?? chat?.config?.dislikes ?? "";
+    const rules = document.getElementById("edit-char-rules")?.value ?? chat?.config?.rules ?? "";
     const avatar = this._charDraftAvatar || chat?.avatar;
     document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
     openModal({
@@ -651,6 +942,12 @@ const App = {
         <textarea class="input" id="edit-char-style" rows="2">${esc(speaking)}</textarea>
         <label class="field-label">对话示例（可选）</label>
         <textarea class="input" id="edit-char-examples" rows="2">${esc(examples)}</textarea>
+        <label class="field-label">喜欢（可选）</label>
+        <textarea class="input" id="edit-char-likes" rows="2" placeholder="TA 喜欢什么。不是你的记忆。">${esc(likes)}</textarea>
+        <label class="field-label">不喜欢（可选）</label>
+        <textarea class="input" id="edit-char-dislikes" rows="2" placeholder="TA 会避开什么。">${esc(dislikes)}</textarea>
+        <label class="field-label">相处规则（可选）</label>
+        <textarea class="input" id="edit-char-rules" rows="2" placeholder="怎么和 TA 相处。不是世界书，也不是关于你的事实。">${esc(rules)}</textarea>
         <label class="field-label">回复速度</label>
         <p class="field-hint">控制这个角色回复消息时的呈现节奏</p>
         <div class="reply-pace-field" data-reply-pace-for="${esc(characterId)}">
@@ -660,6 +957,7 @@ const App = {
             onChange: `window.EchoApp.setCharacterReplyPace.bind(null, '${esc(characterId)}')`,
           })}
         </div>
+        <button type="button" class="btn btn-ghost btn-sm sheet-action" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openCharacterWorldbook('${esc(characterId)}')">角色世界书</button>
       `,
       footer: `
         <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">取消</button>
@@ -678,6 +976,9 @@ const App = {
     const scenario = document.getElementById("edit-char-scenario")?.value || "";
     const mesExample = document.getElementById("edit-char-examples")?.value || "";
     const speakingStyle = document.getElementById("edit-char-style")?.value || "";
+    const likes = document.getElementById("edit-char-likes")?.value || "";
+    const dislikes = document.getElementById("edit-char-dislikes")?.value || "";
+    const rules = document.getElementById("edit-char-rules")?.value || "";
     const avatar = this._charDraftAvatar;
     this._charDraftAvatar = null;
     Character.updateCharacter(characterId, {
@@ -685,15 +986,20 @@ const App = {
       identity,
       personality: { description: identity, scenario, mesExample },
       speakingStyle: speakingStyle ? { notes: speakingStyle } : {},
+      preferences: { likes, dislikes, rules },
       ...(avatar ? { avatar } : {}),
     })
       .then(() => {
         const chats = store.getState().chats.filter((c) => c.roleId === characterId);
+        const previousName = chats
+          .slice()
+          .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))[0]?.name;
         chats.forEach((c) => {
+          const rename = !c.name || c.name === previousName;
           store.updateChat(c.id, {
-            name,
+            ...(rename ? { name } : {}),
             ...(avatar ? { avatar } : {}),
-            config: { ...c.config, persona: identity, scenario, mesExample, speakingStyle },
+            config: { ...c.config, persona: identity, scenario, mesExample, speakingStyle, likes, dislikes, rules },
           });
         });
         document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
@@ -793,7 +1099,7 @@ const App = {
       title: "创建角色",
       width: "440px",
       content: `
-        <p class="create-sub">给 TA 一个名字，开始相处。</p>
+        <p class="create-sub">创造一个陪伴对象。给 TA 一个名字，开始相处。</p>
         <button type="button" class="create-primary-btn" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openCreateQuickStart()">
           <span class="create-card-ic">${Icons.sparkles}</span>
           <span class="create-card-title">从模板或空白开始</span>
@@ -823,8 +1129,8 @@ const App = {
       width: "440px",
       content: `
         <div class="create-secondary-group">
-          ${pick(Icons.users, "选内置角色", "挑一个性格，直接开聊", "window.EchoApp.openTemplatePicker()")}
-          ${pick(Icons.sparkles, "空白创建", "名字、头像和一句话描述", "window.EchoApp.openCreateBlank()")}
+          ${pick(Icons.users, "选内置角色", "挑一个性格，预览后直接开聊", "window.EchoApp.openTemplatePicker()")}
+          ${pick(Icons.sparkles, "空白创建", "看着 TA 成形：名字、头像和一句话", "window.EchoApp.openCreateBlank()")}
         </div>
       `,
       footer: `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openBring()">返回</button>`,
@@ -841,15 +1147,16 @@ const App = {
   openTemplatePicker() {
     const templates = getSystemTemplates();
     openModal({
-      title: "内置角色",
+      title: "推荐性格",
       width: "440px",
       content: `
+        <p class="create-sub">先看性格，再开始相处。人设可以以后再改。</p>
         <div class="create-secondary-group">
           ${templates
             .slice(0, 10)
             .map(
               (t) => `
-            <button type="button" class="create-secondary-btn" onclick="this.closest('.modal-overlay').remove();window.EchoApp.selectTemplate('${esc(t.name)}')">
+            <button type="button" class="create-secondary-btn" onclick="this.closest('.modal-overlay').remove();window.EchoApp.previewTemplate('${esc(t.name)}')">
               <span class="create-card-ic">${Icons.users}</span>
               <span>
                 <span class="create-card-title">${esc(t.name)}</span>
@@ -871,21 +1178,55 @@ const App = {
   _paintCreateBlank() {
     const name = document.getElementById("blank-char-name")?.value || "";
     const desc = document.getElementById("blank-char-desc")?.value || "";
+    const scenario = document.getElementById("blank-char-scenario")?.value || "";
+    const examples = document.getElementById("blank-char-examples")?.value || "";
+    const likes = document.getElementById("blank-char-likes")?.value || "";
+    const dislikes = document.getElementById("blank-char-dislikes")?.value || "";
+    const rules = document.getElementById("blank-char-rules")?.value || "";
     document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
     openModal({
-      title: "创建新人设",
+      title: "创造陪伴",
       width: "440px",
       content: `
-        ${this._avatarPickerMarkup("blank", this._blankAvatar, name || "新角色")}
+        <div class="create-presence">
+          ${this._avatarPickerMarkup("blank", this._blankAvatar, name || "新角色")}
+          <div class="create-presence-copy">
+            <div class="create-presence-name" id="blank-preview-name">${esc(name.trim() || "还没有名字")}</div>
+            <div class="create-presence-line" id="blank-preview-line">${esc(desc.trim() || "一句话，TA 就会站在这里。")}</div>
+          </div>
+        </div>
         <label class="field-label">名字</label>
-        <input class="input" id="blank-char-name" placeholder="给 TA 起个名字" maxlength="32" value="${esc(name)}" />
+        <input class="input" id="blank-char-name" placeholder="给 TA 起个名字" maxlength="32" value="${esc(name)}" oninput="window.EchoApp.previewBlankCharacter()" />
         <label class="field-label">一句话描述（可选）</label>
-        <textarea class="input" id="blank-char-desc" rows="3" placeholder="例如：她是咖啡店店员，不爱说话但会记得我的喜好。" style="min-height:88px;">${esc(desc)}</textarea>
+        <p class="field-hint">这是 TA 是谁。关于你的事会在聊天里慢慢记住，不必写在这里。</p>
+        <textarea class="input" id="blank-char-desc" rows="3" placeholder="例如：她是咖啡店店员，不爱说话但会记得我的喜好。" style="min-height:88px;" oninput="window.EchoApp.previewBlankCharacter()">${esc(desc)}</textarea>
+        <details class="profile-fold">
+          <summary>情景、示例、相处规则（可选）</summary>
+          <label class="field-label">初始背景</label>
+          <textarea class="input" id="blank-char-scenario" rows="2" placeholder="你们现在在什么情景里。">${esc(scenario)}</textarea>
+          <label class="field-label">说话示例</label>
+          <textarea class="input" id="blank-char-examples" rows="2" placeholder="用户: …\n角色: …">${esc(examples)}</textarea>
+          <label class="field-label">喜欢 / 不喜欢</label>
+          <textarea class="input" id="blank-char-likes" rows="2" placeholder="TA 喜欢什么">${esc(likes)}</textarea>
+          <textarea class="input" id="blank-char-dislikes" rows="2" placeholder="TA 不喜欢什么">${esc(dislikes)}</textarea>
+          <label class="field-label">相处规则</label>
+          <textarea class="input" id="blank-char-rules" rows="2" placeholder="怎么和 TA 相处。不是世界书。">${esc(rules)}</textarea>
+        </details>
       `,
       footer: `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openCreateQuickStart()">返回</button>
         <button class="btn btn-primary" onclick="window.EchoApp.createBlankCharacter()">创建角色</button>`,
     });
     this.bindRippleButtons();
+  },
+  previewBlankCharacter() {
+    const name = document.getElementById("blank-char-name")?.value || "";
+    const desc = document.getElementById("blank-char-desc")?.value || "";
+    const nameEl = document.getElementById("blank-preview-name");
+    const lineEl = document.getElementById("blank-preview-line");
+    const fallback = document.querySelector(".create-presence .avatar-fallback");
+    if (nameEl) nameEl.textContent = name.trim() || "还没有名字";
+    if (lineEl) lineEl.textContent = desc.trim() || "一句话，TA 就会站在这里。";
+    if (fallback) fallback.textContent = (name.trim() || "?").slice(0, 1);
   },
   _avatarPickerMarkup(target, src, name) {
     const id = `avatar-pick-${target}`;
@@ -929,6 +1270,11 @@ const App = {
   async createBlankCharacter() {
     const name = document.getElementById("blank-char-name")?.value?.trim();
     const desc = document.getElementById("blank-char-desc")?.value?.trim() || "";
+    const scenario = document.getElementById("blank-char-scenario")?.value?.trim() || "";
+    const mesExample = document.getElementById("blank-char-examples")?.value?.trim() || "";
+    const likes = document.getElementById("blank-char-likes")?.value?.trim() || "";
+    const dislikes = document.getElementById("blank-char-dislikes")?.value?.trim() || "";
+    const rules = document.getElementById("blank-char-rules")?.value?.trim() || "";
     if (!name) {
       showToast({ message: "先写个名字", type: "warning" });
       return;
@@ -939,6 +1285,11 @@ const App = {
         persona: desc || `${name}。`,
         firstMessage: "",
         avatar: this._blankAvatar || "assets/avatars/default.svg",
+        scenario,
+        mesExample,
+        likes,
+        dislikes,
+        rules,
       });
       this._blankAvatar = null;
       document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
@@ -950,6 +1301,7 @@ const App = {
       }
       this.render();
       showToast({ message: `「${name}」已创建，可以开始聊了`, type: "success" });
+      queueMicrotask(() => document.getElementById("chat-input")?.focus());
     } catch (err) {
       showToast({ message: "创建失败", type: "error" });
     }
@@ -964,12 +1316,15 @@ const App = {
         title: "相处线",
         width: "420px",
         content: `
-          <p class="recon-lead">同一位 ${esc(chat.name || "TA")} 的不同聊天主题。记忆和关系共享。</p>
+          <p class="recon-lead">TA 是这个角色。每条线是一次聊天。记忆和关系跟着 TA，不跟着某一条线。</p>
           ${convos.map((c) => `
-            <button type="button" class="bring-opt ${c.id === chat.id ? "bring-opt-on" : ""}" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openConversation('${c.id}')">
-              <span class="bring-opt-title">${esc(c.name || "日常相处")}</span>
-              <span class="bring-opt-desc">${esc((c.lastPreview || "还没有聊过").slice(0, 48))}</span>
-            </button>
+            <div class="conv-row">
+              <button type="button" class="conv-item ${c.id === chat.id ? "on" : ""}" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openConversation('${c.id}')">
+                <span class="n">${esc(c.threadTitle || "日常相处")}</span>
+                <span class="d">${esc((c.lastPreview || "还没有聊过").slice(0, 48))}</span>
+              </button>
+              <button type="button" class="conv-del" onclick="window.EchoApp.openThreadRename('${c.id}')">改名</button>
+            </div>
           `).join("")}
         `,
         footer: `
@@ -979,7 +1334,37 @@ const App = {
       });
     });
   },
+  openThreadRename(chatId) {
+    const chat = store.getState().chats.find((c) => c.id === chatId);
+    if (!chat) return;
+    import("./domain/conversation.js").then(({ getThreadTitle }) => {
+      const current = getThreadTitle(chat);
+      document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+      openModal({
+        title: "相处线名称",
+        width: "400px",
+        content: `
+          <label class="field-label">给这条线起个好认的名字</label>
+          <input class="input" id="thread-title-input" value="${esc(current)}" maxlength="40" />
+        `,
+        footer: `
+          <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">取消</button>
+          <button class="btn btn-primary" onclick="window.EchoApp.saveThreadRename('${chatId}')">保存</button>
+        `,
+      });
+      queueMicrotask(() => document.getElementById("thread-title-input")?.focus());
+    });
+  },
+  saveThreadRename(chatId) {
+    const title = document.getElementById("thread-title-input")?.value || "";
+    import("./domain/conversation.js").then(({ renameConversation }) => {
+      if (!renameConversation(chatId, title)) return;
+      document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+      this.render();
+    });
+  },
   selectChat(id) {
+    this._persistLiveChatScroll();
     store.selectChat(id);
     store.setProfileOpen(window.innerWidth >= PROFILE_PERSIST_MIN_WIDTH);
     import("./domain/message-store.js")
@@ -989,25 +1374,55 @@ const App = {
   },
   deleteChat(id) {
     const chat = store.getState().chats.find((c) => c.id === id);
+    const siblings = (store.getState().chats || []).filter((c) => c.roleId === chat?.roleId && c.id !== id && !c.archivedAt);
+    const lastThread = !!chat && siblings.length === 0;
     openConfirm({
-      title: "删除对话",
-      message: `确定删除与「${chat?.name || "此角色"}」的对话吗？所有聊天记录将被永久删除，此操作不可恢复。`,
+      title: lastThread ? "删除角色" : "删除这条相处线",
+      message: lastThread
+        ? `这是「${chat?.name || "此角色"}」的最后一条相处线。删除后角色、对话、记忆和痕迹都会一起去掉，不能恢复。`
+        : `确定删除与「${chat?.name || "此角色"}」的这条相处线吗？这条线里的聊天记录会永久删除，角色还在。`,
       confirmText: "删除",
       cancelText: "取消",
       variant: "danger",
       onConfirm: () => {
-        import("./domain/conversation.js")
-          .then(({ deleteConversation }) => deleteConversation(id))
-          .then(() => showToast({ message: "对话已删除", type: "success" }))
+        const work = lastThread
+          ? Character.permanentDeleteCharacter(chat.roleId)
+          : import("./domain/conversation.js").then(({ deleteConversation }) => deleteConversation(id));
+        work
+          .then(() => {
+            document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+            showToast({ message: lastThread ? "角色已删除" : "相处线已删除", type: "success" });
+            this.render();
+          })
           .catch(() => {
             store.deleteChat(id);
-            showToast({ message: "对话已删除", type: "success" });
+            this.render();
+            showToast({ message: "相处线已删除", type: "success" });
           });
       },
     });
   },
+  deleteCharacter(id) {
+    const chat = store.getState().chats.find((c) => c.roleId === id);
+    openConfirm({
+      title: "删除角色",
+      message: `确定删除「${chat?.name || "这个角色"}」吗？对话、记忆、关系和痕迹都会一起删掉，不能恢复。`,
+      confirmText: "删除",
+      cancelText: "取消",
+      variant: "danger",
+      onConfirm: () => {
+        Character.permanentDeleteCharacter(id)
+          .then(() => {
+            document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+            showToast({ message: "角色已删除", type: "success" });
+            this.render();
+          })
+          .catch(() => showToast({ message: "删除失败", type: "error" }));
+      },
+    });
+  },
   backToList() {
-    // 移动端返回列表
+    this._persistLiveChatScroll();
     store.selectChat(null);
   },
   setSearch(q) {
@@ -1019,10 +1434,25 @@ const App = {
   },
 
   // 聊天
+  fillComposer(text) {
+    const input = document.getElementById("chat-input");
+    if (!input) return;
+    input.value = String(text || "");
+    this.onChatInput(input);
+    this.autoGrowInput(input);
+    this.updateChatCount(input);
+    input.focus();
+  },
   sendMessage() {
+    stopDictation();
+    this._syncMicButton();
     const input = document.getElementById("chat-input");
     const text = input?.value?.trim();
     if (!text) return;
+    if (isSending()) {
+      showToast({ message: "上一条还在回复", type: "info" });
+      return;
+    }
     if (text.length > MAX_USER_MESSAGE_CHARS) {
       showToast({ message: `单条最多 ${MAX_USER_MESSAGE_CHARS} 字，请删短后再发`, type: "info" });
       this.updateChatCount(input);
@@ -1041,6 +1471,7 @@ const App = {
       return;
     }
     this._sendPulse = true;
+    this._pinChatToBottom = true;
     return sendMessage(text);
   },
   stopSend() {
@@ -1077,68 +1508,87 @@ const App = {
   },
   copyMessage(index) {
     const chat = store.getCurrentChat();
-    import("./domain/message-store.js").then(({ peekMessages }) => {
-      const msg = peekMessages(chat?.id)?.[index];
-      if (msg) copyMessage(msg.text);
-    });
+    const msg = peekMessages(chat?.id)?.[index];
+    if (msg) copyMessage(msg.text || "");
+  },
+  copyMessageById(messageId) {
+    this.copyMessage(this.indexByMessageId(messageId));
+  },
+  copyCodeBlock(btn) {
+    const code = btn?.closest(".md-pre")?.querySelector("code")?.textContent || "";
+    if (code) copyMessage(code);
   },
   rememberMessage(index) {
     const chat = store.getCurrentChat();
-    import("./domain/message-store.js").then(({ peekMessages }) => {
-      const msg = peekMessages(chat?.id)?.[index];
-      if (msg) {
-        rememberMessage(chat, msg);
-        showToast({ message: "已加入记忆", type: "success" });
-      }
-    });
+    const msg = peekMessages(chat?.id)?.[index];
+    if (msg) {
+      rememberMessage(chat, msg);
+      showToast({ message: "已加入记忆", type: "success" });
+    }
+  },
+  rememberMessageById(messageId) {
+    this.rememberMessage(this.indexByMessageId(messageId));
   },
   regenerateMessage(index) {
+    this._pinChatToBottom = true;
     regenerate(index);
   },
+  regenerateMessageById(messageId) {
+    this.regenerateMessage(this.indexByMessageId(messageId));
+  },
   retryLastMessage() {
+    this._pinChatToBottom = true;
     return retryLastMessage();
   },
   editMessage(index) {
-    const text = editMessage(index);
-    const input = document.getElementById("chat-input");
-    if (input && text) {
-      input.value = text;
-      this.autoGrowInput(input);
-      input.focus();
+    const text = readUserMessage(index);
+    if (!text) return;
+    document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+    openModal({
+      title: "编辑消息",
+      width: "440px",
+      content: `<p class="profile-muted">改完后会按这句重新生成后面的回复。已经记住的事不会被删掉。</p>
+        <textarea class="input" id="edit-msg-text" rows="5" maxlength="${MAX_USER_MESSAGE_CHARS}">${esc(text)}</textarea>`,
+      footer: `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">取消</button>
+        <button class="btn btn-primary" onclick="window.EchoApp.commitEditedMessage(${index})">保存并重生成</button>`,
+    });
+  },
+  editMessageById(messageId) {
+    this.editMessage(this.indexByMessageId(messageId));
+  },
+  commitEditedMessage(index) {
+    const next = document.getElementById("edit-msg-text")?.value || "";
+    document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+    if (!String(next).trim()) {
+      showToast({ message: "先写点内容", type: "warning" });
+      return;
     }
+    this._pinChatToBottom = true;
+    return editMessage(index, next);
   },
   deleteMessage(index) {
+    const chat = store.getCurrentChat();
+    if (!chat) return;
+    const msg = peekMessages(chat.id)?.[index];
+    if (!msg) return;
+    const id = msg.id;
     openConfirm({
       title: "删除消息",
-      message: "确定删除这条消息吗？此操作不可恢复。",
+      message: "确定删除这条消息吗？此操作不可恢复，已经记住的事不会被删掉。",
       confirmText: "删除",
       cancelText: "取消",
       variant: "danger",
       onConfirm: () => {
-        deleteMessage(index);
+        deleteMessageById(id);
         showToast({ message: "消息已删除", type: "success" });
       },
     });
   },
-  retryFromMessage(index) {
-    const chat = store.getCurrentChat();
-    if (!chat) return;
-    import("./domain/message-store.js").then(async ({ peekMessages, truncateMessages }) => {
-      const msgs = peekMessages(chat.id);
-      let userText = null;
-      for (let i = index - 1; i >= 0; i--) {
-        if (msgs[i]?.role === "me") {
-          userText = msgs[i].text;
-          break;
-        }
-      }
-      if (!userText) {
-        showToast({ message: "无法重试，请重新发送", type: "info" });
-        return;
-      }
-      await truncateMessages(chat.id, index);
-      sendMessage(userText);
-    });
+  deleteMessageById(messageId) {
+    this.deleteMessage(this.indexByMessageId(messageId));
+  },
+  retryFromMessage() {
+    return this.retryLastMessage();
   },
   exportChat(id) {
     const chat = store.getState().chats.find((c) => c.id === id);
@@ -1159,6 +1609,16 @@ const App = {
   setMomentsFilter(value) {
     store.setMomentsFilter(value);
   },
+  openMomentsFeed(roleId) {
+    store.setMomentsFilter(roleId || "all");
+    document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+    this.switchTab("moments");
+  },
+  deleteMomentEntry(id) {
+    if (!id) return;
+    deleteMoment(id);
+    this.render();
+  },
   setMomentsFilterAndRefresh(value, roleId, chatId) {
     store.setMomentsFilter(value);
     this._paintContinuitySheet(roleId, chatId);
@@ -1170,7 +1630,7 @@ const App = {
   _paintContinuitySheet(roleId, chatId) {
     document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
     openModal({
-      title: "相处痕迹",
+      title: "记忆与痕迹",
       width: "520px",
       content: renderContinuitySheetContent(roleId, chatId),
       footer: `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">关闭</button>`,
@@ -1217,25 +1677,73 @@ const App = {
     }
     if (input) input.value = "";
     addComment(id, "me", text);
-    showToast({ message: "评论已发布", type: "success" });
+    showToast({ message: "已记下", type: "success" });
+    this.render();
   },
-  addWorldbookEntry() {
+  addWorldbookEntry(bookId) {
     const keys = document.getElementById("wb-keys")?.value || "";
     const content = String(document.getElementById("wb-content")?.value || "").trim();
     if (!content) {
       showToast({ message: "先写一点设定", type: "warning" });
       return;
     }
-    addEntry("global", {
-      name: keys.split(",")[0]?.trim() || "条目",
+    const targetId = bookId || this._wbContext?.bookId || "global";
+    addEntry(targetId, {
+      name: String(keys).split(",")[0]?.trim() || "条目",
       keys,
       content: content.slice(0, 1200),
+      enabled: document.getElementById("wb-enabled") ? document.getElementById("wb-enabled").checked : true,
+      constant: !!document.getElementById("wb-constant")?.checked,
     });
-    this._paintSettings("worldbook");
+    this._wbEditing = null;
+    this._repaintWorldbook();
     showToast({ message: "条目已添加", type: "success" });
+  },
+  saveWorldbookEntry(bookId) {
+    const entryId = document.getElementById("wb-edit-id")?.value;
+    const keys = document.getElementById("wb-keys")?.value || "";
+    const content = String(document.getElementById("wb-content")?.value || "").trim();
+    if (!entryId || !content) {
+      showToast({ message: "先写一点设定", type: "warning" });
+      return;
+    }
+    updateEntry(bookId || this._wbContext?.bookId || "global", entryId, {
+      name: String(keys).split(",")[0]?.trim() || "条目",
+      keys,
+      content: content.slice(0, 1200),
+      enabled: document.getElementById("wb-enabled") ? document.getElementById("wb-enabled").checked : true,
+      constant: !!document.getElementById("wb-constant")?.checked,
+    });
+    this._wbEditing = null;
+    this._repaintWorldbook();
+    showToast({ message: "条目已更新", type: "success" });
+  },
+  editWorldbookEntry(bookId, entryId) {
+    this._wbEditing = { bookId, entryId };
+    this._repaintWorldbook();
+  },
+  cancelWorldbookEdit() {
+    this._wbEditing = null;
+    this._repaintWorldbook();
+  },
+  toggleWorldbookEntry(bookId, entryId) {
+    toggleEntryEnabled(bookId, entryId);
+    this._repaintWorldbook();
   },
   deleteWorldbookEntry(bookId, entryId) {
     deleteEntry(bookId, entryId);
+    if (this._wbEditing?.entryId === entryId) this._wbEditing = null;
+    this._repaintWorldbook();
+  },
+  openCharacterWorldbook(roleId) {
+    if (!roleId) return;
+    const chat = store.getState().chats.find((c) => c.roleId === roleId);
+    const book = ensureCharacterBook(roleId, chat?.name ? `${chat.name}的世界书` : "角色世界书");
+    this._wbContext = { mode: "character", roleId, bookId: book.id };
+    this._wbEditing = null;
+    this._paintSettings("worldbook");
+  },
+  _repaintWorldbook() {
     this._paintSettings("worldbook");
   },
 
@@ -1243,12 +1751,18 @@ const App = {
   //  设置：按分区打开，每层都能返回「我的」
   // ============================================================
   _apiMoreOpen: false,
+  _wbContext: { mode: "global", roleId: null, bookId: "global" },
+  _wbEditing: null,
 
   openSettings(section) {
     const sec = section || "api";
     if (sec === "api") {
       const presetId = store.getState().settings.apiPresetId;
       if (presetId && presetId !== "siliconflow") this._apiMoreOpen = true;
+    }
+    if (sec === "worldbook") {
+      this._wbContext = { mode: "global", roleId: null, bookId: "global" };
+      this._wbEditing = null;
     }
     this._paintSettings(sec);
   },
@@ -1259,10 +1773,11 @@ const App = {
     document.querySelectorAll(".toast").forEach((t) => t.remove());
     const titles = {
       api: "API 与模型",
-      memory: "记忆",
+      memory: "记忆条数",
       appearance: "外观",
       backup: "备份",
       worldbook: "世界书",
+      notes: "额外叮嘱",
       voice: "语音",
     };
     const s = store.getState();
@@ -1279,6 +1794,7 @@ const App = {
         <button class="btn btn-primary" onclick="window.EchoApp.saveSettings()">保存</button>`;
     } else if (section === "memory") {
       content = `
+        <p class="profile-muted">这是上限，不是 TA 已经记住的内容。关于你的记忆在相处中打开。记忆不是角色设定，也不是世界书。</p>
         <label class="field-label">每位角色最多记忆条数 · <span id="mem-max-val">${s.memoryCfg.maxPerRole}</span></label>
         <input type="range" class="slider" id="set-mem-max" min="10" max="100" step="5" value="${s.memoryCfg.maxPerRole}"
           oninput="document.getElementById('mem-max-val').textContent=this.value" />
@@ -1294,52 +1810,66 @@ const App = {
     } else if (section === "backup") {
       content = `
         <div class="settings-group-body">
-          ${SettingRow({ icon: Icons.download, title: "导出全部数据", desc: "JSON 全量备份，含对话、记忆、设置", onClick: "window.EchoApp.exportAll()" })}
-          ${SettingRow({ icon: Icons.upload, title: "导入备份", desc: "从 JSON 备份文件恢复", onClick: "window.EchoApp.importAll()" })}
+          ${SettingRow({ icon: Icons.download, title: "导出全部数据", desc: "把对话、记忆、相处和设定收成一份文件", onClick: "window.EchoApp.exportAll()" })}
+          ${SettingRow({ icon: Icons.upload, title: "导入备份", desc: "从备份文件恢复，可看进度、可取消", onClick: "window.EchoApp.importAll()" })}
           ${SettingRow({ icon: Icons.trash, title: "清空所有对话", desc: "删除全部聊天记录，保留设置与记忆", onClick: "window.EchoApp.clearAllChats()" })}
           ${SettingRow({ icon: Icons.warning, title: "重置应用", desc: "清除所有数据并恢复初始状态", onClick: "window.EchoApp.resetApp()" })}
         </div>`;
       footer = `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">返回</button>`;
-    } else if (section === "worldbook") {
-      const books = listBooks();
-      const global = books.find((b) => b.id === "global") || books[0];
-      const entries = (global?.entries || []).slice(0, 24);
+    } else if (section === "notes") {
       content = `
-        <label class="field-label">关键词（逗号分隔）</label>
-        <input class="input" id="wb-keys" placeholder="雨天, 咖啡馆" />
-        <label class="field-label">设定</label>
-        <textarea class="input" id="wb-content" rows="4" maxlength="1200" placeholder="只有提到关键词时才会用到。"></textarea>
-        <button type="button" class="btn btn-secondary btn-sm" style="margin-top:12px" onclick="window.EchoApp.addWorldbookEntry()">添加条目</button>
-        <div class="wb-list" style="margin-top:16px">
-          ${entries.length
-            ? entries
-                .map(
-                  (e) => `<div class="mem-line memory-row">
-              <span class="memory-row-text"><b>${esc(e.name || (e.keys || []).join("、") || "条目")}</b>${
-                    (e.keys || []).length ? ` · ${esc((e.keys || []).join("、"))}` : ""
-                  }</span>
-              <button type="button" class="memory-row-del" onclick="window.EchoApp.deleteWorldbookEntry('${global.id}','${e.id}')" aria-label="删除条目">${Icons.close}</button>
-            </div>`
-                )
-                .join("")
-            : `<p class="profile-muted">还没有条目。写好关键词和设定后点添加。</p>`}
-        </div>`;
+        <label class="field-label">给所有角色的补充说明</label>
+        <p class="field-hint">出现在这一轮的附加说明里，不会写进记忆或关系。</p>
+        <textarea class="input" id="set-extra-notes" rows="5" maxlength="800" placeholder="例如：回复短一点，不要列清单。">${esc(s.settings.extraNotes || "")}</textarea>
+        <button type="button" class="btn btn-secondary btn-sm" style="margin-top:12px" onclick="window.EchoApp.openPromptPreview()">查看当前 Prompt</button>`;
+      footer = `
+        <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">返回</button>
+        <button class="btn btn-primary" onclick="window.EchoApp.saveExtraNotes()">保存</button>`;
+    } else if (section === "worldbook") {
+      const ctx = this._wbContext || { mode: "global", bookId: "global" };
+      const book =
+        ctx.mode === "character" && ctx.roleId
+          ? ensureCharacterBook(
+              ctx.roleId,
+              (store.getState().chats.find((c) => c.roleId === ctx.roleId) || {}).name
+            )
+          : getBook(ctx.bookId || "global") || listBooks().find((b) => b.id === "global");
+      const chat = ctx.roleId ? store.getState().chats.find((c) => c.roleId === ctx.roleId) : null;
+      titles.worldbook = ctx.mode === "character" ? `${chat?.name || "角色"}的世界书` : "世界书";
+      content = renderWorldbookEditorHtml({
+        book,
+        roleId: ctx.roleId,
+        editing: this._wbEditing?.entryId || null,
+        characters: listCharactersForHub(),
+      });
       footer = `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">返回</button>`;
     } else if (section === "voice") {
+      const sttOn = !!s.settings.sttEnabled;
+      const sttOk = isSttSupported();
       content = `
         <div class="settings-group-body">
           ${SettingRow({
             icon: Icons.volume,
             title: "朗读回复",
-            desc: s.settings.ttsEnabled ? "已开启" : "已关闭",
+            desc: s.settings.ttsEnabled ? "已开启：回复完成后自动朗读" : "已关闭",
             onClick: "window.EchoApp.toggleTTS();window.EchoApp.openSettings('voice')",
+          })}
+          ${SettingRow({
+            icon: Icons.stop,
+            title: "停止朗读",
+            desc: "立刻停下当前语音",
+            onClick: "window.EchoApp.stopSpeech()",
           })}
           ${SettingRow({
             icon: Icons.mic,
             title: "语音输入",
-            desc: "即将支持",
-            right: "<span></span>",
+            desc: sttOk
+              ? (sttOn ? "已开启：点麦克风说话，文字进输入框" : "已关闭")
+              : sttSupportNote(),
+            onClick: sttOk ? "window.EchoApp.toggleSttEnabled();window.EchoApp.openSettings('voice')" : "",
+            right: sttOk ? "" : "<span></span>",
           })}
+          <p class="profile-muted" style="margin:12px 16px 4px">${esc(sttSupportNote())}</p>
         </div>`;
       footer = `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">返回</button>`;
     }
@@ -1486,6 +2016,7 @@ const App = {
     try {
       const resp = await fetch(s.baseUrl.replace(/\/+$/, "") + "/models", {
         headers: { Authorization: `Bearer ${s.apiKey}` },
+        signal: typeof AbortSignal !== "undefined" && AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined,
       });
       showToast({
         message: resp.ok ? "连接成功" : `连接失败（${resp.status}）`,
@@ -1568,6 +2099,7 @@ const App = {
     this.render();
     if (pending) {
       this._sendPulse = true;
+      this._pinChatToBottom = true;
       sendMessage(pending);
     } else {
       showToast({ message: "模型已连接", type: "success" });
@@ -1603,10 +2135,10 @@ const App = {
       cancelText: "取消",
       variant: "danger",
       onConfirm: () => {
-        storage.clearAll();
-        store.reset();
-        showToast({ message: "应用已重置", type: "success" });
-        setTimeout(() => location.reload(), 800);
+        resetProductData().then(() => {
+          showToast({ message: "应用已重置", type: "success" });
+          setTimeout(() => location.reload(), 800);
+        });
       },
     });
   },
@@ -1625,6 +2157,13 @@ const App = {
     if (this._apiSurface === "connect") this.openApiConnect();
     else this._paintSettings("api");
   },
+  saveExtraNotes() {
+    const extraNotes = String(document.getElementById("set-extra-notes")?.value || "").slice(0, 800);
+    store.updateSettings({ extraNotes });
+    document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
+    this.render();
+    showToast({ message: extraNotes.trim() ? "叮嘱已保存" : "已清空叮嘱", type: "success" });
+  },
   saveSettings() {
     this._captureApiFields();
     document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
@@ -1637,7 +2176,13 @@ const App = {
     if (document.querySelector(".theme-grid")) this._paintSettings("appearance");
   },
   openChatSettings() {
-    showToast({ message: "聊天设置开发中", type: "info" });
+    const chat = store.getCurrentChat();
+    const roleId = chat?.roleId;
+    if (!roleId) {
+      showToast({ message: "请先打开一个对话", type: "info" });
+      return;
+    }
+    this.openPreferencesSheet(roleId);
   },
   openPromptPreview() {
     const chat = store.getCurrentChat();
@@ -1670,16 +2215,98 @@ const App = {
   },
   toggleTTS() {
     const s = store.getState();
-    store.updateSettings({ ttsEnabled: !s.settings.ttsEnabled });
-    showToast({ message: s.settings.ttsEnabled ? "朗读已关闭" : "朗读已开启", type: "info" });
+    const next = !s.settings.ttsEnabled;
+    store.updateSettings({ ttsEnabled: next });
+    if (!next) stopSpeech();
+    showToast({ message: next ? "朗读已开启" : "朗读已关闭", type: "info" });
+  },
+  stopSpeech() {
+    stopSpeech();
+  },
+  speakMessage(messageIndex) {
+    const chat = store.getCurrentChat();
+    const msg = peekMessages(chat?.id)?.[messageIndex];
+    if (!msg?.text || msg.role === "me") return;
+    speakText(msg.text);
+  },
+  speakMessageById(messageId) {
+    this.speakMessage(this.indexByMessageId(messageId));
   },
   toggleSTT() {
-    showToast({ message: "语音输入开发中", type: "info" });
+    if (isDictating()) {
+      stopDictation();
+      this._syncMicButton();
+      return;
+    }
+    if (!isSttSupported()) {
+      showToast({ message: "当前浏览器不支持语音输入，请用 Chrome 或 Edge", type: "info" });
+      return;
+    }
+    if (!store.getState().settings.sttEnabled) {
+      showToast({ message: "语音输入已关闭，可在「我的 → 语音」打开", type: "info" });
+      return;
+    }
+    stopSpeech();
+    const input = document.getElementById("chat-input");
+    this._sttBase = input?.value || "";
+    const started = startDictation({
+      lang: store.getState().settings.voiceLang || "zh-CN",
+      onInterim: (text) => this._applyDictation(text, false),
+      onFinal: (text) => this._applyDictation(text, true),
+      onError: (code) => {
+        this._syncMicButton();
+        const msg = sttErrorMessage(code);
+        if (msg) showToast({ message: msg, type: "info" });
+      },
+      onEnd: () => this._syncMicButton(),
+    });
+    if (!started.ok) {
+      showToast({
+        message: started.reason === "unsupported"
+          ? "当前浏览器不支持语音输入，请用 Chrome 或 Edge"
+          : "没法开始语音输入",
+        type: "info",
+      });
+      this._syncMicButton();
+      return;
+    }
+    this._syncMicButton();
   },
-  exportAll() {
-    const data = store.exportAll();
-    downloadFile(`echodownload-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data, null, 2));
-    showToast({ message: "已导出全部数据", type: "success" });
+  toggleSttEnabled() {
+    const next = !store.getState().settings.sttEnabled;
+    store.updateSettings({ sttEnabled: next });
+    if (!next) stopDictation();
+    this._syncMicButton();
+    showToast({ message: next ? "语音输入已开启" : "语音输入已关闭", type: "info" });
+  },
+  _applyDictation(text, isFinal) {
+    const input = document.getElementById("chat-input");
+    if (!input) return;
+    const next = joinDictation(this._sttBase || "", text).slice(0, MAX_USER_MESSAGE_CHARS);
+    input.value = next;
+    if (isFinal) this._sttBase = next;
+    this.autoGrowInput(input);
+    this.updateChatCount(input);
+    this.onChatInput(input);
+  },
+  _syncMicButton() {
+    const btn = document.querySelector(".chat-mic-btn");
+    if (!btn) return;
+    const on = isDictating();
+    btn.classList.toggle("is-listening", on);
+    btn.classList.toggle("icon-btn-active", on);
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    btn.title = on ? "停止语音输入" : "语音输入";
+    btn.setAttribute("aria-label", on ? "停止语音输入" : "语音输入");
+  },
+  async exportAll() {
+    try {
+      const data = await exportProductBackup();
+      downloadFile(`echochat-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data));
+      showToast({ message: "已导出全部数据", type: "success" });
+    } catch (err) {
+      showToast({ message: "导出失败", type: "error" });
+    }
   },
   importAll() {
     const input = document.createElement("input");
@@ -1691,16 +2318,50 @@ const App = {
       try {
         const text = await readFileAsText(file);
         const data = JSON.parse(text);
-        store.importAll(data, "merge");
+        this._importAbort = new AbortController();
+        const total = (data.state?.chats || []).reduce((n, c) => n + ((c.messages || []).length), 0);
+        this._paintImportProgress({ done: 0, total, percent: 0 });
+        await importProductBackup(data, "merge", {
+          signal: this._importAbort.signal,
+          onProgress: (p) => this._paintImportProgress(p),
+        });
+        closeModal(this._importOverlay);
+        this._importOverlay = null;
         import("./domain/message-store.js")
           .then(({ messageStore }) => messageStore.bootstrapStorage(store.getState().currentChatId))
           .catch(() => {});
         showToast({ message: "导入成功", type: "success" });
+        this.render();
       } catch (err) {
-        showToast({ message: "导入失败", type: "error" });
+        closeModal(this._importOverlay);
+        this._importOverlay = null;
+        const aborted = err?.name === "AbortError" || /aborted/.test(String(err?.message || ""));
+        showToast({ message: aborted ? "已取消导入" : "导入失败", type: aborted ? "info" : "error" });
       }
     };
     input.click();
+  },
+  _paintImportProgress(progress) {
+    const p = progress || {};
+    const overlay = this._importOverlay;
+    if (overlay?.isConnected) {
+      const strong = overlay.querySelector(".import-progress-copy strong");
+      const span = overlay.querySelector(".import-progress-copy span");
+      const fill = overlay.querySelector(".import-progress-fill");
+      const bar = overlay.querySelector(".import-progress-track");
+      const done = Number(p.done) || 0;
+      const total = Number(p.total) || 0;
+      const pct = Number(p.percent) || 0;
+      if (strong) strong.textContent = `${done.toLocaleString()} / ${total.toLocaleString()}`;
+      if (span) span.textContent = `${pct}%`;
+      if (fill) fill.style.width = `${pct}%`;
+      if (bar) bar.setAttribute("aria-valuenow", String(pct));
+      return;
+    }
+    this._importOverlay = openModal(importProgressMarkup(p));
+  },
+  cancelBulkImport() {
+    this._importAbort?.abort();
   },
 
   _recon: { overlay: null, step: "paste", pasteText: "", draft: null, error: "", sourceChatId: null, importMode: "file" },
@@ -1849,16 +2510,30 @@ const App = {
     this._captureReconstructionEdits();
     if (!this._recon.draft) return;
     try {
-      const result = await confirmReconstruction(this._recon.draft);
+      this._importAbort = new AbortController();
+      const total = (this._recon.draft.messages || []).length;
+      this._paintImportProgress({ done: 0, total, percent: 0 });
+      const result = await confirmReconstruction(this._recon.draft, {
+        signal: this._importAbort.signal,
+        onProgress: (p) => this._paintImportProgress(p),
+      });
       if (!result.ok) {
+        closeModal(this._importOverlay);
+        this._importOverlay = null;
+        if (result.aborted) {
+          showToast({ message: "已取消写入", type: "info" });
+          this._paintReconstruction();
+          return;
+        }
         this._recon.error = "创建失败，请检查记录后再试。";
         this._paintReconstruction();
         return;
       }
       const charName = this._recon.draft?.name || "TA";
       const insufficient = result.insufficient;
-      // 成功页停留一下再进对话，让「认出了谁」这件事被看见
       const wizardOverlay = this._recon.overlay;
+      closeModal(this._importOverlay);
+      this._importOverlay = null;
       this._recon.overlay = openModal({
         title: "",
         width: "380px",
@@ -1881,6 +2556,8 @@ const App = {
         }
       }, 1100);
     } catch (err) {
+      closeModal(this._importOverlay);
+      this._importOverlay = null;
       showToast({ message: "创建失败", type: "error" });
     }
   },

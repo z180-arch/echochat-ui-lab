@@ -29,6 +29,9 @@ export function getCharacterSlots(chat) {
     scenario: asText(cfg.scenario || personaObj.scenario),
     examples: asText(cfg.mesExample || personaObj.mes_example || personaObj.mesExample),
     speakingStyle: asText(cfg.speakingStyle || personaObj.speakingStyle),
+    likes: asText(cfg.likes || personaObj.likes),
+    dislikes: asText(cfg.dislikes || personaObj.dislikes),
+    rules: asText(cfg.rules || personaObj.rules || personaObj.system || cfg.systemPrompt),
   };
 }
 

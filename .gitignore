@@ -4,3 +4,11 @@ node_modules/
 .tmp-extract/
 .claude/
 .superpowers/
+.hallmark/
+backups/
+
+# Local secrets — never commit API keys
+.echochat.local.json
+.env
+.env.local
+.env.*.local

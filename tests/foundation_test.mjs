@@ -33,7 +33,7 @@ global.URL = { createObjectURL: () => "blob:mock" };
 
 const { storage, KEYS, runMigrations } = await import("../src/core/storage.js");
 const { store } = await import("../src/core/store.js");
-const { formatDateTime, todayStr } = await import("../src/core/utils.js");
+const { formatDateTime, todayStr, renderMarkdown } = await import("../src/core/utils.js");
 const { saveChatDraft, loadChatDraft, clearChatDraft } = await import("../src/domain/chat-draft.js");
 // ============================================================
 //  测试工具
@@ -414,16 +414,28 @@ test("chat draft is keyed by conversation id", () => {
 
 console.log("\n=== 6. Known Legacy Modules (Deferred) ===");
 
-test("moments.js uses storage (deferred to Phase 11)", () => {
+test("moments.js hydrates canonical storage (legacy key is recovery)", () => {
   
   const content = readFileSync(srcPath("src/domain/moments.js"), "utf-8");
-  assert.ok(content.includes("storage.get"), "moments.js uses storage (known legacy, deferred)");
+  assert.ok(content.includes("hydrateMoments"), "moments.js hydrates from canonical Dexie");
+  assert.ok(content.includes("KEYS.MOMENTS"), "moments.js still knows the legacy recovery key");
 });
 
-test("relations.js uses storage (deferred to Phase 9)", () => {
+test("relations.js hydrates canonical storage (legacy key is recovery)", () => {
   
   const content = readFileSync(srcPath("src/domain/relations.js"), "utf-8");
-  assert.ok(content.includes("storage.get"), "relations.js uses storage (known legacy, deferred)");
+  assert.ok(content.includes("hydrateRelations"), "relations.js hydrates from canonical Dexie");
+  assert.ok(content.includes("KEYS.RELATIONS"), "relations.js still knows the legacy recovery key");
+});
+
+test("renderMarkdown escapes HTML and rejects javascript links", () => {
+  assert.equal(renderMarkdown("hello"), "hello");
+  assert.ok(renderMarkdown("**bold**").includes("<strong>"));
+  assert.ok(renderMarkdown("`code`").includes("md-inline"));
+  assert.ok(!renderMarkdown("<img src=x>").includes("<img"));
+  assert.ok(!renderMarkdown("`<script>`").includes("<script>"));
+  assert.ok(!renderMarkdown("[x](javascript:alert(1))").includes("href="));
+  assert.ok(renderMarkdown("[ok](https://example.com)").includes('href="https://example.com"'));
 });
 
 // ============================================================

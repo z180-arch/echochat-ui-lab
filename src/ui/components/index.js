@@ -155,14 +155,14 @@ export function RelationshipBrief({ affinity = null, lastEvent = "", hasTalk = f
   const brief = String(affinity.brief || "").trim();
   if (compact) {
     const line = brief || String(affinity.toneHint || "").trim();
-    const days = affinity.knownDays ? `相处 ${affinity.knownDays} 天` : "";
+    const days = affinity.knownDays ? `认识第${affinity.knownDays}天` : "";
     return `<div class="relationship-brief">
       ${line ? `<p class="relationship-brief-copy">${esc(line)}</p>` : ""}
       ${days ? `<p class="profile-muted relationship-brief-meta">${esc(days)}</p>` : ""}
       ${event ? `<p class="profile-muted relationship-brief-meta">最近 · ${esc(event)}</p>` : ""}
     </div>`;
   }
-  const days = affinity.knownDays ? ` · 相处 ${affinity.knownDays} 天` : "";
+  const days = affinity.knownDays ? ` · 认识第${affinity.knownDays}天` : "";
   return `<div class="relationship-brief">
     <div class="relationship-brief-head">${StageChip({ label: affinity.stageLabel, stage: affinity.stage })}</div>
     <p class="relationship-brief-copy">${esc(affinity.stageLabel || "")}。${esc(affinity.toneHint || "")}${esc(days)}。多聊，关系会自己靠近——没有数值可以调。</p>

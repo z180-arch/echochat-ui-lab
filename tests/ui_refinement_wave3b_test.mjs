@@ -99,8 +99,10 @@ test("Wave 1 hub one secondary line is unchanged", () => {
 
 test("Profile header is a single stage line", () => {
   assert.ok(viewsSrc.includes("StageChip({ label: presented.label, stage: presented.stage })"));
-  assert.ok(!viewsSrc.includes("presented.hasHistory && presented.knownDays"));
-  assert.ok(!/profile-status`[^`]*相处 \$\{presented\.knownDays\}/.test(viewsSrc));
+  const profileStart = viewsSrc.indexOf("function renderProfilePane");
+  const profile = profileStart >= 0 ? viewsSrc.slice(profileStart) : "";
+  assert.ok(!/profile-status`[^`]*相处 \$\{presented\.knownDays\}/.test(profile));
+  assert.ok(!/profile-status[\s\S]{0,200}presented\.knownDays/.test(profile.split("profile-rows")[0] || ""));
 });
 
 test("Profile identity uses edit in actions, not duplicate tools block", () => {

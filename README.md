@@ -79,7 +79,7 @@ See [docs/design.md](docs/design.md).
 
 Shipped companion loop on Product Core. Storage names and Memory/retrieval/`assembleTurnContext`/Provider/Dexie schema are frozen unless a dedicated task says otherwise.
 
-Facts: [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md). Intent: [docs/ROADMAP.md](docs/ROADMAP.md).
+Facts: [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md). Snapshot: [docs/DEVELOPMENT_STATUS.md](docs/DEVELOPMENT_STATUS.md). Intent: [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ---
 
@@ -89,13 +89,13 @@ Facts: [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md). Intent: [docs/ROADMAP.md]
 npm test
 ```
 
-`package.json` only runs Node suites (no product dependencies). Browser checks need Chrome; CI runs them from `.github/workflows/ci.yml`.
+This is the only local verification entry. `package.json` has no product dependencies. Browser checks run in CI only.
 
 ---
 
 ## Roadmap
 
-See [docs/ROADMAP.md](docs/ROADMAP.md). Next work should come from production evidence, not from old stage lists.
+See [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/DEVELOPMENT_STATUS.md](docs/DEVELOPMENT_STATUS.md).
 
 ---
 
@@ -105,6 +105,7 @@ See [docs/ROADMAP.md](docs/ROADMAP.md). Next work should come from production ev
 |------|------|
 | [docs/README.md](docs/README.md) | Map |
 | [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md) | Shipped facts |
+| [docs/DEVELOPMENT_STATUS.md](docs/DEVELOPMENT_STATUS.md) | What to work on next |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layers |
 | [AGENTS.md](AGENTS.md) | Agent working agreement |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contributions |

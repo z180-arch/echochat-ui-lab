@@ -125,13 +125,13 @@ Do not add a new theme kit, animation system, component library, or particle-dem
 
 ## Tests
 
-Node 20+. From the repo root:
+Local and CI node entry:
 
 ```bash
 npm test
 ```
 
-That runs the Node suites listed in `.github/workflows/ci.yml` (no extra packages). Browser checks need Chrome and are the `scripts/*_verify.mjs` jobs in the same workflow.
+No other local test command. Browser checks need Chrome and run in CI only (`scripts/*_verify.mjs` listed in `.github/workflows/ci.yml`).
 
 Optional live model matrix (never logs the key):
 
@@ -140,6 +140,8 @@ node scripts/live_continuity_matrix.mjs
 ```
 
 Credentials: env or gitignored `.echochat.local.json`. Do not commit keys.
+
+Development snapshot: [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
 ---
 

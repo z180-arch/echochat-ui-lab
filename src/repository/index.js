@@ -1,12 +1,8 @@
 /**
  * EchoChat Repository Layer
  *
- * 统一入口。所有 Repository 通过此模块导出。
- * 核心 Domain 只依赖此模块，不依赖具体存储实现。
- *
- * Phase 1: Legacy Adapter (localStorage + IndexedDB)
- * Phase 2: Dexie Adapter (IndexedDB) — Repository 接口不变
- * Phase 9+: Platform-specific Adapters — Repository 接口不变
+ * Barrel export. Domain modules import specific repositories, not this file.
+ * Persistence is Dexie with a legacy localStorage adapter for compatibility.
  */
 
 import { CharacterRepository } from "./character.js";

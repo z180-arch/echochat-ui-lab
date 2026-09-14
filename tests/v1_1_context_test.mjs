@@ -1,5 +1,6 @@
 /**
- * V1.1 Context Builder, turn-relevant memory, relationship brief.
+ * Context builder, turn-relevant memory, relationship brief.
+ * Filename kept; this is not a V1.1 stage gate.
  */
 import { strict as assert } from "node:assert";
 import { pathToFileURL } from "node:url";

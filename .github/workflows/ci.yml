@@ -6,7 +6,7 @@ on:
 
 jobs:
   test:
-    name: Foundation Tests
+    name: Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -19,135 +19,8 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Migration Atomicity
-        run: node tests/migration_atomicity_test.mjs
-
-      - name: Foundation Test
-        run: node tests/foundation_test.mjs
-
-      - name: Storage Cutover
-        run: node tests/storage_cutover_test.mjs
-
-      - name: Core Product
-        run: node tests/core_product_test.mjs
-
-      - name: Reconstruction
-        run: node tests/reconstruction_test.mjs
-
-      - name: Core Loop
-        run: node tests/core_loop_test.mjs
-
-      - name: Reply Clean
-        run: node tests/reply_clean_test.mjs
-
-      - name: Chat Send
-        run: node tests/chat_send_test.mjs
-
-      - name: Chat Actions
-        run: node tests/chat_actions_test.mjs
-
-      - name: Stream Paint
-        run: node tests/stream_paint_test.mjs
-
-      - name: Virtual List
-        run: node tests/virtual_list_test.mjs
-
-      - name: Message Window
-        run: node tests/message_window_test.mjs
-
-      - name: Message Import
-        run: node tests/message_import_test.mjs
-
-      - name: Lived Moments
-        run: node tests/lived_moment_test.mjs
-
-      - name: Character Voice Slots
-        run: node tests/character_voice_slots_test.mjs
-
-      - name: Provider
-        run: node tests/provider_test.mjs
-
-      - name: Voice TTS
-        run: node tests/voice_test.mjs
-
-      - name: Voice STT
-        run: node tests/stt_test.mjs
-
-      - name: Theme Tokens
-        run: node tests/theme_tokens_test.mjs
-
-      - name: Ambient Policy
-        run: node tests/ambient_policy_test.mjs
-
-      - name: V1.1 Context
-        run: node tests/v1_1_context_test.mjs
-
-      - name: Memory Representation
-        run: node tests/memory_representation_test.mjs
-
-      - name: Memory Persist
-        run: node tests/memory_persist_test.mjs
-
-      - name: Context Integration
-        run: node tests/context_integration_test.mjs
-
-      - name: Plugin Runtime
-        run: node tests/plugin_runtime_test.mjs
-
-      - name: Product Loop
-        run: node tests/product_loop_test.mjs
-
-      - name: Moments Product
-        run: node tests/moments_product_test.mjs
-
-      - name: Character Worldbook
-        run: node tests/character_worldbook_test.mjs
-
-      - name: Storage Satellite
-        run: node tests/storage_satellite_test.mjs
-
-      - name: Lived Continuity
-        run: node tests/lived_continuity_test.mjs
-
-      - name: Lived Thread
-        run: node tests/lived_thread_test.mjs
-
-      - name: Quiet Remember
-        run: node tests/quiet_remember_test.mjs
-
-      - name: Continuity Write Path
-        run: node tests/continuity_write_path_test.mjs
-
-      - name: Continuity Perception
-        run: node tests/continuity_perception_test.mjs
-
-      - name: Retrieval Regression
-        run: node tests/retrieval_regression_test.mjs
-
-      - name: UI Refinement Wave 1
-        run: node tests/ui_refinement_wave1_test.mjs
-
-      - name: UI Refinement Wave 2
-        run: node tests/ui_refinement_wave2_test.mjs
-
-      - name: UI Refinement Wave 3A
-        run: node tests/ui_refinement_wave3a_test.mjs
-
-      - name: UI Refinement Wave 3B
-        run: node tests/ui_refinement_wave3b_test.mjs
-
-      - name: UI Refinement Wave 4
-        run: node tests/ui_refinement_wave4_test.mjs
-
-      - name: Companion UX presentation
-        run: node tests/companion_ux_test.mjs
-
-      - name: Syntax check (src)
-        run: |
-          set -euo pipefail
-          while IFS= read -r -d '' f; do
-            node --check "$f"
-          done < <(find src -type f -name '*.js' -print0)
+      - name: Node tests
+        run: npm test
 
       - name: Install Chrome
         id: chrome

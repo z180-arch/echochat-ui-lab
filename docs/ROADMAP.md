@@ -22,9 +22,7 @@ Shipped in the running product ([CURRENT_STATE.md](CURRENT_STATE.md)):
 
 ## NEXT
 
-No authorized backlog is checked in.
-
-Next work should be a **small explicit package** from production observation — not from retired workshop notes.
+See [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md) for P0 / P1 / P2. No other backlog is checked in.
 
 Frozen unless a task explicitly asks: Memory schema, retrieval, `assembleTurnContext`, Provider architecture, Dexie schema, in-app visual language.
 

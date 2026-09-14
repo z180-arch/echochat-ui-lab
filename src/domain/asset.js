@@ -1,20 +1,6 @@
 /**
- * EchoChat Asset Domain (Phase 6)
- *
- * 统一管理二进制资产（头像、图片、附件）。
- * Asset Metadata + Binary Storage 分离。
- *
- * V1 模型：blob 直接存储在 IndexedDB，无 metadata
- * Phase 6 模型：Asset Metadata（Dexie assets 表）+ Binary（IndexedDB blobs store）
- *
- * Domain 层通过 AssetRepository 访问，不直接访问 idb 或 Dexie。
- *
- * 未来支持：
- * - IndexedDB（当前）
- * - OPFS
- * - Desktop File System
- * - Cloud Object Storage
- * 通过 Adapter 解耦。
+ * Binary assets (avatars, images). Metadata in Dexie; blobs in IDB.
+ * Domain talks to AssetRepository only.
  */
 
 import { AssetRepository } from "../repository/asset.js";

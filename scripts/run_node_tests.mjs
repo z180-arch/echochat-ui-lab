@@ -1,6 +1,6 @@
 /**
- * Run CI Node suites. No extra packages.
- * Usage: npm test   or   node scripts/run_node_tests.mjs
+ * Run CI Node suites. This is the only local verification entry (`npm test`).
+ * Browser verifies stay in CI; they are not required to develop.
  */
 import { spawnSync } from "node:child_process";
 import { readdirSync, statSync } from "node:fs";

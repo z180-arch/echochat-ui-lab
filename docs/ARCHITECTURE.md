@@ -98,4 +98,5 @@ Do not describe a marketplace, sandbox, Cordis, or OpenAI Agents runtime. Those 
 - [PLUGIN_POLICY.md](architecture/PLUGIN_POLICY.md) — extraPrompt only
 - [DATA_OWNERSHIP.md](architecture/DATA_OWNERSHIP.md)
 - [CURRENT_STATE.md](CURRENT_STATE.md)
+- [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md)
 - [design.md](design.md)

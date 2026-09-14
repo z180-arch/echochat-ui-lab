@@ -9,6 +9,7 @@ This file is for Codex / Cursor / Claude / Gemini and similar agents. It is not 
 3. [README.md](README.md)
 4. [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md)
 5. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+6. [docs/DEVELOPMENT_STATUS.md](docs/DEVELOPMENT_STATUS.md)
 
 **Runtime foundation:** EchoChat Product Core. See [docs/architecture/PRODUCT_BASE.md](docs/architecture/PRODUCT_BASE.md). Foreign chat/agent projects are reference only.
 

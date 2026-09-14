@@ -6,9 +6,17 @@ node_modules/
 .superpowers/
 .hallmark/
 backups/
+build/
+dist/
+coverage/
+logs/
+*.log
 
 # Local secrets — never commit API keys
 .echochat.local.json
 .env
 .env.local
 .env.*.local
+*.local
+.local/
+

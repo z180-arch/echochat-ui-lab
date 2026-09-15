@@ -38,7 +38,6 @@ const PRECACHE_URLS = [
   "./src/infrastructure/dexie-adapter.js",
   "./src/infrastructure/dexie-migration.js",
   "./src/infrastructure/idb.js",
-  "./src/infrastructure/asset.js",
   // Phase 1: Repository Layer
   "./src/repository/index.js",
   "./src/repository/interfaces.js",

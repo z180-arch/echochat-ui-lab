@@ -576,6 +576,23 @@ async function runWidth(send, width, expect) {
   );
   record(`${width} · moments no overflow`, !moments.overflowX ? "PASS" : "FAIL");
 
+  await evalExpr(send, `window.EchoApp.setMomentsFilter('nobody'); true`);
+  await sleep(200);
+  const momentsEmpty = await evalExpr(send, EMPTY_SNAP);
+  record(
+    `${width} · moments empty`,
+    momentsEmpty.present &&
+      momentsEmpty.title === "还没有一起经历过的事" &&
+      /按天/.test(momentsEmpty.desc) &&
+      /不是整段聊天记录/.test(momentsEmpty.desc) &&
+      momentsEmpty.btnCount === 1 &&
+      momentsEmpty.primary &&
+      !momentsEmpty.overflowX
+      ? "PASS"
+      : "FAIL",
+    JSON.stringify(momentsEmpty)
+  );
+
   await evalExpr(send, `window.EchoApp.switchTab('companion'); window.EchoApp.backToList(); true`);
   await sleep(200);
   const empty = await evalExpr(send, EMPTY_SNAP);

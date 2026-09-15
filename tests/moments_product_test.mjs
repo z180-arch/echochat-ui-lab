@@ -251,8 +251,8 @@ test("moments tab is a real shell surface", () => {
   const storeSrc = readFileSync(srcFile("src/core/store.js"), "utf8");
   assert.ok(views.includes('switchTab(\'moments\')'));
   assert.ok(views.includes("renderMomentsPane"));
-  assert.ok(views.includes("还没有瞬间"));
-  assert.ok(views.includes("和聊天记录不是一回事"));
+  assert.ok(views.includes("还没有一起经历过的事"));
+  assert.ok(views.includes("不是整段聊天记录"));
   assert.ok(storeSrc.includes('tab === "moments"'));
   assert.ok(!storeSrc.includes('tab === "chats" || tab === "moments"'));
 });

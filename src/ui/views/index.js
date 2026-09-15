@@ -633,13 +633,13 @@ export function renderMomentsFeedHtml({ filterRoleId = "all", emptyAction = "" }
   const avatarByRole = Object.fromEntries(hub.map((h) => [h.id, h.avatar]));
 
   if (moments.length === 0) {
-    return EmptyState({
+    return `<div class="moments-feed moments-empty">${EmptyState({
       icon: Icons.moments,
-      title: "还没有瞬间",
-      desc: "你们一起经历过的片段会留在这里，和聊天记录不是一回事。",
+      title: "还没有一起经历过的事",
+      desc: "相处里发生过的片段会按天留在这里，不是整段聊天记录。",
       actionText: emptyAction ? "去相处" : "",
       actionOnClick: emptyAction || "",
-    });
+    })}</div>`;
   }
 
   return `<div class="moments-feed">${groupMomentsByDay(moments)

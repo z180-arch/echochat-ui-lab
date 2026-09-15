@@ -1177,6 +1177,16 @@ button.profile-section-link {
   margin: 0 auto;
   width: 100%;
 }
+.moments-feed.moments-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8) var(--space-4);
+}
+.moments-empty .empty-icon {
+  background: var(--color-mint-soft);
+  color: var(--color-success);
+}
 .moment-day {
   position: relative;
   padding-left: var(--space-5);

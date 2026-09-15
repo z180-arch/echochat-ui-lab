@@ -82,7 +82,7 @@ test("feed markup groups by day and keeps source off the time line", () => {
   assert.match(views, /class="moment-who-row"/);
   const ctx = views.slice(views.indexOf("function momentContextLine"), views.indexOf("function renderMomentsPane"));
   assert.doesNotMatch(ctx, /momentSourceLabel/);
-  assert.match(views, /title: "还没有瞬间"/);
+  assert.match(views, /title: "还没有一起经历过的事"/);
 });
 
 test("timeline rail reuses mint tokens, not a second overlay kit", () => {
@@ -121,7 +121,7 @@ test("two calendar days render as two labeled groups", () => {
   assert.match(html, /moment-src-tag">那天</);
   assert.match(html, /林夏/);
   assert.match(html, /夜班后/);
-  assert.doesNotMatch(html, /还没有瞬间/);
+  assert.doesNotMatch(html, /还没有一起经历过的事/);
 });
 
 console.log(`\nUI moments timeline: ${passed} passed, ${failed} failed`);

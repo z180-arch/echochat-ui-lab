@@ -152,7 +152,7 @@ test("EmptyState is title, one explanation, one primary action", () => {
   assert.ok(!html.includes("btn-secondary"));
   assert.ok(viewsSrc.includes('title: "还没有你的角色"'));
   assert.ok(viewsSrc.includes('title: "选一个角色开始聊"'));
-  assert.ok(viewsSrc.includes('title: "还没有瞬间"'));
+  assert.ok(viewsSrc.includes('title: "还没有一起经历过的事"'));
 });
 
 test("Chat empty type matches empty-state hierarchy", () => {

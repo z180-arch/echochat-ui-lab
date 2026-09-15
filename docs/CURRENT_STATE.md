@@ -3,7 +3,7 @@
 If another Markdown file disagrees with **code + tests**, the code wins.
 
 **Last reconciled:** 2026-09-15  
-**Canonical line:** GitHub `main` (Vercel static deploy)
+**Canonical line:** GitHub `main` (Cloudflare Pages static deploy: https://echochat-f4j.pages.dev/)
 
 ---
 

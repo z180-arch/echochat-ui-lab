@@ -73,7 +73,7 @@ const { recordRelationshipEvent, getAffinity, hydrateRelations, resetRelationsRu
 const { markEntityMigrated, clearMigrationFlags, isEntityMigrated } = await import(
   srcHref("src/infrastructure/satellite-reconcile.js")
 );
-const { getMigrationStatus, isFullyMigrated } = await import(srcHref("src/infrastructure/dexie-migration.js"));
+const { getMigrationStatus, isFullyMigrated, rollbackMigration } = await import(srcHref("src/infrastructure/dexie-migration.js"));
 
 let passed = 0;
 let failed = 0;
@@ -518,6 +518,10 @@ await testAsync("migration status APIs read satellite flags without throwing", a
   markEntityMigrated("worldbook");
   assert.equal(isFullyMigrated(), true);
   assert.equal(getMigrationStatus().messages.status, "completed");
+});
+
+await testAsync("rollbackMigration rejects unknown entities before opening Dexie", async () => {
+  await assert.rejects(() => rollbackMigration("not-an-entity"), /Unknown entity/);
 });
 
 resetStorageTestHooks();

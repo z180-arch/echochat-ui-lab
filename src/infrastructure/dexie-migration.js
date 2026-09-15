@@ -28,7 +28,7 @@ import {
   markEntityMigrated,
   markEntityFailed,
   getMigrationState,
-  setMigrationState,
+  clearEntityMigrated,
 } from "./satellite-reconcile.js";
 
 // ============================================================
@@ -437,7 +437,6 @@ export async function migrateAllToDexie(options = {}) {
  * 旧数据保留在 localStorage，可重新迁移
  */
 export async function rollbackMigration(entityName) {
-  const db = await getDb();
   const tableMap = {
     messages: [TABLES.MESSAGES, TABLES.CONVERSATIONS],
     characters: [TABLES.CHARACTERS],
@@ -450,17 +449,14 @@ export async function rollbackMigration(entityName) {
   const tables = tableMap[entityName];
   if (!tables) throw new Error(`Unknown entity: ${entityName}`);
 
+  const db = await getDb();
   await db.transaction("rw", tables, async () => {
     for (const t of tables) {
       await db.table(t).clear();
     }
   });
 
-  // 清除迁移标记
-  const state = getMigrationState();
-  delete state[entityName];
-  setMigrationState(state);
-
+  clearEntityMigrated(entityName);
   console.log(`[Migration] Rolled back ${entityName}`);
 }
 

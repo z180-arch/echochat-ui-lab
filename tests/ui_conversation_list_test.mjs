@@ -73,6 +73,11 @@ test("active thread, rename, and delete are visible actions", () => {
   assert.equal((html.match(/class="conv-row"/g) || []).length, 2);
 });
 
+test("chat header hides the thread chip until there is more than one chat", () => {
+  assert.match(views, /showThreadChip = roleId && convos.length > 1/);
+  assert.doesNotMatch(views, /threadChipLabel = convos.length > 1 \? currentThreadTitle : "相处线"/);
+});
+
 test("thread rows reuse mint/primary surfaces and 44px tools", () => {
   assert.match(layouts, /\.conv-item\.on\s*\{[^}]*--color-primary-soft/);
   assert.match(layouts, /\.conv-now\s*\{[^}]*--font-micro/);

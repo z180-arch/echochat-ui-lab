@@ -76,7 +76,7 @@ export function renderLanding() {
       <div class="welcome-mark">${LogoMark({ size: 64 })}</div>
       <h1>EchoChat</h1>
       <p class="welcome-lead">${slogan}</p>
-      <p class="welcome-sub">先创建一个角色，再开始聊天。</p>
+      <p class="welcome-sub">先把一个想长期相处的人带进来。</p>
       <div class="welcome-beats">
         <div class="welcome-beat"><strong>角色</strong><span>一个陪伴对象</span></div>
         <div class="welcome-beat"><strong>记忆</strong><span>关于你的长期事实</span></div>
@@ -270,7 +270,7 @@ function renderChatPane(chat, hideChatMobile) {
 
   const recall = getLastMemoryRetrieve();
   const showRecall = recall.hadHit && recall.chatId === chat.id && recall.preview;
-  const showThreadChip = roleId && (convos.length > 1 || messages.length > 0);
+  const showThreadChip = roleId && convos.length > 1;
   const reunion = reunionLine(chat.lastMessageAt);
   const latestMoment = roleId ? listMoments(roleId)[0] : null;
   const latestMemory = roleId ? getMemoryList(roleId, 1)[0] : null;
@@ -293,7 +293,7 @@ function renderChatPane(chat, hideChatMobile) {
   const greeting = definedGreeting(chat);
   const starters = meetStarterPrompts(slots);
   const currentThreadTitle = convos.find((c) => c.id === chat.id)?.threadTitle || "日常相处";
-  const threadChipLabel = convos.length > 1 ? currentThreadTitle : "相处线";
+  const threadChipLabel = currentThreadTitle;
   const ritualClick =
     ritual.kind === "recall"
       ? `window.EchoApp.openContinuitySheet('${esc(roleId)}','${chat.id}')`
@@ -354,7 +354,7 @@ function renderChatPane(chat, hideChatMobile) {
             <div class="chat-empty-t">${messages.length || affinity?.hasHistory ? `继续和 ${esc(chat.name || "TA")} 相处` : `还没有和 ${esc(chat.name || "TA")} 聊过`}</div>
             ${!affinity?.hasHistory && slots.identity ? `<p class="meet-identity">${esc(clipPreview(slots.identity, 72))}</p>` : ""}
             ${!affinity?.hasHistory && greeting ? `<blockquote class="meet-hello">${esc(greeting)}</blockquote>` : ""}
-            <p>${reunion ? `${esc(reunion)}。直接说一句就好。` : "直接说一句就好。重要的事会被悄悄记住，之后还能被想起来。"}</p>
+            <p>${reunion ? `${esc(reunion)}。直接说一句就好。` : "直接说一句就好。"}</p>
             ${!affinity?.hasHistory ? `<div class="chat-starters">
               ${starters
                 .map(

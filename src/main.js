@@ -1108,7 +1108,7 @@ const App = {
       title: "创建角色",
       width: "440px",
       content: `
-        <p class="create-sub">创造一个陪伴对象。给 TA 一个名字，开始相处。</p>
+        <p class="create-sub">给 TA 一个名字，开始你们的第一句。</p>
         <button type="button" class="create-primary-btn" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openCreateQuickStart()">
           <span class="create-card-ic">${Icons.sparkles}</span>
           <span class="create-card-title">从模板或空白开始</span>

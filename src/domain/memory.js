@@ -148,6 +148,16 @@ async function flushPersist() {
 function schedulePersist() {
   persistChain = persistChain.then(flushPersist).catch((err) => {
     console.warn("[memory] persist failed:", err && err.message ? err.message : err);
+    try {
+      store.set((s) => ({ ...s, longTermMemory: { ...cache } }));
+    } catch {
+      // ignore
+    }
+    try {
+      markEntityFailed(ENTITY, err);
+    } catch {
+      // ignore
+    }
   });
   return persistChain;
 }

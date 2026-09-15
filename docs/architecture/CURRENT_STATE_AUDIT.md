@@ -16,8 +16,10 @@ This file is a research snapshot. It is not a rewrite plan.
 | P-04 | CURRENT_STATE records satellite Dexie-only persist + migrate flag key | `docs(current-state): record satellite Dexie-only persist and migrate flag key` |
 | P-05 | Dexie migration status/rollback APIs import satellite flag helpers | `fix(migration): wire Dexie rollback status APIs to satellite flags` |
 | P-06 | `storeBlob` writes `(id, blob)`; Dexie adapter has `updateMetadata` | `fix(assets): persist blobs under the repository-generated id` |
+| P-07 | hydrateChat no longer shrinks STATE message fallback | `fix(storage): keep full message fallback when hydrating the UI window` |
+| P-08 | Memory persist failure writes store copy and marks migrate failed | `fix(memory): recover persist failures onto store for reload merge` |
 
-P-07 **fixed this pass** (hydrate no longer shrinks store). P-08 remains open until persist-failure recovery is tested. See `ARCHITECTURE_IMPROVEMENT_PROPOSAL.md`.
+P-07 and P-08 **fixed this pass**. See remediation table.
 
 ---
 
@@ -272,7 +274,7 @@ Classification rule used here: **Confirmed Problem** requires at least one of: e
 | P-05 | `dexie-migration.js` rollback/status APIs throw `ReferenceError` | `getMigrationState` / `setMigrationState` used but not imported (`dexie-migration.js` ~453–472). Functions exist in `satellite-reconcile.js`. No production caller, but the API is broken if invoked. | **Yes** — “迁移不可验证” example; small fix. |
 | P-06 | `AssetRepository.storeBlob` cannot persist blobs | `legacyAdapter.storeBlob(blob, id)` ignores `id` and calls `idb.putBlob(blob)`. `putBlob(id, blob)` no-ops when `blob` is undefined. `dexieAssetAdapter.updateMetadata` is missing; `AssetRepository.updateMetadata` will always warn. UI currently avoids this path (data URLs). Landmine for the next agent that “wires assets properly”. | **Yes** — data-integrity bug with code proof. |
 | P-07 | After long-chat hydrate, STATE keeps only last 80 messages | **Fixed** — `hydrateChat` no longer writes the UI window into store. `message_window_test.mjs` covers Dexie-down reload from the full store fallback. |
-| P-08 | Memory persist failure does not emergency-write store | `memory.js` `schedulePersist` catch only logs. Moments/worldbook do LS emergency write. | **No (P1)** — real asymmetry; do not change Memory persist policy in this pass without a dedicated task. Memory schema/retrieval is frozen. |
+| P-08 | Memory persist failure does not emergency-write store | **Fixed** — persist catch writes `store.longTermMemory` and `markEntityFailed` so reload reconciles. `memory_persist_test.mjs` covers it. |
 
 ### Possible Improvement
 

@@ -264,6 +264,32 @@ await testAsync("clearMemory is persistable", async () => {
   assert.equal(getMemoryList("role_a").length, 0);
 });
 
+await testAsync("persist failure keeps store copy and reconciles on reload", async () => {
+  resetAll();
+  const backend = createMemoryBackend();
+  await boot(backend);
+  addMemory("role_a", "我喜欢黑咖啡", 7, "auto");
+  await flushMemoriesPersist();
+  assert.equal(backend.memory._dump().length, 1);
+
+  const original = backend.memory.replaceAll.bind(backend.memory);
+  backend.memory.replaceAll = async () => {
+    throw new Error("simulated dexie persist failure");
+  };
+  addMemory("role_a", "我养了一只橘猫", 8, "auto");
+  await flushMemoriesPersist();
+  const stored = store.getState().longTermMemory?.role_a?.memories || [];
+  assert.ok(stored.some((m) => /橘猫/.test(m.content)), "emergency store copy must include the failed persist");
+  assert.equal(isEntityMigrated("memories"), false);
+
+  backend.memory.replaceAll = original;
+  resetMemoriesRuntime();
+  await hydrateMemories();
+  const list = getMemoryList("role_a");
+  assert.ok(list.some((m) => /黑咖啡/.test(m.content)));
+  assert.ok(list.some((m) => /橘猫/.test(m.content)));
+});
+
 resetStorageTestHooks();
 resetMemoriesRuntime();
 

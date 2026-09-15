@@ -73,6 +73,7 @@ const { recordRelationshipEvent, getAffinity, hydrateRelations, resetRelationsRu
 const { markEntityMigrated, clearMigrationFlags, isEntityMigrated } = await import(
   srcHref("src/infrastructure/satellite-reconcile.js")
 );
+const { getMigrationStatus, isFullyMigrated } = await import(srcHref("src/infrastructure/dexie-migration.js"));
 
 let passed = 0;
 let failed = 0;
@@ -503,6 +504,20 @@ await testAsync("legacy relations migrate and persist on Dexie", async () => {
   assert.equal(getAffinity("role_a").brief, "后来去了咖啡馆");
   const ls = localStorage.getItem(KEYS.RELATIONS);
   assert.ok(!ls || !/后来去了咖啡馆/.test(ls), "post-cutover relations must not use runtime localStorage");
+});
+
+await testAsync("migration status APIs read satellite flags without throwing", async () => {
+  clearMigrationFlags();
+  assert.deepEqual(getMigrationStatus(), {});
+  assert.equal(isFullyMigrated(), false);
+  markEntityMigrated("messages");
+  markEntityMigrated("characters");
+  markEntityMigrated("memories");
+  markEntityMigrated("relationships");
+  markEntityMigrated("moments");
+  markEntityMigrated("worldbook");
+  assert.equal(isFullyMigrated(), true);
+  assert.equal(getMigrationStatus().messages.status, "completed");
 });
 
 resetStorageTestHooks();

@@ -23,7 +23,13 @@
 import { legacyAdapter } from "../repository/legacy-adapter.js";
 import { dexieAdapter } from "./dexie-adapter.js";
 import { getDb, TABLES } from "./dexie-db.js";
-import { isEntityMigrated, markEntityMigrated, markEntityFailed } from "./satellite-reconcile.js";
+import {
+  isEntityMigrated,
+  markEntityMigrated,
+  markEntityFailed,
+  getMigrationState,
+  setMigrationState,
+} from "./satellite-reconcile.js";
 
 // ============================================================
 //  数据转换函数

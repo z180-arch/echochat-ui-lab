@@ -665,13 +665,8 @@ export async function hydrateChat(chatId) {
     const msgs = await readTail(chatId, { limit: UI_WINDOW });
     setCache(chatId, msgs);
     olderFlags.set(chatId, count > msgs.length);
-    if (await dexieReady()) {
-      try {
-        store.updateChat(chatId, { messages: msgs });
-      } catch {
-        // tests without this chat in store
-      }
-    }
+    // Do not shrink store.messages to the UI window. Dexie is canonical;
+    // the store copy is the reload fallback if Dexie later fails.
   } else {
     await getMessages(chatId);
     olderFlags.set(chatId, false);

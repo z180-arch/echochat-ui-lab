@@ -86,7 +86,7 @@ Confirmed from `src/core/storage.js`, `src/infrastructure/dexie-db.js`, `src/inf
 | `echochat` (Dexie) | Characters, conversations, messages, memories, relationships, moments, worldbook, asset metadata, migration log |
 | `echodownload_assets` | Binary blobs (avatars / images) |
 
-Dexie is **canonical** for those entities after hydrate. `echodownload_lite_state_v1` still dual-writes settings, the chat list, and the last UI message window (`UI_WINDOW` = 80). Moments / worldbook / relations / memory **stop refreshing** their legacy localStorage (or `store.longTermMemory`) keys once `usingCanonical` is true; those keys remain recovery copies, not live mirrors.
+Dexie is **canonical** for those entities after hydrate. `echodownload_lite_state_v1` still dual-writes settings, the chat list, and the **full** message fallback. The UI peeks the last `UI_WINDOW` (80) from the runtime cache; `hydrateChat` must not shrink the store copy. Moments / worldbook / relations / memory **stop refreshing** their legacy localStorage (or `store.longTermMemory`) keys once `usingCanonical` is true; those keys remain recovery copies, not live mirrors.
 
 ---
 
@@ -154,7 +154,7 @@ Development snapshot: [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
 ## Technical debt (real)
 
-1. Message dual-write (STATE UI window vs Dexie full history) is compatibility, not a missing chat shell. Satellite entities are Dexie-only after hydrate.
+1. Message dual-write (STATE fallback vs Dexie full history) is compatibility, not a missing chat shell. The UI window is cache-only; hydrate must not truncate STATE. Satellite entities are Dexie-only after hydrate.
 2. `src/main.js` is a large orchestrator by design
 3. Plugin layer must not grow into a marketplace or agent OS
 4. Firefox has no Web Speech STT; iOS installed-PWA recognition is unreliable

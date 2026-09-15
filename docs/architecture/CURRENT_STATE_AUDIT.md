@@ -17,7 +17,7 @@ This file is a research snapshot. It is not a rewrite plan.
 | P-05 | Dexie migration status/rollback APIs import satellite flag helpers | `fix(migration): wire Dexie rollback status APIs to satellite flags` |
 | P-06 | `storeBlob` writes `(id, blob)`; Dexie adapter has `updateMetadata` | `fix(assets): persist blobs under the repository-generated id` |
 
-P-07 and P-08 remain open (P1). See `ARCHITECTURE_IMPROVEMENT_PROPOSAL.md`.
+P-07 **fixed this pass** (hydrate no longer shrinks store). P-08 remains open until persist-failure recovery is tested. See `ARCHITECTURE_IMPROVEMENT_PROPOSAL.md`.
 
 ---
 
@@ -271,7 +271,7 @@ Classification rule used here: **Confirmed Problem** requires at least one of: e
 | P-04 | CURRENT_STATE dual-write + key table are incomplete | Satellites stop LS writes after hydrate. `echodownload_dexie_migration` omitted. | **Yes** — same doc/runtime split. |
 | P-05 | `dexie-migration.js` rollback/status APIs throw `ReferenceError` | `getMigrationState` / `setMigrationState` used but not imported (`dexie-migration.js` ~453–472). Functions exist in `satellite-reconcile.js`. No production caller, but the API is broken if invoked. | **Yes** — “迁移不可验证” example; small fix. |
 | P-06 | `AssetRepository.storeBlob` cannot persist blobs | `legacyAdapter.storeBlob(blob, id)` ignores `id` and calls `idb.putBlob(blob)`. `putBlob(id, blob)` no-ops when `blob` is undefined. `dexieAssetAdapter.updateMetadata` is missing; `AssetRepository.updateMetadata` will always warn. UI currently avoids this path (data URLs). Landmine for the next agent that “wires assets properly”. | **Yes** — data-integrity bug with code proof. |
-| P-07 | After long-chat hydrate, STATE keeps only last 80 messages | `message-store.js` `UI_WINDOW`. If Dexie later fails, fallback is truncated. Data-consistency **risk**. No production incident. DEVELOPMENT_STATUS already says: tighten dual-write only if real desync shows up. | **No (P1)** — latent; changing it is a storage-behavior change. Do not migrate schema to “fix” it. |
+| P-07 | After long-chat hydrate, STATE keeps only last 80 messages | **Fixed** — `hydrateChat` no longer writes the UI window into store. `message_window_test.mjs` covers Dexie-down reload from the full store fallback. |
 | P-08 | Memory persist failure does not emergency-write store | `memory.js` `schedulePersist` catch only logs. Moments/worldbook do LS emergency write. | **No (P1)** — real asymmetry; do not change Memory persist policy in this pass without a dedicated task. Memory schema/retrieval is frozen. |
 
 ### Possible Improvement

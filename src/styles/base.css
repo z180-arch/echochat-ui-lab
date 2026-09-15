@@ -15,6 +15,7 @@ html {
   font-size: 16px;
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
+  overflow-x: clip;
 }
 
 body {
@@ -24,6 +25,7 @@ body {
   color: var(--color-text);
   background: var(--color-bg);
   overflow: hidden;
+  overflow-x: clip;
   height: 100vh;
   height: 100dvh;
   -webkit-font-smoothing: antialiased;

@@ -57,10 +57,12 @@ test("home reunion copy only appears next to a real last preview", () => {
 
 test("home is not a stack of labeled admin cards", () => {
   assert.match(pane, /companion-home/);
+  assert.match(pane, /companion-identity/);
   assert.doesNotMatch(pane, /记忆条数/);
   assert.doesNotMatch(pane, /条设定/);
   assert.doesNotMatch(pane, /embedding|retrieval score|vector|confidence/);
   assert.match(layouts, /\.companion-home \.profile-peek\s*\{[^}]*border:\s*none/);
+  assert.match(layouts, /\.profile-header\s*\{[^}]*text-align:\s*left/);
 });
 
 console.log(`\nUI companion home: ${passed} passed, ${failed} failed`);

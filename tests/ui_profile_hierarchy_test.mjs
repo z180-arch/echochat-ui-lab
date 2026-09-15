@@ -52,10 +52,12 @@ test("profile source order is identity, now, recent, us, about you, world, actio
 
 test("identity is a lead, not an equal labeled data block", () => {
   assert.match(pane, /profile-lead/);
+  assert.match(pane, /companion-identity/);
   assert.doesNotMatch(pane, /关于 TA/);
   assert.doesNotMatch(pane, /profile-section-title">关系/);
   assert.match(layouts, /\.profile-kicker\s*\{[^}]*--font-micro/);
-  assert.match(layouts, /\.profile-relate\s*\{[^}]*--color-mint-soft/);
+  assert.match(layouts, /\.profile-header\s*\{[^}]*text-align:\s*left/);
+  assert.match(layouts, /\.profile-relate\s*\{[^}]*--color-mint/);
   assert.match(layouts, /\.companion-home\s*\{/);
 });
 

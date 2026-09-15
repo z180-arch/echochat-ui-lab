@@ -132,7 +132,7 @@
     display: flex;
   }
   .continuity-legend {
-    grid-template-columns: minmax(0, 1fr);
+    display: none;
   }
 
   /* 会话列表：全屏覆盖 */
@@ -202,7 +202,7 @@
   }
   .welcome-beats {
     grid-template-columns: minmax(0, 1fr);
-    max-width: 280px;
+    max-width: 22em;
   }
   .onboard-grid {
     grid-template-columns: 1fr 1fr;

@@ -1,6 +1,11 @@
+/* Hallmark · macrostructure: Presence Workbench · tone: soft companion · anchor hue: mint-sky
+ * theme: evolved Morning Mint · genre: editorial · designed-as-app · design-system: DESIGN.md
+ * pre-emit critique: P5 H5 E4 S5 R5 V4
+ */
 /* ============================================================
    EchoChat Rebuild · Design Tokens
    统一设计变量：颜色/字号/圆角/间距/阴影/动画
+   Authority: DESIGN.md — do not pick a catalog theme for /app/
    ============================================================ */
 
 :root {
@@ -25,6 +30,9 @@
   --color-accent: #7CB8E8;
   --color-online: #9DD9C2;
   --color-danger: #E57373;
+  --color-relationship: var(--color-mint-soft);
+  --color-memory: var(--color-primary-soft);
+  --color-moments: var(--color-mint-soft);
   --color-warning: #E8C96A;
   --color-success: #6BB89A;
   --color-bubble-me: #EDF9F4;
@@ -93,6 +101,8 @@
   --dur-fast: 150ms;
   --dur-normal: 250ms;
   --dur-slow: 350ms;
+  --dur-expressive: 480ms;
+  --dur-cinematic: 720ms;
   --motion: 220ms var(--ease-out);
 
   /* ---- 布局 ---- */

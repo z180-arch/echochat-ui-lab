@@ -164,7 +164,7 @@ function renderNavRail(activeTab) {
   <nav class="nav-rail" aria-label="主导航">
     <div class="nav-logo" aria-hidden="true">${LogoMark({ size: 36 })}</div>
     <span class="nav-rail-indicator" aria-hidden="true"></span>
-    <button class="nav-item ${activeTab === "companion" ? "nav-item-active" : ""}" onclick="window.EchoApp.switchTab('companion')" title="陪伴">
+    <button class="nav-item ${activeTab === "companion" ? "nav-item-active" : ""}" onclick="window.EchoApp.switchTab('companion')" title="陪伴" data-nav="home">
       ${Icons.message}<span class="nav-item-label">陪伴</span>
     </button>
     <button class="nav-item ${activeTab === "moments" ? "nav-item-active" : ""}" onclick="window.EchoApp.switchTab('moments')" title="痕迹">
@@ -183,7 +183,7 @@ function renderBottomNav(activeTab) {
   return `
   <nav class="bottom-nav" aria-label="主导航" style="--tab-indicator-left:${left}">
     <span class="bottom-nav-indicator" aria-hidden="true"></span>
-    <button class="bottom-nav-item ${activeTab === "companion" ? "bottom-nav-item-active" : ""}" onclick="window.EchoApp.switchTab('companion')">
+    <button class="bottom-nav-item ${activeTab === "companion" ? "bottom-nav-item-active" : ""}" onclick="window.EchoApp.switchTab('companion')" data-nav="home">
       ${Icons.message}<span>陪伴</span>
     </button>
     <button class="bottom-nav-item ${activeTab === "moments" ? "bottom-nav-item-active" : ""}" onclick="window.EchoApp.switchTab('moments')">
@@ -536,15 +536,19 @@ function renderProfilePane(chat) {
     <div class="profile-scroll">
       <div class="profile-header">
         <button class="icon-btn profile-close" onclick="window.EchoApp.toggleProfile()" aria-label="关闭">${Icons.close}</button>
-        ${CharacterAvatar({ src: getRoleAvatar(chat), size: "lg", className: "profile-avatar", alt: chat.name || "角色", name: chat.name || "角色" })}
-        <div class="profile-name">${esc(chat.name || "角色")}</div>
-        <div class="profile-status">${StageChip({ label: presented.label, stage: presented.stage })}</div>
-        ${reunion ? `<p class="profile-muted profile-reunion">${esc(reunion)}</p>` : ""}
+        <div class="companion-identity">
+          ${CharacterAvatar({ src: getRoleAvatar(chat), size: "lg", className: "profile-avatar", alt: chat.name || "角色", name: chat.name || "角色" })}
+          <div class="companion-identity-copy">
+            <div class="profile-name">${esc(chat.name || "角色")}</div>
+            <div class="profile-status">${StageChip({ label: presented.label, stage: presented.stage })}</div>
+            ${reunion ? `<p class="profile-muted profile-reunion">${esc(reunion)}</p>` : ""}
+          </div>
+        </div>
         ${identity
           ? `<p class="profile-lead">${esc(identity.slice(0, 120))}${identity.length > 120 ? "…" : ""}</p>`
           : `<p class="profile-muted profile-lead">还没写下 TA 是谁。</p>`}
       </div>
-      <section class="profile-now profile-section">
+      <section class="profile-now profile-section profile-section-primary">
         <p class="profile-kicker">正在聊</p>
         ${nowPeek}
       </section>
@@ -767,20 +771,7 @@ export function renderContinuitySheetContent(roleId, chatId) {
 
   return `
     <p class="recon-lead">这里是 TA 记住的关于你的事，和你们一起经历过的片段。不是聊天记录。</p>
-    <div class="continuity-legend">
-      <div class="continuity-legend-card">
-        <div class="continuity-legend-k">记忆</div>
-        <p>关于你的长期事实</p>
-      </div>
-      <div class="continuity-legend-card">
-        <div class="continuity-legend-k">瞬间</div>
-        <p>你们一起经历过的片段</p>
-      </div>
-      <div class="continuity-legend-card">
-        <div class="continuity-legend-k">相处</div>
-        <p>关系怎么慢慢靠近</p>
-      </div>
-    </div>
+    <p class="continuity-legend-line">记忆是关于你的长期事实。痕迹是一起经历过的片段。相处是关系怎么慢慢靠近。</p>
     <div class="continuity-rel">${RelationshipBrief({ affinity, hasTalk: presented.hasHistory, compact: true })}</div>
     ${journal}
     ${pendingCount ? `<p class="profile-muted">有 ${pendingCount} 条待确认的记忆。</p>` : ""}
@@ -940,7 +931,7 @@ function renderMePane() {
       </button>
 
       <div class="me-settings-group">
-        <div class="me-settings-group-title">对话</div>
+        <div class="me-settings-group-title">相处</div>
         <div class="me-settings-list">
           ${meRow({ icon: Icons.database, title: "API 与模型", value: apiSummary(state.settings), action: "openSettings('api')" })}
           ${meRow({ icon: Icons.brain, title: "记忆条数", value: `每位 ${state.memoryCfg.maxPerRole} 条`, action: "openSettings('memory')" })}
@@ -948,7 +939,7 @@ function renderMePane() {
       </div>
 
       <div class="me-settings-group">
-        <div class="me-settings-group-title">体验</div>
+        <div class="me-settings-group-title">氛围</div>
         <div class="me-settings-list">
           ${meRow({ icon: Icons.palette, title: "外观", value: appearanceSummary(state.settings), action: "openSettings('appearance')" })}
           ${meRow({ icon: Icons.volume, title: "语音", value: state.settings.ttsEnabled ? "朗读已开" : "朗读关", action: "openSettings('voice')" })}

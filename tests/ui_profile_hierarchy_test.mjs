@@ -32,20 +32,19 @@ function test(name, fn) {
 
 const pane = views.slice(views.indexOf("function renderProfilePane"), views.indexOf("function momentDayLabel"));
 
-test("profile source order is identity, now, recent, us, about you, world, actions", () => {
+test("profile source order is identity, now, us, about you, world, actions", () => {
   const header = pane.indexOf("profile-header");
   const now = pane.indexOf("profile-now");
-  const together = pane.indexOf("profile-together");
   const relate = pane.indexOf("profile-relate");
   const you = pane.indexOf("profile-you");
   const support = pane.indexOf("profile-support");
   const actions = pane.indexOf("profile-actions");
-  assert.ok(header >= 0 && now > header && together > now && relate > together && you > relate && support > you && actions > support);
+  assert.ok(header >= 0 && now > header && relate > now && you > relate && support > you && actions > support);
   assert.match(pane, /正在聊/);
-  assert.match(pane, />最近</);
   assert.match(pane, />我们</);
   assert.match(pane, />关于你</);
   assert.match(pane, />这个世界</);
+  assert.doesNotMatch(pane, />最近</);
   assert.ok(!pane.includes("导出角色卡"));
   assert.ok(views.includes("导出角色卡"));
 });
@@ -69,8 +68,8 @@ test("edit stays a secondary action, not a mid-panel tool row", () => {
 
 test("overlay continue chat uses persist breakpoint, not phone-only", () => {
   assert.match(pane, /PROFILE_PERSIST_MIN_WIDTH/);
-  assert.match(pane, /继续聊天/);
-  assert.match(pane, /开始聊天/);
+  assert.match(pane, /接着聊/);
+  assert.match(pane, /开口第一句/);
 });
 
 console.log(`\nUI profile hierarchy: ${passed} passed, ${failed} failed`);

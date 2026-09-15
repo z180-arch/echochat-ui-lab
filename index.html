@@ -4,11 +4,12 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="theme-color" content="#F6F9F8" />
-<meta name="description" content="EchoChat — 创造一个真正记得你的 AI 角色。本地优先，无需注册，打开即用。" />
+<meta name="description" content="EchoChat — 本地优先的 AI companion。关系会留下来。对话需要你自己的 API 密钥。" />
 <title>EchoChat — 念念不忘，必有回响</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;1,500;1,600&family=Noto+Serif+SC:wght@500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;1,500;1,600&family=Noto+Serif+SC:wght@500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+<noscript><link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;1,500;1,600&family=Noto+Serif+SC:wght@500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet" /></noscript>
 <style>
 /* ============================================================
    EchoChat Landing Page — Art Direction V5 (Brand World)
@@ -1027,14 +1028,14 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
 
         <!-- H1 Hierarchy with Sole Gradient Focus -->
         <h1>
-          <span class="line-reveal" id="line1"><span class="line-reveal-inner">创造一个</span></span>
-          <span class="line-reveal" id="line2"><span class="line-reveal-inner serif-italic gradient-flow">真正记得你的</span></span>
-          <span class="line-reveal" id="line3"><span class="line-reveal-inner">AI 角色</span></span>
+          <span class="line-reveal" id="line1"><span class="line-reveal-inner">遇见一个</span></span>
+          <span class="line-reveal" id="line2"><span class="line-reveal-inner gradient-flow">会记得你的人</span></span>
+          <span class="line-reveal" id="line3"><span class="line-reveal-inner">明天还在</span></span>
         </h1>
 
         <p class="hero-sub" id="heroSub">
-          <span class="sub-full">普通 AI 聊天工具只记住最近几条消息。EchoChat 的角色有独立的性格，会真正记住你说过的话，并在每一次对话中与你建立更深的关系。</span>
-          <span class="sub-short">它有独立的性格，会真正记住你说过的话，在一次次对话中与你建立更深的关系。</span>
+          <span class="sub-full">EchoChat 是本地优先的 AI companion。对话会积累成关系、记忆和一起经历过的事。聊天需要你自己的 API 密钥，密钥留在这台设备上。</span>
+          <span class="sub-short">本地优先的 companion。关系会留下来。开口需要你自己的 API 密钥。</span>
         </p>
         <ul class="hero-beats" aria-label="产品差异">
           <li><strong>角色</strong>一个会说话的陪伴对象</li>
@@ -1044,7 +1045,7 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
 
         <div class="hero-actions" id="heroActions" data-od-id="hero-actions">
           <a href="/app/" class="btn-primary" id="heroCta" data-od-id="hero-cta">
-            <span>开始创建角色</span>
+            <span>打开应用</span>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           </a>
           <a href="#how" class="btn-secondary" data-od-id="hero-secondary">查看产品体验</a>
@@ -1057,7 +1058,7 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
           </span>
           <span class="hero-meta-item">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-            无需注册
+            自备 API 密钥
           </span>
           <span class="hero-meta-item">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
@@ -1130,7 +1131,7 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
         </div>
         <div class="proof-text">
           <h4>无需注册</h4>
-          <p>打开即用，不收集个人信息</p>
+          <p>本地保存。对话需要你自己的 API 密钥。</p>
         </div>
       </div>
       <div class="proof-item">
@@ -1222,31 +1223,31 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
         <p>EchoChat 的记忆是结构化保存的：你提到的喜好、经历、重要的日子，都会被角色独立保存，并在后续对话中自然引用。</p>
         <div class="memory-proof-note">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
-          <p><strong>真实证明：</strong>你说"最近在学吉他"，几天后角色会自然问你"吉他练得怎么样了"——而不是你需要重新提醒。</p>
+          <p><strong>怎么发生：</strong>你在对话里说下一件关于自己的事，它会留下来，下次还会被提起。不是演示数据。</p>
         </div>
       </div>
       <div class="memory-timeline-wrap reveal" id="memoryShowcase">
         <div class="memory-timeline">
           <div class="memory-timeline-fill"></div>
           <div class="memory-item">
-            <div class="memory-date">3 天前</div>
-            <div class="memory-content">你说你喜欢雨天的味道，她记住了</div>
-            <div class="memory-source">来自对话 · 2024.01.15</div>
+            <div class="memory-date">记下之后</div>
+            <div class="memory-content">你说你喜欢雨天的味道，这件事会留下来</div>
+            <div class="memory-source">来自你们的对话</div>
           </div>
           <div class="memory-item">
-            <div class="memory-date">1 周前</div>
-            <div class="memory-content">你提到最近在学吉他，她问你学了什么曲子</div>
-            <div class="memory-source">来自对话 · 2024.01.11</div>
+            <div class="memory-date">下次开口</div>
+            <div class="memory-content">TA 可以再提起你学过的东西，而不是你重新介绍自己</div>
+            <div class="memory-source">长期记忆，不是最近几条消息</div>
           </div>
           <div class="memory-item">
-            <div class="memory-date">2 周前</div>
-            <div class="memory-content">你说妈妈生日快到了，她提醒你别忘了</div>
-            <div class="memory-source">来自对话 · 2024.01.04</div>
+            <div class="memory-date">一起经历</div>
+            <div class="memory-content">具体发生过的片段会按天留下来</div>
+            <div class="memory-source">不是整段聊天记录</div>
           </div>
           <div class="memory-item">
-            <div class="memory-date">1 个月前</div>
-            <div class="memory-content">你说你养了一只橘猫，叫橘子</div>
-            <div class="memory-source">来自对话 · 2023.12.18</div>
+            <div class="memory-date">明天回来</div>
+            <div class="memory-content">数据在这台设备上。TA 还在。</div>
+            <div class="memory-source">本地优先</div>
           </div>
         </div>
       </div>
@@ -1340,10 +1341,10 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
   <div class="container">
     <div class="final-cta-content reveal">
       <div class="final-cta-eyebrow">开始这段关系</div>
-      <h2>创造一个角色，<br/>开始一段<span class="serif-italic gradient-flow">值得记住</span>的陪伴</h2>
+      <h2>把一个人带进来，<br/>开始一段<span class="gradient-flow">会留下来</span>的相处</h2>
       <p>不需要注册，不需要付费。你的角色、记忆和关系，都只存储在你的设备上，完全属于你。</p>
       <a href="/app/" class="btn-primary" id="finalCta" data-od-id="final-cta-button">
-        <span>开始创建角色</span>
+        <span>打开应用</span>
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
       </a>
     </div>

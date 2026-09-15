@@ -194,15 +194,14 @@ test("Wave 3B hub/profile/settings markers stay in place", () => {
 });
 
 test("First-run empty and companion cues are in the shell", () => {
-  assert.ok(viewsSrc.includes("先有一个角色，才能开始聊天。"));
+  assert.ok(viewsSrc.includes("把一个会留下来的人带进来。不是创建一个 AI。"));
   assert.ok(viewsSrc.includes("fillComposer"));
   assert.ok(presentSrc.includes("刚刚认识 · 打开相处中"));
   assert.ok(viewsSrc.includes("companionRitual"));
   assert.ok(viewsSrc.includes("关于你的记忆"));
   assert.ok(viewsSrc.includes("一起经历过的片段会留在这里，不是聊天记录。"));
   assert.ok(viewsSrc.includes("记忆条数"));
-  assert.ok(mainSrc.includes("记下了一件关于你的事"));
-  assert.ok(mainSrc.includes("你们刚刚留下了一条相处痕迹"));
+  assert.ok(viewsSrc.includes("记下了"));
   assert.ok(mainSrc.includes("openBring()"));
   assert.ok(layouts.includes(".chat-starters"));
 });

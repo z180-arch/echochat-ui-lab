@@ -6,6 +6,7 @@
 
 import { storage, KEYS } from "../core/storage.js";
 import { recordRelationshipEvent } from "./relations.js";
+import { noteWitness } from "./witness.js";
 import { events, EVT } from "../core/events.js";
 import { uid, todayStr } from "../core/utils.js";
 import { getStorageHooks } from "../repository/storage-hooks.js";
@@ -366,10 +367,11 @@ export function livedMomentText(text) {
   const t = String(text || "")
     .trim()
     .replace(/\s+/g, " ");
-  if (t.length < 6 || t.length > CONTENT_SOFT_CAP) return "";
+  if (t.length < 8 || t.length > CONTENT_SOFT_CAP) return "";
   if (JUNK_DYNAMIC_RE.test(t)) return "";
-  if (!LIVED_MOMENT_RE.test(t)) return "";
-  return t.slice(0, CONTENT_SOFT_CAP);
+  if (MEMORY_RESTATE_RE.test(t)) return "";
+  if (LIVED_MOMENT_RE.test(t) || LIVED_SCENE_RE.test(t)) return t.slice(0, CONTENT_SOFT_CAP);
+  return "";
 }
 
 /** Shared experience from the conversation. Not a durable Memory fact. */
@@ -387,6 +389,7 @@ export function captureLivedMoment(roleId, text, { chatId, roleName } = {}) {
   });
   if (added && listMoments(roleId).length > before) {
     recordRelationshipEvent(roleId, { type: "lived", text: content, roleName });
+    noteWitness({ roleId, chatId: chatId || null, kind: "moment", preview: content });
   }
   return added;
 }

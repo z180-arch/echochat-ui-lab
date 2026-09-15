@@ -62,6 +62,7 @@ const SUITES = [
   "tests/ui_conversation_list_test.mjs",
   "tests/ui_memory_list_test.mjs",
   "tests/companion_ux_test.mjs",
+  "tests/companion_grammar_test.mjs",
 ];
 
 function walkJs(dir, acc = []) {

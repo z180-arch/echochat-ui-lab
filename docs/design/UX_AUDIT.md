@@ -1,5 +1,7 @@
 # EchoChat UX / Visual Audit
 
+**Stale vs `a33be33`.** Several P0s below (left identity, her-bubble shadow, destacked welcome cards) were already shipped. Do not treat this file as the current visual punch list. Product identity diagnosis: [PRODUCT_INTELLIGENCE_AUDIT.md](PRODUCT_INTELLIGENCE_AUDIT.md).
+
 **Date:** 2026-09-15  
 **Evidence:** `src/ui/views/index.js`, `src/ui/components/index.js`, `src/styles/{tokens,layouts,components,motion,responsive}.css`, `src/ui/present.js`, mobile captures of `/app/` first-run, 痕迹 empty, 我的, Companion Home, Chat.  
 **Not in scope:** architecture rewrite. Frozen layers recorded only in `FUTURE_ARCHITECTURE.md`.

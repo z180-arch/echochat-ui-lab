@@ -44,14 +44,25 @@ export function daysAway(lastAt, now = Date.now()) {
   return days > 0 ? days : 0;
 }
 
-/** Reunion copy from a real last-seen time. Empty if they talked today. Never invents events. */
+/** Hours since last real timestamp. 0 if missing or in the future. */
+export function hoursAway(lastAt, now = Date.now()) {
+  const t = Number(lastAt) || 0;
+  if (!t) return 0;
+  const n = Number(now) || Date.now();
+  if (n < t) return 0;
+  return (n - t) / 3600000;
+}
+
+/** Reunion copy from a real last-seen time. Empty if they talked in the last four hours. Never invents events. */
 export function reunionLine(lastAt, now = Date.now()) {
+  const hours = hoursAway(lastAt, now);
+  if (hours < 4) return "";
   const days = daysAway(lastAt, now);
-  if (days < 1) return "";
-  if (days === 1) return "隔了一天";
-  if (days < 7) return "有几天没聊了";
-  if (days < 30) return "好久不见";
-  return "很久没见了";
+  if (days >= 30) return "很久没见了";
+  if (days >= 7) return "好久不见";
+  if (days >= 2) return "有几天没聊了";
+  if (days >= 1) return "隔了一天";
+  return "你回来了";
 }
 
 export function clipPreview(text, max = 28) {
@@ -71,11 +82,12 @@ export function companionRitual({
   hasMessages = false,
   meetEarly = false,
   sending = false,
+  now = Date.now(),
 } = {}) {
   if (sending) return { kind: "", text: "" };
   const recall = String(recallPreview || "").trim();
   if (recall) return { kind: "recall", text: `想起了 ${recall}` };
-  const reunion = reunionLine(lastAt);
+  const reunion = reunionLine(lastAt, now);
   if (reunion && hasMessages) return { kind: "reunion", text: reunion };
   if (meetEarly) return { kind: "meet", text: "刚刚认识 · 打开相处中" };
   return { kind: "", text: "" };
@@ -101,7 +113,7 @@ export function definedGreeting(chat) {
 
 /**
  * Resume strip from real last talk / moment / memory / stage.
- * Hidden unless they have been away at least a day.
+ * Hidden unless they have been away at least four hours.
  */
 export function livedResume({
   lastPreview = "",
@@ -112,6 +124,7 @@ export function livedResume({
   now = Date.now(),
 } = {}) {
   const days = daysAway(lastAt, now);
+  const hours = hoursAway(lastAt, now);
   const reunion = reunionLine(lastAt, now);
   const lines = [];
   if (reunion) lines.push({ kind: "gap", text: reunion });
@@ -123,7 +136,7 @@ export function livedResume({
   if (mem) lines.push({ kind: "memory", text: `还记得 · ${mem}` });
   const stage = String(stageLabel || "").trim();
   if (stage && stage !== "还没有聊过") lines.push({ kind: "rel", text: stage });
-  return { days, reunion, lines, show: days >= 1 && lines.length > 0 };
+  return { days, hours, reunion, lines, show: hours >= 4 && lines.length > 0 };
 }
 
 export function hubResumeLine(lastPreview, lastAt, now = Date.now()) {

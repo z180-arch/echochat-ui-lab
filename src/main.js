@@ -25,6 +25,7 @@ import { getApiPresets, findPreset } from "./domain/provider.js";
 import { speakAssistantMessage, speakText, stopSpeech } from "./domain/voice.js";
 import { isSttSupported, isDictating, startDictation, stopDictation, joinDictation, sttErrorMessage, sttSupportNote } from "./domain/stt.js";
 import { continueCharacter as continueCharacterHub, startConversationForCharacter, listCharactersForHub } from "./domain/character-hub.js";
+import { considerOutreach } from "./domain/outreach.js";
 import { Character } from "./domain/character.js";
 import { peekMessages, peekHasOlder, loadOlderMessages } from "./domain/message-store.js";
 import {
@@ -168,6 +169,11 @@ const App = {
     });
     events.on(EVT.MEMORY_CANDIDATES_READY, ({ roleId, chatId, count }) => {
       if (!count) return;
+      const current = store.getCurrentChat();
+      if (current && (current.roleId === roleId || current.id === chatId)) {
+        this.render();
+        return;
+      }
       showToast({
         message: count === 1 ? "有 1 件事可以记下" : `有 ${count} 件事可以记下`,
         type: "info",
@@ -178,33 +184,8 @@ const App = {
         },
       });
     });
-    events.on(EVT.MEMORY_ADDED, ({ roleId, memory } = {}) => {
-      if (memory?.source !== "auto") return;
-      if (this._quietMemoryHint) return;
-      this._quietMemoryHint = true;
-      const chatId = store.getCurrentChat()?.id;
-      showToast({
-        message: "记下了一件关于你的事",
-        type: "info",
-        duration: 5000,
-        action: {
-          label: "看看",
-          handler: () => this.openContinuitySheet(roleId, chatId),
-        },
-      });
-    });
-    events.on(EVT.MOMENT_ADDED, ({ roleId } = {}) => {
-      if (this._momentHint) return;
-      this._momentHint = true;
-      showToast({
-        message: "你们刚刚留下了一条相处痕迹",
-        type: "info",
-        duration: 5000,
-        action: {
-          label: "看看",
-          handler: () => this.openMomentsFeed(roleId),
-        },
-      });
+    events.on(EVT.CONTINUITY_WITNESSED, () => {
+      if (this.view === "app") this.render();
     });
     events.on("rerender", () => this.render());
     events.on(EVT.STREAM_DELTA, ({ chatId, text } = {}) => {
@@ -234,6 +215,8 @@ const App = {
       }
       this.finishSplashAnimation();
       this.render();
+      this._bindOutreachLoop();
+      this.considerCompanionOutreach();
     }, 800);
   },
 
@@ -1105,7 +1088,7 @@ const App = {
         <span class="create-card-title">${title}</span>
       </button>`;
     openModal({
-      title: "创建角色",
+      title: "把 TA 带进来",
       width: "440px",
       content: `
         <p class="create-sub">给 TA 一个名字，开始你们的第一句。</p>
@@ -1149,7 +1132,7 @@ const App = {
   _apiHintMarkup() {
     if (!needsApiSetup()) return "";
     return `<div class="api-hint">
-      <span>模型未配置 · 可先创建角色，发送消息前再连接</span>
+      <span>模型未配置 · 可先把 TA 带进来，开口前再接上你的密钥</span>
       <button type="button" class="link-btn" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openSettings('api')">去配置</button>
     </div>`;
   },
@@ -1524,7 +1507,6 @@ const App = {
     const msg = peekMessages(chat?.id)?.[index];
     if (msg) {
       rememberMessage(chat, msg);
-      showToast({ message: "已加入记忆", type: "success" });
     }
   },
   rememberMessageById(messageId) {
@@ -1801,7 +1783,11 @@ const App = {
           oninput="document.getElementById('mem-max-val').textContent=this.value" />
         <label class="field-label" style="margin-top:16px">每次对话最多注入 · <span id="mem-inject-val">${s.memoryCfg.injectMax}</span> 条</label>
         <input type="range" class="slider" id="set-mem-inject" min="3" max="30" step="1" value="${s.memoryCfg.injectMax}"
-          oninput="document.getElementById('mem-inject-val').textContent=this.value" />`;
+          oninput="document.getElementById('mem-inject-val').textContent=this.value" />
+        <label class="setting-check" style="margin-top:16px">
+          <input type="checkbox" ${s.settings.outreachEnabled === false ? "" : "checked"} onchange="window.EchoApp.setOutreachEnabled(this.checked)" />
+          离开一段时间后，TA 可以用上次真正说过的话先开口
+        </label>`;
       footer = `
         <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">返回</button>
         <button class="btn btn-primary" onclick="window.EchoApp.saveMemorySettings()">保存</button>`;
@@ -2220,6 +2206,29 @@ const App = {
     store.updateSettings({ ttsEnabled: next });
     if (!next) stopSpeech();
     showToast({ message: next ? "朗读已开启" : "朗读已关闭", type: "info" });
+  },
+  setOutreachEnabled(on) {
+    store.updateSettings({ outreachEnabled: !!on });
+    this.render();
+  },
+  toggleOutreachEnabled() {
+    const on = store.getState().settings.outreachEnabled !== false;
+    this.setOutreachEnabled(!on);
+  },
+  _bindOutreachLoop() {
+    if (this._outreachBound) return;
+    this._outreachBound = true;
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") this.considerCompanionOutreach();
+    });
+  },
+  async considerCompanionOutreach() {
+    try {
+      const sent = await considerOutreach();
+      if (sent.length && this.view === "app") this.render();
+    } catch (e) {
+      console.warn("[App] outreach skipped:", e.message);
+    }
   },
   stopSpeech() {
     stopSpeech();

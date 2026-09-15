@@ -583,6 +583,50 @@
 .msg-action-danger:hover {
   color: var(--color-danger);
 }
+.msg-action-primary {
+  color: var(--color-text);
+  font-weight: var(--weight-semibold);
+}
+.msg-more {
+  position: relative;
+}
+.msg-more > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.msg-more > summary::-webkit-details-marker {
+  display: none;
+}
+.msg-more-menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-top: 2px;
+}
+.witness-chip {
+  margin: 0 var(--space-4) var(--space-2);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: var(--font-label);
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.02em;
+}
+.setting-check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  font-size: var(--font-caption);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  min-height: 44px;
+}
+.setting-check input {
+  margin-top: 4px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
 @media (hover: hover) and (pointer: fine) {
   .msg:hover .msg-actions {
     display: flex;

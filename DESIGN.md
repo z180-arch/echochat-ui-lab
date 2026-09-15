@@ -75,12 +75,14 @@ User appearance presets (sky / lavender / rose / sage / cloud) are **tints**, no
 
 `--font-family`: `"Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif`.
 
+Google Fonts is optional enhancement. Do not parser-block `/app/` on `fonts.googleapis.com`; PingFang / YaHei must be able to start the app.
+
 Do not introduce Inter, Roboto, Geist, or a display serif as brand type for `/app/`. Chinese-first. Headings are roman (`font-style: normal`). Italic only inside running body copy.
 
 | Role | Token | Size | Weight | Where |
 |------|--------|------|--------|--------|
 | Display | `--font-display` | 28px | 600 | In-app welcome title only |
-| Heading | `--font-title` | 20px | 600 | Pane titles (陪伴, 痕迹, 我的), companion name |
+| Heading | `--font-title` | 20px | 600 | Pane titles (陪伴, 我们, 我的), companion name |
 | Section | `--font-section` | 17px | 600 | Empty titles, chat empty heading |
 | Body / conversational | `--font-body` | 15px | 400 | Chat bubbles, identity lead. Never below 15px in chat. |
 | Caption | `--font-caption` | 13px | 400 | Supporting, settings values |
@@ -338,20 +340,54 @@ Skill matrix: see AGENT_DESIGN_PROTOCOL.md.
 
 ---
 
+## Companion Interaction Grammar
+
+The basic unit is not a **message**. It is:
+
+**encounter → conversation → witnessing → continuation**
+
+Messages are how a conversation is written. They are not the product.
+
+| Unit | What the user should feel |
+|------|---------------------------|
+| Encounter | I met someone who will still be here. Not: I configured an AI. |
+| Conversation | We are talking on paper, in a room. Not: Messenger + regenerate workbench. |
+| Witnessing | That sentence did not vanish into a log. Not: stored in a database. |
+| Continuation | We pick up the relationship. Not: last session detected. |
+
+Full interaction contract: [docs/product/COMPANION_GRAMMAR.md](docs/product/COMPANION_GRAMMAR.md).
+
+**First verb:** 把 TA 带进来. One door.
+
+**Chat actions:** primary 记下 / 记下了. Copy, regenerate, edit, delete sit behind 更多.
+
+**Reunion:** after four hours of real silence, from the last real message time.
+
+**Proactive:** existing `rollProactive` gates, composed only from real last-talk or a real moment.
+
+**Home:** 正在聊 / 我们 / 关于你. Not a feature directory.
+
+**Nav:** 陪伴 · 我们 · 我的.
+
+---
+
 ## Design decision rationale
 
 | Decision | Why | Rejected |
 |----------|-----|----------|
 | Keep Morning Mint hex tokens | Brand memory + wave 3B/4 tests lock hex | Full OKLCH rewrite this round |
-| Keep 3 nav destinations | Continuity needs Traces and Me reachable; burying them inside a character hides lived history | 5-tab feature list; chat-only with overflow |
+| Keep 3 nav destinations | Continuity needs 我们 and 我的 reachable | 5-tab feature list; chat-only with overflow |
 | Companion Home left identity | Centered poster reads as a character sheet | Keep centered avatar stack |
 | Relationship as prose | Product forbids meters | Mint filled relationship card (historical) |
 | Chat bubbles without her-shadow | Shadowed white bubbles = WeChat clone | Keep `--shadow-sm` on her messages |
 | No GSAP yet | CSS covers micro/standard/expressive | Timeline engine for every transition |
 | Cards only for objects | Card-stacking was the main remaining slop after the companion-home IA pass | Wrap every section |
+| First verb is encounter | Create-and-chat is Character.AI grammar | Dual CTA 创建角色 / 开始聊天 |
+| Witness in the transcript | Continuity must be felt in the 95% loop | Toast spam + Memory sheet as the only proof |
+| Outreach from last talk | Companion can continue; never invent | Daily random pings / streak bait |
 
 ---
 
 ## What makes EchoChat look like EchoChat
 
-Quiet mint paper. One person in the room. Conversation on that paper, not in chrome cards. Relationship spoken as days-known and a sentence, not a bar. Traces grouped by day. Settings look like the same house, quieter. If you hide the word EchoChat, it should still not look like ChatGPT, Character.AI, Notion, or a SaaS console.
+Quiet mint paper. One person in the room. Conversation on that paper, not in chrome cards. Relationship spoken as days-known and a sentence, not a bar. Lived days under 我们. Settings look like the same house, quieter. If you hide the word EchoChat, it should still not look like ChatGPT, Character.AI, Notion, or a SaaS console.

@@ -12,6 +12,7 @@ Major UI work and which skills were actually loaded. New agents should append a 
 | 2026-09-15 | Navigation | Hallmark | DESIGN.md | Hallmark **Used** | `a33be33`. Continuity weighting, not a feature list. |
 | 2026-09-15 | Memory, Moments, Relationship, Settings | Hallmark | Taste | Hallmark **Used**; Taste **Used** | `a33be33`. Lived surfaces, not dashboard cards. |
 | 2026-09-15 | Skill infrastructure (this registry) | — | — | Install/register only. **No UI redesign.** | Registry + protocol + `AGENTS.md`. Preserve `a33be33`. |
+| 2026-09-16 | Companion Grammar reconstruction (`/app/` + landing honesty) | Claude `frontend-design` | Hallmark (redesign guardrail, DESIGN.md locked); Taste v2 (density / hierarchy); Pro Max (implementation QA only); GSAP **Referenced, not Used** (CSS only, no runtime) | frontend-design **Used**; Hallmark **Used** (redesign, not audit); Taste **Used**; Pro Max **Used** (QA); GSAP **Referenced, not Used**. Mobbin **Unavailable**. | First verb, witnessing, reunion, outreach wiring, Home/nav, landing BYOK honesty. |
 
 Official Taste v2 (`design-taste-frontend`), Claude `frontend-design`, GSAP skills, Open Design modules, UI/UX Pro Max, Cinematic UI, and PencilPlaybook were **not** Used on `a33be33`. They were installed or registered later the same day.
 

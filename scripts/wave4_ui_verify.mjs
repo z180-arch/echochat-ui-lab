@@ -193,13 +193,16 @@ const SNAP = `(() => {
     exportInTools: !!(tools && /导出/.test(tools.innerText || '')),
     exportInMore: !!(document.querySelector('.profile-rows') && /更多/.test(document.querySelector('.profile-rows')?.innerText || '')),
     exportOnHome: /导出角色卡/.test(profile?.innerText || ''),
-    profileHasHome: !!(profile && /正在聊/.test(profile.innerText) && /最近/.test(profile.innerText) && /我们/.test(profile.innerText) && /关于你/.test(profile.innerText) && /这个世界/.test(profile.innerText)),
+    profileHasHome: !!(profile && /正在聊/.test(profile.innerText) && /我们/.test(profile.innerText) && /关于你/.test(profile.innerText) && /这个世界/.test(profile.innerText) && !/>最近</.test(profile.innerHTML)),
     companionHome: !!profile?.classList.contains("companion-home"),
-    continueChat: /继续聊天|开始聊天/.test(document.querySelector('.profile-actions')?.innerText || ''),
+    continueChat: /接着聊|开口第一句/.test(document.querySelector('.profile-actions')?.innerText || ''),
     profileOrder: profile
-      ? ["profile-header", "profile-now", "profile-together", "profile-relate", "profile-you", "profile-support", "profile-actions"]
-          .map((cls) => profile.querySelector("." + cls))
-          .filter(Boolean)
+      ? [...new Map(
+          ["profile-header", "profile-now", "profile-together", "profile-you", "profile-support", "profile-actions"]
+            .map((cls) => profile.querySelector("." + cls))
+            .filter(Boolean)
+            .map((el) => [el, el])
+        ).values()]
           .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)
           .map((el) =>
             el.classList.contains("profile-header")
@@ -208,13 +211,11 @@ const SNAP = `(() => {
                 ? "now"
                 : el.classList.contains("profile-together")
                   ? "together"
-                  : el.classList.contains("profile-relate")
-                    ? "relate"
-                    : el.classList.contains("profile-you")
-                      ? "you"
-                      : el.classList.contains("profile-support")
-                        ? "support"
-                        : "actions"
+                  : el.classList.contains("profile-you")
+                    ? "you"
+                    : el.classList.contains("profile-support")
+                      ? "support"
+                      : "actions"
           )
       : [],
   };
@@ -273,6 +274,19 @@ const EMPTY_SNAP = `(() => {
     descCount: descs.length,
     btnCount: btns.length,
     primary: btns[0]?.classList.contains('btn-primary') || false,
+  };
+})()`;
+
+const WAITING_SNAP = `(() => {
+  const waiting = document.querySelector('.chat-waiting');
+  if (!waiting) return { present: false };
+  const overflowDoc = document.documentElement.scrollWidth > window.innerWidth + 2;
+  return {
+    present: true,
+    overflowX: overflowDoc,
+    title: (waiting.querySelector('.chat-empty-t')?.textContent || '').trim(),
+    btnCount: waiting.querySelectorAll('.btn').length,
+    primary: !!waiting.querySelector('.btn-primary'),
   };
 })()`;
 
@@ -433,7 +447,7 @@ function checkProfile(width, snap) {
   record(`${width} · profile home order`, snap.profileHasHome ? "PASS" : "FAIL");
   record(
     `${width} · profile hierarchy`,
-    snap.profileOrder.join(",") === "header,now,together,relate,you,support,actions" ? "PASS" : "FAIL",
+    snap.profileOrder.join(",") === "header,now,together,you,support,actions" ? "PASS" : "FAIL",
     snap.profileOrder.join(",")
   );
   record(`${width} · companion home`, snap.companionHome ? "PASS" : "FAIL");
@@ -618,7 +632,7 @@ async function runWidth(send, width, expect) {
   );
   record(
     `${width} · me section titles`,
-    me.titles.includes("对话") && me.titles.includes("体验") && me.titles.includes("数据") && me.titles.includes("高级") ? "PASS" : "FAIL",
+    me.titles.includes("相处") && me.titles.includes("氛围") && me.titles.includes("数据") && me.titles.includes("高级") ? "PASS" : "FAIL",
     me.titles.join(",")
   );
 
@@ -661,10 +675,10 @@ async function runWidth(send, width, expect) {
 
   await evalExpr(send, `window.EchoApp.switchTab('companion'); window.EchoApp.backToList(); true`);
   await sleep(200);
-  const empty = await evalExpr(send, EMPTY_SNAP);
+  const empty = await evalExpr(send, WAITING_SNAP);
   record(
     `${width} · empty structure`,
-    empty.present && empty.titleCount === 1 && empty.descCount === 1 && empty.btnCount === 1 && empty.primary
+    empty.present && /还在/.test(empty.title) && empty.btnCount === 1 && empty.primary
       ? "PASS"
       : "FAIL",
     JSON.stringify(empty)
@@ -688,6 +702,7 @@ const chrome = spawn(
     "--hide-scrollbars",
     "--no-sandbox",
     "--disable-dev-shm-usage",
+    "--host-resolver-rules=MAP fonts.googleapis.com ~NOTFOUND,MAP fonts.gstatic.com ~NOTFOUND",
     "about:blank",
   ],
   { stdio: "ignore" }

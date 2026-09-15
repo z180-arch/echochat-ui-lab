@@ -1139,6 +1139,7 @@
   .welcome-screen h1,
   .welcome-actions,
   .welcome-beats,
+  .welcome-letter,
   .modal,
   .modal-overlay,
   .drawer,
@@ -1153,7 +1154,8 @@
   .welcome-lead .lead-char,
   .welcome-screen h1,
   .welcome-actions,
-  .welcome-beats {
+  .welcome-beats,
+  .welcome-letter {
     opacity: 1;
     transform: none;
   }

@@ -18,7 +18,9 @@ Source of truth is **running code**, then this folder.
 | [design/AGENT_DESIGN_PROTOCOL.md](design/AGENT_DESIGN_PROTOCOL.md) | How agents change UI |
 | [design/SKILL_REGISTRY.md](design/SKILL_REGISTRY.md) | External design-skill contract (status, license, path) |
 | [design/SKILL_USAGE.md](design/SKILL_USAGE.md) | Which skills were used on which surfaces |
-| [design/UX_AUDIT.md](design/UX_AUDIT.md) | Latest visual/UX audit |
+| [design/PRODUCT_INTELLIGENCE_AUDIT.md](design/PRODUCT_INTELLIGENCE_AUDIT.md) | 2026-09-15 product identity diagnosis. Implementation status appended 2026-09-16. |
+| [product/COMPANION_GRAMMAR.md](product/COMPANION_GRAMMAR.md) | Interaction grammar after reconstruction |
+| [design/UX_AUDIT.md](design/UX_AUDIT.md) | Visual/UX notes; stale vs `a33be33` — do not treat as current P0 |
 | [design/MOTION.md](design/MOTION.md) | Motion language |
 | [ROADMAP.md](ROADMAP.md) | CURRENT / NEXT / LATER |
 

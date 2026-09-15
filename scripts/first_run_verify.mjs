@@ -51,6 +51,8 @@ async function cdpConnect(wsUrl) {
   });
   let nextId = 1;
   const pending = new Map();
+  const exceptions = [];
+  const logs = [];
   ws.addEventListener("message", (ev) => {
     const msg = JSON.parse(ev.data);
     if (msg.id && pending.has(msg.id)) {
@@ -58,6 +60,19 @@ async function cdpConnect(wsUrl) {
       pending.delete(msg.id);
       if (msg.error) reject(new Error(JSON.stringify(msg.error)));
       else resolve(msg.result);
+      return;
+    }
+    if (msg.method === "Runtime.exceptionThrown") {
+      exceptions.push(msg.params?.exceptionDetails?.exception?.description || JSON.stringify(msg.params));
+    }
+    if (msg.method === "Runtime.consoleAPICalled") {
+      logs.push((msg.params?.args || []).map((a) => a.value || a.description || "").join(" "));
+    }
+    if (msg.method === "Network.loadingFailed") {
+      logs.push("NETFAIL " + JSON.stringify(msg.params));
+    }
+    if (msg.method === "Network.responseReceived" && msg.params?.response?.status >= 400) {
+      logs.push("HTTP " + msg.params.response.status + " " + msg.params.response.url);
     }
   });
   const send = (method, params = {}) => {
@@ -66,6 +81,8 @@ async function cdpConnect(wsUrl) {
     ws.send(JSON.stringify({ id, method, params }));
     return p;
   };
+  send._exceptions = exceptions;
+  send._logs = logs;
   return { ws, send };
 }
 
@@ -86,7 +103,30 @@ async function waitApp(send) {
     if (ready) return;
     await sleep(200);
   }
-  throw new Error("EchoApp not ready");
+  const diag = await evalExpr(
+    send,
+    `({
+      href: location.href,
+      title: document.title,
+      readyState: document.readyState,
+      htmlLen: document.documentElement ? document.documentElement.outerHTML.length : 0,
+      errors: window.__errors || [],
+      pre: (document.querySelector('pre')||{}).textContent || '',
+      hasApp: !!window.EchoApp,
+      scripts: [...document.scripts].map((s) => s.src || s.getAttribute('src') || s.type),
+      bodyHtml: (document.body && document.body.innerHTML || '').slice(0, 280),
+      body: (document.body && document.body.innerText || '').slice(0, 400),
+      resources: performance.getEntriesByType('resource').map((e) => e.name + ':' + e.responseStatus).slice(0, 30)
+    })`
+  );
+  throw new Error(
+    "EchoApp not ready " +
+      JSON.stringify({
+        ...diag,
+        exceptions: send._exceptions || [],
+        logs: (send._logs || []).slice(0, 20),
+      })
+  );
 }
 
 const LANDING = `(() => {
@@ -103,7 +143,7 @@ const LANDING = `(() => {
 const AFTER_EMPTY = `(() => {
   const overlay = document.querySelector('.modal-overlay');
   const title = (overlay?.querySelector('.modal-title')?.textContent || '').trim();
-  return { bringOpen: !!overlay && title === '创建角色' };
+  return { bringOpen: !!overlay && title === '把 TA 带进来' };
 })()`;
 
 const CREATE = `(() => (async () => {
@@ -192,6 +232,7 @@ const chrome = spawn(
     "--no-first-run",
     "--disable-gpu",
     "--no-sandbox",
+    "--host-resolver-rules=MAP fonts.googleapis.com ~NOTFOUND,MAP fonts.gstatic.com ~NOTFOUND",
     "about:blank",
   ],
   { stdio: "ignore" }
@@ -204,12 +245,15 @@ try {
   const { ws, send } = await cdpConnect(page.webSocketDebuggerUrl);
   await send("Page.enable");
   await send("Runtime.enable");
+  await send("Network.enable");
+  await send("Network.setBlockedURLs", { urls: ["*fonts.googleapis.com*", "*fonts.gstatic.com*"] });
   await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
   await send("Page.navigate", { url: `${BASE}?c=${Date.now()}` });
+  await sleep(1500);
   await waitApp(send);
 
   const land = await evalExpr(send, LANDING);
-  record("landing cta", land.landing && land.cta === "创建角色" && land.ghost.includes("开始聊天") && !land.overflowX ? "PASS" : "FAIL", JSON.stringify(land));
+  record("landing cta", land.landing && land.cta === "把 TA 带进来" && !land.ghost.includes("开始聊天") && !land.overflowX ? "PASS" : "FAIL", JSON.stringify(land));
 
   await evalExpr(send, `window.EchoApp.enterAppEmpty(); true`);
   await sleep(450);
@@ -236,7 +280,7 @@ try {
   record("quiet remember kept", mem.kept && mem.keptMark ? "PASS" : "FAIL", JSON.stringify(mem));
   record("first-meet chip", /刚刚认识/.test(mem.meet) ? "PASS" : "FAIL", mem.meet);
   record("continuity not chat log", mem.sheet === "记忆与痕迹" && mem.leadHasNotChat ? "PASS" : "FAIL", JSON.stringify(mem));
-  record("moment visible in traces", mem.momentsTitle === "痕迹" && /咖啡馆/.test(mem.momentCard) ? "PASS" : "FAIL", JSON.stringify(mem));
+  record("moment visible in traces", mem.momentsTitle === "我们" && /咖啡馆/.test(mem.momentCard) ? "PASS" : "FAIL", JSON.stringify(mem));
   record(
     "traces peek is not memory",
     mem.peekHasMoment && !mem.peekHasMemory && /关于你/.test(mem.memMeta) ? "PASS" : "FAIL",

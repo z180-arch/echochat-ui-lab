@@ -287,6 +287,9 @@
   line-height: 1.7;
   max-width: 22em;
 }
+.chat-waiting .btn-primary {
+  margin-top: var(--space-4);
+}
 .meet-identity {
   margin: 0 0 var(--space-2);
   max-width: 22em;
@@ -1109,6 +1112,21 @@ button.profile-section-link {
   line-height: 1.5;
   margin: 0 0 16px;
   max-width: 22em;
+}
+.welcome-letter {
+  font-size: var(--font-body);
+  color: var(--color-text-secondary);
+  line-height: 1.65;
+  margin: 0 0 12px;
+  max-width: 20em;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(8px);
+}
+.welcome-letter.on {
+  opacity: 1;
+  transform: none;
+  transition: opacity var(--dur-slow) var(--ease-out), transform var(--dur-slow) var(--ease-out);
 }
 .welcome-beats {
   display: grid;

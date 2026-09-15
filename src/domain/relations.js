@@ -463,11 +463,12 @@ export function markProactiveSent(roleId, now) {
 
 export function shouldConsiderProactive(roleId, opts) {
   const a = getAffinity(roleId, opts);
+  const now = opts?.now != null ? opts.now : Date.now();
   if (a.score <= AFFINITY_THRESHOLD) return { ok: false, reason: "affinity" };
   if (!a.lastChatAt) return { ok: false, reason: "never" };
-  const gap = Date.now() - a.lastChatAt;
+  const gap = now - a.lastChatAt;
   if (gap < DAY_MS) return { ok: false, reason: "recent" };
-  if (a.lastProactiveAt && Date.now() - a.lastProactiveAt < DAY_MS) {
+  if (a.lastProactiveAt && now - a.lastProactiveAt < DAY_MS) {
     return { ok: false, reason: "cooldown" };
   }
   return { ok: true, affinity: a, gap };

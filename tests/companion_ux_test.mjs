@@ -56,9 +56,9 @@ function test(name, fn) {
 const DAY = 86400000;
 const now = Date.parse("2026-09-15T00:00:00Z");
 
-test("reunion starts after one real day", () => {
+test("reunion starts after four hours, then names the gap", () => {
   assert.equal(reunionLine(now, now), "");
-  assert.equal(reunionLine(now - 0.5 * DAY, now), "");
+  assert.equal(reunionLine(now - 0.5 * DAY, now), "你回来了");
   assert.equal(reunionLine(now - 1 * DAY, now), "隔了一天");
   assert.equal(reunionLine(now - 2 * DAY, now), "有几天没聊了");
   assert.equal(reunionLine(now - 3 * DAY, now), "有几天没聊了");
@@ -77,6 +77,7 @@ test("ritual priority: recall beats reunion beats first-meet", () => {
       hasMessages: true,
       meetEarly: true,
       sending: false,
+      now,
     }).kind,
     "recall"
   );
@@ -86,6 +87,7 @@ test("ritual priority: recall beats reunion beats first-meet", () => {
       hasMessages: true,
       meetEarly: true,
       sending: false,
+      now,
     }).kind,
     "reunion"
   );
@@ -95,10 +97,11 @@ test("ritual priority: recall beats reunion beats first-meet", () => {
       hasMessages: true,
       meetEarly: true,
       sending: false,
+      now,
     }).text,
     "刚刚认识 · 打开相处中"
   );
-  assert.equal(companionRitual({ sending: true, meetEarly: true, lastAt, hasMessages: true }).kind, "");
+  assert.equal(companionRitual({ sending: true, meetEarly: true, lastAt, hasMessages: true, now }).kind, "");
 });
 
 test("clipPreview does not invent text", () => {

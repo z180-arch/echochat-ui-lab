@@ -141,17 +141,16 @@ test("Settings rows share 44px touch and 16px padding", () => {
 test("EmptyState is title, one explanation, one primary action", () => {
   const html = EmptyState({
     icon: "x",
-    title: "还没有你的角色",
-    desc: "创建角色后，就可以开始相处。",
-    actionText: "创建角色",
+    title: "还没有人在这儿",
+    desc: "把一个会留下来的人带进来。不是创建一个 AI。",
+    actionText: "把 TA 带进来",
     actionOnClick: "window.EchoApp.openBring()",
   });
   assert.ok(html.includes("empty-title"));
   assert.ok(html.includes("empty-desc"));
   assert.equal((html.match(/btn-primary/g) || []).length, 1);
   assert.ok(!html.includes("btn-secondary"));
-  assert.ok(viewsSrc.includes('title: "还没有你的角色"'));
-  assert.ok(viewsSrc.includes('title: "选一个角色开始聊"'));
+  assert.ok(viewsSrc.includes('title: "还没有人在这儿"'));
   assert.ok(viewsSrc.includes('title: "还没有一起经历过的事"'));
 });
 

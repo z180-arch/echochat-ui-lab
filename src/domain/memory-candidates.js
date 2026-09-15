@@ -10,6 +10,7 @@ import { addMemory, getMemoryList } from "./memory.js";
 import { addMoment, parseSummaryAndMoment, ingestSummaryDynamic } from "./moments.js";
 import { getRoleName } from "./persona.js";
 import { recordRelationshipEvent } from "./relations.js";
+import { noteWitness } from "./witness.js";
 
 const FACT_RE = /我(喜欢|讨厌|爱吃|爱|是|在|住|有|想|会|要|叫)|今天|明天|昨天|工作|上学|生日/;
 const DURABLE_SELF_RE = /我(很|有点|有點)?(怕|害怕|讨厌|討厭|喜欢|喜歡|爱吃|愛吃|过敏|過敏|不吃|不能|住)/;
@@ -154,6 +155,7 @@ export function quietRememberUserText(roleId, text) {
   const mem = addMemory(roleId, t, 7, "auto");
   if (!mem) return null;
   recordRelationshipEvent(roleId, { type: "memory", text: "记下了一件关于你的事" });
+  noteWitness({ roleId, kind: "memory", preview: t });
   return mem;
 }
 
@@ -171,8 +173,24 @@ export function applyAutoSummaryResult(roleId, raw, { chatId } = {}) {
     memories: getMemoryList(roleId),
   });
   // Duplicate-only batches must not toast or block heuristic「从对话提取」.
-  if (!actionable.length) return { count: 0, momentId: dynamic.moment?.id || null };
+  if (!actionable.length) {
+    if (dynamic.moment) {
+      noteWitness({
+        roleId,
+        chatId: chatId || null,
+        kind: "moment",
+        preview: dynamic.moment.content,
+      });
+    }
+    return { count: 0, momentId: dynamic.moment?.id || null };
+  }
   setPendingCandidates(roleId, candidates, chatId);
+  noteWitness({
+    roleId,
+    chatId: chatId || null,
+    kind: "review",
+    preview: actionable[0]?.text || "",
+  });
   events.emit(EVT.MEMORY_CANDIDATES_READY, {
     roleId,
     chatId: chatId || null,

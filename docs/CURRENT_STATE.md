@@ -2,7 +2,7 @@
 
 If another Markdown file disagrees with **code + tests**, the code wins.
 
-**Last reconciled:** 2026-09-15  
+**Last reconciled:** 2026-09-16
 **Canonical line:** GitHub `main` (Cloudflare Pages static deploy: https://echochat-f4j.pages.dev/)
 
 ---
@@ -114,13 +114,16 @@ Do not add a new theme kit, animation engine, component library, or particle-dem
 
 ## Shipped product loop
 
-- Create / import Character (templates, blank, Card V2 JSON)
+- Create / import Character (templates, blank, Card V2 JSON). First verb: 把 TA 带进来
 - Chat with streaming paint and a virtualized long transcript
 - Quiet Memory of user facts; retrieve-for-turn (photography aliases only — frozen)
-- Moments and Relationship as lived traces
+- Witnessing in-chat when a fact or lived moment is kept
+- Moments and Relationship as lived traces (nav: 我们)
 - Continuity sheet (记忆与痕迹) from real data only
 - First-run starters fill the composer; they do not auto-send
-- Reunion / resume copy from `lastMessageAt`, last preview, moments, memory, stage
+- Reunion / resume from last real message time (≥4h) plus last preview, moments, memory, stage
+- Companion outreach via existing `rollProactive` gates, composed from real last-talk only
+- Landing states BYOK; does not claim 打开即用
 
 ---
 

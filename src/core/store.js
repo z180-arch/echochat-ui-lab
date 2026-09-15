@@ -62,6 +62,7 @@ function defaultState() {
       voiceLang: "zh-CN",
       emojiEnabled: true,
       emojiIntensity: 50,
+      outreachEnabled: true,
     },
     global: {
       persona: CFG.globalPersona || "",

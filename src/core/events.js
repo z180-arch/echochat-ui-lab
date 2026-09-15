@@ -62,6 +62,7 @@ export const EVT = {
   MEMORY_ADDED: "memory:added",
   MEMORY_CANDIDATES_READY: "memory:candidates-ready",
   MOMENT_ADDED: "moment:added",
+  CONTINUITY_WITNESSED: "continuity:witnessed",
   RELATION_UPDATE: "relation:update",
   SETTINGS_CHANGE: "settings:change",
   THEME_CHANGE: "theme:change",

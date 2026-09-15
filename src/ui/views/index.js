@@ -43,6 +43,7 @@ import { listCharactersForHub, listActiveConversations, resolveAvatarSrc } from 
 import { isDictating } from "../../domain/stt.js";
 import { getCharacterSlots } from "../../domain/context-builder.js";
 import { listBooks } from "../../domain/worldbook.js";
+import { getLastWitness, witnessLine } from "../../domain/witness.js";
 import {
   hubSecondaryLine,
   presentCompanionStage,
@@ -62,7 +63,7 @@ function isWide() {
 }
 
 // ============================================================
-// Landing — 一句 slogan + 创建 / 开聊
+// First encounter — Letter, not a 3-beat product tour
 // ============================================================
 const LANDING_SLOGAN = "念念不忘，必有回响";
 
@@ -76,15 +77,10 @@ export function renderLanding() {
       <div class="welcome-mark">${LogoMark({ size: 64 })}</div>
       <h1>EchoChat</h1>
       <p class="welcome-lead">${slogan}</p>
-      <p class="welcome-sub">先把一个想长期相处的人带进来。</p>
-      <div class="welcome-beats">
-        <div class="welcome-beat"><strong>角色</strong><span>一个陪伴对象</span></div>
-        <div class="welcome-beat"><strong>记忆</strong><span>关于你的长期事实</span></div>
-        <div class="welcome-beat"><strong>相处</strong><span>关系会慢慢靠近</span></div>
-      </div>
+      <p class="welcome-letter">这里有一个会留下来的人。先遇见 TA。明天回来，还在。</p>
+      <p class="welcome-sub">开口需要你自己的 API 密钥。密钥只留在这台设备上。</p>
       <div class="welcome-actions">
-        <button class="btn btn-primary welcome-cta" onclick="window.EchoApp.openBring()">创建角色</button>
-        <button class="btn btn-ghost" onclick="window.EchoApp.enterAppEmpty()">开始聊天</button>
+        <button class="btn btn-primary welcome-cta" onclick="window.EchoApp.openBring()">把 TA 带进来</button>
       </div>
     </div>
   </div>`;
@@ -96,20 +92,20 @@ export function animateLanding() {
   const chars = document.querySelectorAll(".welcome-lead .lead-char");
   const title = document.querySelector(".welcome-screen h1");
   const actions = document.querySelector(".welcome-actions");
-  const beats = document.querySelector(".welcome-beats");
+  const letter = document.querySelector(".welcome-letter");
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (reduced) {
     chars.forEach((c) => c.classList.add("on"));
     title?.classList.add("on");
     actions?.classList.add("on");
-    beats?.classList.add("on");
+    letter?.classList.add("on");
     return;
   }
   requestAnimationFrame(() => {
     title?.classList.add("on");
     chars.forEach((c, i) => setTimeout(() => c.classList.add("on"), 140 + i * 48));
     setTimeout(() => {
-      beats?.classList.add("on");
+      letter?.classList.add("on");
       actions?.classList.add("on");
     }, 160 + chars.length * 48);
   });
@@ -167,8 +163,8 @@ function renderNavRail(activeTab) {
     <button class="nav-item ${activeTab === "companion" ? "nav-item-active" : ""}" onclick="window.EchoApp.switchTab('companion')" title="陪伴" data-nav="home">
       ${Icons.message}<span class="nav-item-label">陪伴</span>
     </button>
-    <button class="nav-item ${activeTab === "moments" ? "nav-item-active" : ""}" onclick="window.EchoApp.switchTab('moments')" title="痕迹">
-      ${Icons.moments}<span class="nav-item-label">痕迹</span>
+    <button class="nav-item ${activeTab === "moments" ? "nav-item-active" : ""}" onclick="window.EchoApp.switchTab('moments')" title="我们">
+      ${Icons.moments}<span class="nav-item-label">我们</span>
     </button>
     <div class="nav-spacer"></div>
     <button class="nav-item ${activeTab === "me" ? "nav-item-active" : ""}" onclick="window.EchoApp.switchTab('me')" title="我的">
@@ -187,7 +183,7 @@ function renderBottomNav(activeTab) {
       ${Icons.message}<span>陪伴</span>
     </button>
     <button class="bottom-nav-item ${activeTab === "moments" ? "bottom-nav-item-active" : ""}" onclick="window.EchoApp.switchTab('moments')">
-      ${Icons.moments}<span>痕迹</span>
+      ${Icons.moments}<span>我们</span>
     </button>
     <button class="bottom-nav-item ${activeTab === "me" ? "bottom-nav-item-active" : ""}" onclick="window.EchoApp.switchTab('me')">
       ${Icons.me}<span>我的</span>
@@ -208,7 +204,7 @@ function renderCompanionInbox(searchQuery, currentChat, hideListMobile) {
       <div>
         <h1 class="list-title">陪伴</h1>
       </div>
-        ${IconButton({ icon: Icons.plus, title: "创建角色", onClick: "window.EchoApp.openBring()" })}
+        ${IconButton({ icon: Icons.plus, title: "把 TA 带进来", onClick: "window.EchoApp.openBring()" })}
     </div>
     <div class="list-search">
       <div class="search-wrap">
@@ -220,9 +216,9 @@ function renderCompanionInbox(searchQuery, currentChat, hideListMobile) {
       ${hub.length === 0
         ? EmptyState({
             icon: Icons.message,
-            title: "还没有你的角色",
-            desc: "先有一个角色，才能开始聊天。",
-            actionText: "创建角色",
+            title: "还没有人在这儿",
+            desc: "把一个会留下来的人带进来。不是创建一个 AI。",
+            actionText: "把 TA 带进来",
             actionOnClick: "window.EchoApp.openBring()",
           })
         : hub.map((h) => {
@@ -246,13 +242,29 @@ function renderCompanionInbox(searchQuery, currentChat, hideListMobile) {
 }
 
 function renderEmptyChat() {
+  const hub = listCharactersForHub();
+  const waiting = hub.find((h) => h.lastPreview) || hub[0];
+  if (waiting) {
+    const reunion = reunionLine(waiting.lastAt);
+    const last = clipPreview(waiting.lastPreview, 36);
+    return `
+  <div class="chat-pane hidden-mobile">
+    <div class="chat-empty chat-waiting">
+      ${CharacterAvatar({ src: resolveAvatarSrc(waiting.avatar), size: "lg", alt: waiting.name, name: waiting.name })}
+      <div class="chat-empty-t">${esc(waiting.name)} 还在</div>
+      ${reunion ? `<p>${esc(reunion)}</p>` : ""}
+      ${last ? `<p class="meet-identity">上次说到 · ${esc(last)}</p>` : `<p>还没有开口。</p>`}
+      <button type="button" class="btn btn-primary" onclick="window.EchoApp.selectCharacter('${esc(waiting.id)}')">接着聊</button>
+    </div>
+  </div>`;
+  }
   return `
   <div class="chat-pane hidden-mobile">
     ${EmptyState({
       icon: Icons.message,
-      title: "选一个角色开始聊",
-      desc: "从左边选一位，或先创建一个。",
-      actionText: "创建角色",
+      title: "还没有人在这儿",
+      desc: "遇见一个会留下来的人，明天回来 TA 还在。",
+      actionText: "把 TA 带进来",
       actionOnClick: "window.EchoApp.openBring()",
     })}
   </div>`;
@@ -271,20 +283,21 @@ function renderChatPane(chat, hideChatMobile) {
   const recall = getLastMemoryRetrieve();
   const showRecall = recall.hadHit && recall.chatId === chat.id && recall.preview;
   const showThreadChip = roleId && convos.length > 1;
-  const reunion = reunionLine(chat.lastMessageAt);
+  const lastMsgTime = messages.length ? Number(messages[messages.length - 1].time) || 0 : 0;
+  const reunion = reunionLine(lastMsgTime);
   const latestMoment = roleId ? listMoments(roleId)[0] : null;
   const latestMemory = roleId ? getMemoryList(roleId, 1)[0] : null;
   const lastUserOrAny = messages.length ? String(messages[messages.length - 1].text || "") : "";
   const resume = livedResume({
     lastPreview: chat.lastPreview || lastUserOrAny,
-    lastAt: chat.lastMessageAt,
+    lastAt: lastMsgTime,
     latestMoment: latestMoment?.content || "",
     latestMemory: latestMemory?.content || "",
     stageLabel: presented.label,
   });
   const ritual = companionRitual({
     recallPreview: showRecall ? recall.preview : "",
-    lastAt: chat.lastMessageAt,
+    lastAt: lastMsgTime,
     hasMessages: messages.length > 0,
     meetEarly: !!(affinity?.hasHistory && affinity.turns > 0 && affinity.turns <= 2) && !resume.show,
     sending,
@@ -299,6 +312,8 @@ function renderChatPane(chat, hideChatMobile) {
       ? `window.EchoApp.openContinuitySheet('${esc(roleId)}','${chat.id}')`
       : "window.EchoApp.toggleProfile()";
   const resumeClick = "window.EchoApp.toggleProfile()";
+  const witnessed = getLastWitness({ roleId, chatId: chat.id });
+  const witnessedCopy = witnessLine(witnessed);
 
   return `
   <div class="chat-pane ${hideChatMobile ? "hidden-mobile" : ""}">
@@ -341,9 +356,10 @@ function renderChatPane(chat, hideChatMobile) {
         ? `<button type="button" class="recall-chip recall-chip-${ritual.kind}" aria-live="polite" onclick="${ritualClick}">${esc(ritual.text)}</button>`
         : ""
     }
+    ${witnessedCopy ? `<p class="witness-chip" aria-live="polite">${esc(witnessedCopy)}</p>` : ""}
     ${needsApiSetup(chat)
       ? `<div class="composer-hint">
-          <span>连接模型后即可开始对话</span>
+          <span>接上密钥后，TA 才能开口</span>
           <button type="button" class="link-btn" onclick="window.EchoApp.openApiConnect()">去配置</button>
         </div>`
       : ""}
@@ -450,12 +466,17 @@ export function renderMessage(m, index, chat, messages = []) {
       ${kept && roleId ? `<button type="button" class="msg-kept" onclick="window.EchoApp.openContinuitySheet('${esc(roleId)}','${chat.id}')">记下了</button>` : ""}
       ${isError ? `<div class="msg-status">${esc(m.errorText || "没发出去")}${!isSending() ? `<button type="button" class="msg-retry-btn" onclick="window.EchoApp.retryLastMessage()">重试</button>` : ""}</div>` : ""}
       <div class="msg-actions">
-        <button class="msg-action-btn" onclick="window.EchoApp.copyMessageById('${esc(m.id || "")}')">复制</button>
-        <button class="msg-action-btn" onclick="window.EchoApp.rememberMessageById('${esc(m.id || "")}')">记住</button>
-        ${!isMe ? `<button class="msg-action-btn" onclick="window.EchoApp.speakMessageById('${esc(m.id || "")}')">朗读</button>` : ""}
-        ${!isMe && !isError ? `<button class="msg-action-btn" onclick="window.EchoApp.regenerateMessageById('${esc(m.id || "")}')">重生成</button>` : ""}
-        ${isMe ? `<button class="msg-action-btn" onclick="window.EchoApp.editMessageById('${esc(m.id || "")}')">编辑</button>` : ""}
-        <button class="msg-action-btn msg-action-danger" onclick="window.EchoApp.deleteMessageById('${esc(m.id || "")}')">删除</button>
+        <button class="msg-action-btn msg-action-primary" onclick="window.EchoApp.rememberMessageById('${esc(m.id || "")}')">${kept ? "记下了" : "记下"}</button>
+        <details class="msg-more">
+          <summary class="msg-action-btn" aria-label="更多操作">更多</summary>
+          <div class="msg-more-menu">
+            <button class="msg-action-btn" onclick="window.EchoApp.copyMessageById('${esc(m.id || "")}')">复制</button>
+            ${!isMe ? `<button class="msg-action-btn" onclick="window.EchoApp.speakMessageById('${esc(m.id || "")}')">朗读</button>` : ""}
+            ${!isMe && !isError ? `<button class="msg-action-btn" onclick="window.EchoApp.regenerateMessageById('${esc(m.id || "")}')">重生成</button>` : ""}
+            ${isMe ? `<button class="msg-action-btn" onclick="window.EchoApp.editMessageById('${esc(m.id || "")}')">编辑</button>` : ""}
+            <button class="msg-action-btn msg-action-danger" onclick="window.EchoApp.deleteMessageById('${esc(m.id || "")}')">删除</button>
+          </div>
+        </details>
       </div>
     </div>
   </div>`;
@@ -493,7 +514,8 @@ function renderProfilePane(chat) {
   const overlay = typeof window !== "undefined" && window.innerWidth < PROFILE_PERSIST_MIN_WIDTH;
   const identity = String(slots.identity || "").trim();
   const threadTitle = currentThread?.threadTitle || "日常相处";
-  const reunion = reunionLine(chat.lastMessageAt);
+  const lastAt = currentThread?.lastAt || 0;
+  const reunion = reunionLine(lastAt);
   const nowClick = overlay
     ? "window.EchoApp.toggleProfile()"
     : convos.length > 1
@@ -552,13 +574,10 @@ function renderProfilePane(chat) {
         <p class="profile-kicker">正在聊</p>
         ${nowPeek}
       </section>
-      <section class="profile-together profile-section profile-section-peek">
-        <button type="button" class="profile-kicker profile-kicker-link" onclick="window.EchoApp.openMomentsFeed('${esc(roleId || "")}')">最近</button>
-        ${recentPeek}
-      </section>
-      <section class="profile-relate profile-section">
+      <section class="profile-relate profile-together profile-section">
         <p class="profile-kicker">我们</p>
         ${RelationshipBrief({ affinity, hasTalk, compact: true })}
+        ${recentPeek}
       </section>
       ${roleId ? `
       <section class="profile-you profile-section">
@@ -578,7 +597,7 @@ function renderProfilePane(chat) {
       ` : ""}
     </div>
     <div class="profile-actions">
-      ${overlay ? `<button type="button" class="btn btn-primary btn-block" onclick="window.EchoApp.toggleProfile()">${hasTalk ? "继续聊天" : "开始聊天"}</button>` : ""}
+      ${overlay ? `<button type="button" class="btn btn-primary btn-block" onclick="window.EchoApp.toggleProfile()">${hasTalk ? "接着聊" : "开口第一句"}</button>` : ""}
       ${roleId ? `<button type="button" class="btn btn-ghost btn-sm" onclick="window.EchoApp.editCharacter('${roleId}')">编辑人设</button>` : ""}
     </div>
   </aside>`;
@@ -635,7 +654,7 @@ function renderMomentsPane() {
   <div class="moments-pane" id="moments-scroll">
     <div class="inbox-head">
       <div>
-        <h1 class="list-title">痕迹</h1>
+        <h1 class="list-title">我们</h1>
       </div>
       <select class="moments-filter" id="moments-filter" aria-label="筛选角色" onchange="window.EchoApp.setMomentsFilter(this.value)">
         ${options
@@ -935,6 +954,7 @@ function renderMePane() {
         <div class="me-settings-list">
           ${meRow({ icon: Icons.database, title: "API 与模型", value: apiSummary(state.settings), action: "openSettings('api')" })}
           ${meRow({ icon: Icons.brain, title: "记忆条数", value: `每位 ${state.memoryCfg.maxPerRole} 条`, action: "openSettings('memory')" })}
+          ${meRow({ icon: Icons.message, title: "她先开口", value: state.settings.outreachEnabled === false ? "已关" : "离开后可续上", action: "toggleOutreachEnabled()" })}
         </div>
       </div>
 

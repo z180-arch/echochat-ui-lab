@@ -12,6 +12,7 @@ import { uid } from "../core/utils.js";
 import { getRoleId, getPersona, getRoleName } from "./persona.js";
 import { chatCompletion } from "./provider.js";
 import { peekMessages } from "./message-store.js";
+import { noteWitness } from "./witness.js";
 import { getStorageHooks } from "../repository/storage-hooks.js";
 import {
   isEntityMigrated,
@@ -507,7 +508,9 @@ export function buildMemoryBlock(roleId) {
 export function rememberMessage(chat, message) {
   const roleId = getRoleId(chat);
   if (!roleId || !message?.text?.trim()) return;
-  addMemory(roleId, message.text.trim(), 6, "manual");
+  const text = message.text.trim();
+  addMemory(roleId, text, 6, "manual");
+  noteWitness({ roleId, chatId: chat?.id || null, kind: "memory", preview: text });
 }
 
 // 自动摘要（每 N 轮触发一次）

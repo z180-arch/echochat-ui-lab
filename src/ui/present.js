@@ -116,7 +116,7 @@ export function livedResume({
   const lines = [];
   if (reunion) lines.push({ kind: "gap", text: reunion });
   const last = clipPreview(lastPreview, 32);
-  if (last) lines.push({ kind: "last", text: `上次说到 · ${last}` });
+  if (last) lines.push({ kind: "last", text: `上次我们聊到 · ${last}` });
   const moment = clipPreview(latestMoment, 32);
   if (moment) lines.push({ kind: "moment", text: moment });
   const mem = clipPreview(latestMemory, 28);

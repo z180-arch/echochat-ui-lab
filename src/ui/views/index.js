@@ -298,9 +298,7 @@ function renderChatPane(chat, hideChatMobile) {
     ritual.kind === "recall"
       ? `window.EchoApp.openContinuitySheet('${esc(roleId)}','${chat.id}')`
       : "window.EchoApp.toggleProfile()";
-  const resumeClick = roleId
-    ? `window.EchoApp.openContinuitySheet('${esc(roleId)}','${chat.id}')`
-    : "window.EchoApp.toggleProfile()";
+  const resumeClick = "window.EchoApp.toggleProfile()";
 
   return `
   <div class="chat-pane ${hideChatMobile ? "hidden-mobile" : ""}">
@@ -503,7 +501,8 @@ function renderProfilePane(chat) {
       : "";
 
   const nowInner = lastPreview
-    ? `<div class="profile-peek-line">${esc(threadTitle)}</div>
+    ? `${reunion ? `<p class="profile-muted profile-peek-empty">你们上次聊到这里。</p>` : ""}
+        <div class="profile-peek-line">${esc(threadTitle)}</div>
         <div class="profile-peek-line profile-muted">${esc(lastPreview)}</div>`
     : `<p class="profile-muted profile-peek-empty">${hasTalk ? "这条线还没有留下一句。" : "开口第一句，就会出现在这里。"}</p>`;
   const nowPeek = lastPreview && nowClick

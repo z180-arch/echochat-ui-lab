@@ -50,6 +50,11 @@ test("preferences and export are folded into more, not home rows", () => {
   assert.match(more, /导出角色卡/);
 });
 
+test("home reunion copy only appears next to a real last preview", () => {
+  assert.match(pane, /你们上次聊到这里/);
+  assert.match(pane, /lastPreview[\s\S]*reunion \?/);
+});
+
 test("home is not a stack of labeled admin cards", () => {
   assert.match(pane, /companion-home/);
   assert.doesNotMatch(pane, /记忆条数/);

@@ -137,7 +137,7 @@ test("livedResume uses only real last talk / moment / memory / stage", () => {
   });
   assert.equal(day.show, true);
   assert.equal(day.reunion, "隔了一天");
-  assert.ok(day.lines.some((l) => l.kind === "last" && l.text.includes("一起去了咖啡馆")));
+  assert.ok(day.lines.some((l) => l.kind === "last" && l.text.includes("上次我们聊到") && l.text.includes("一起去了咖啡馆")));
   assert.ok(day.lines.some((l) => l.kind === "moment" && l.text.includes("雨夜便利店")));
   assert.ok(day.lines.some((l) => l.kind === "memory" && l.text.includes("学摄影")));
   assert.ok(day.lines.every((l) => l.text.length > 0));

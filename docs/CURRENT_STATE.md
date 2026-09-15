@@ -73,10 +73,11 @@ Confirmed from `src/core/storage.js`, `src/infrastructure/dexie-db.js`, `src/inf
 | `echodownload_meta_v2` | Schema version / migration log |
 | `echodownload_migration_staging_v2` | Migration staging |
 | `echodownload_onboard_done` | In-app welcome completed |
-| `echodownload_ios_hint` | iOS install hint dismissed |
+| `echodownload_ios_hint` | Defined as `KEYS.IOS_HINT`; **not read or written** in current code |
 | `echodownload_chat_drafts_v1` | Composer drafts |
+| `echodownload_dexie_migration` | Per-entity Dexie hydrate/migrate flags (`satellite-reconcile.js`) |
 
-`echodownload_*` is a **compatibility prefix**. It is not a reason to migrate keys. `SCHEMA_VERSION = 2`.
+`echodownload_*` is a **compatibility prefix**. It is not a reason to migrate keys. `SCHEMA_VERSION = 2` is the localStorage roleId migration, not the Dexie table version.
 
 ### IndexedDB
 
@@ -85,7 +86,7 @@ Confirmed from `src/core/storage.js`, `src/infrastructure/dexie-db.js`, `src/inf
 | `echochat` (Dexie) | Characters, conversations, messages, memories, relationships, moments, worldbook, asset metadata, migration log |
 | `echodownload_assets` | Binary blobs (avatars / images) |
 
-Dexie is **canonical** for those entities. App state may cache. Dual-write to localStorage remains for compatibility.
+Dexie is **canonical** for those entities after hydrate. `echodownload_lite_state_v1` still dual-writes settings, the chat list, and the last UI message window (`UI_WINDOW` = 80). Moments / worldbook / relations / memory **stop refreshing** their legacy localStorage (or `store.longTermMemory`) keys once `usingCanonical` is true; those keys remain recovery copies, not live mirrors.
 
 ---
 
@@ -153,7 +154,7 @@ Development snapshot: [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
 ## Technical debt (real)
 
-1. Message dual-write (store cache vs Dexie) is compatibility, not a missing chat shell
+1. Message dual-write (STATE UI window vs Dexie full history) is compatibility, not a missing chat shell. Satellite entities are Dexie-only after hydrate.
 2. `src/main.js` is a large orchestrator by design
 3. Plugin layer must not grow into a marketplace or agent OS
 4. Firefox has no Web Speech STT; iOS installed-PWA recognition is unreliable

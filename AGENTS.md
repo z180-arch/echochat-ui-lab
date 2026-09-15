@@ -69,29 +69,41 @@ repository → infrastructure / core
 
 No `domain → infrastructure`, `domain → ui`, `ui → Dexie/idb`, `repository → domain`.
 
-## Design (UI / UX / visual / motion)
+## Design Intelligence
 
-Before any in-app UI change (`src/ui`, `src/styles`, chat chrome in `src/main.js`, first-run welcome):
+**Skill availability is environment-dependent. EchoChat design authority is repository-dependent.**
+
+External design skills (Hallmark, Taste, Claude `frontend-design`, GSAP skills, Open Design modules, UI/UX Pro Max, …) may or may not be installed on the current agent machine. EchoChat’s visual rules stay the same regardless.
+
+Before any UI / UX / visual / motion work (`src/ui`, `src/styles`, chat chrome in `src/main.js`, first-run welcome, marketing `/`):
 
 1. Read [DESIGN.md](DESIGN.md) — design authority
-2. Read [docs/design/AGENT_DESIGN_PROTOCOL.md](docs/design/AGENT_DESIGN_PROTOCOL.md) — how to work
-3. Pick **one** Design Lead and at most 2–3 supporting skills (matrix in the protocol)
-4. External skills must not override EchoChat product logic (companion continuity, no XP meters, no fake Memory/Moments)
-5. If a named skill is not installed, do not claim you used it
-6. Browser visual QA when tools exist; otherwise say what you could not verify
-7. Responsive QA at 390–1440 and `prefers-reduced-motion`
-8. DESIGN.md compliance + anti-slop before the commit
-9. Reuse verified decisions in DESIGN.md; do not re-invent the visual system
-10. Do not add features or fake data to fill a sparse page
+2. Read [docs/design/AGENT_DESIGN_PROTOCOL.md](docs/design/AGENT_DESIGN_PROTOCOL.md) — how to work, including Skill Loading Protocol
+3. Read [docs/design/SKILL_REGISTRY.md](docs/design/SKILL_REGISTRY.md) — which skills exist, licenses, install paths, status
+4. Choose **one** Design Lead and at most 2–3 supporting skills (matrix in the protocol)
+5. Check whether each selected skill is actually readable in **this** agent environment (`INSTALLED` / `AVAILABLE`)
+6. If it is, load the real skill file from the registry local path (or the agent’s equivalent)
+7. If it is not (`RESEARCH-ONLY` / `UNAVAILABLE` / `EXTERNAL TOOL`), follow DESIGN.md. Write **Referenced** or **Unavailable** — never **Used**
+8. Browser visual QA when tools exist; otherwise say what you could not verify
+9. DESIGN.md compliance + anti-slop before the commit
+
+Also: responsive QA at 390–1440 and `prefers-reduced-motion`. Reuse verified decisions in DESIGN.md. Do not add features or fake data to fill a sparse page. Do not restyle `/app/` to match the landing.
+
+Past UI skill use: [docs/design/SKILL_USAGE.md](docs/design/SKILL_USAGE.md).
+
+Do not vendor third-party skill trees into this repo. The registry is the contract.
+
+Do not add GSAP (or any other motion library) to the production runtime because a GSAP *skill* is installed.
 
 Landing `/` may use Hallmark marketing macros. Do not restyle `/app/` to match the landing.
 
 ## Skills
 
-Project skills live in `.cursor/skills/`. Triggers are narrow. Do not load Hallmark on a storage/provider bug.
+Project skills live in `.cursor/skills/`. Triggers are narrow. Do not load Hallmark on a storage/provider bug. External design skills are **not** vendored here; see [docs/design/SKILL_REGISTRY.md](docs/design/SKILL_REGISTRY.md).
 
 | Skill | When |
 |-------|------|
+| `echo-design-intelligence` | UI / UX / visual / motion — points at DESIGN.md + registry; does **not** replace Hallmark |
 | `echo-references` | In-app UI (`src/ui`, `src/styles`) or companion chat chrome — after DESIGN.md |
 | `echo-architecture` | New modules or cross-layer imports |
 | `echo-storage` | Dexie, repository, migration, backup, restore |

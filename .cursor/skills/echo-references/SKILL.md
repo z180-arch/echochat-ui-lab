@@ -5,7 +5,7 @@ description: Apply Morning Mint component-scope UI rules when changing EchoChat 
 
 # EchoChat UI references
 
-Read **[DESIGN.md](../../../DESIGN.md)** first, then [docs/design/AGENT_DESIGN_PROTOCOL.md](../../../docs/design/AGENT_DESIGN_PROTOCOL.md).
+Read **[DESIGN.md](../../../DESIGN.md)** first, then [docs/design/AGENT_DESIGN_PROTOCOL.md](../../../docs/design/AGENT_DESIGN_PROTOCOL.md), then [docs/design/SKILL_REGISTRY.md](../../../docs/design/SKILL_REGISTRY.md) if an external design skill might be used.
 
 In-app UI is **Morning Mint** (`src/styles/tokens.css`) plus quiet Ripple (`src/styles/motion.css`). No new theme kit, animation engine, or component library.
 

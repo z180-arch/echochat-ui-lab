@@ -26,11 +26,11 @@ What we changed, and the DESIGN.md rule it follows.
 
 ## Primary Skill
 
-One name.
+One name. Declare **Used** only if the skill was `INSTALLED` / `AVAILABLE` and actually loaded. Otherwise **Referenced** or **Unavailable** (see `SKILL_REGISTRY.md`).
 
 ## Supporting Skills
 
-0–3 names. Skills not installed: list as unavailable, do not claim use.
+0–3 names. Same Used / Referenced / Unavailable rule.
 
 ## Why This Design
 

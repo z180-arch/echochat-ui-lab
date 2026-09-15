@@ -7,7 +7,9 @@ A locked design system for this product. Every UI change reads this file before 
 
 **Authority.** If an external design skill (Hallmark, Taste, Open Design, GSAP, Cinematic UI, UI/UX Pro Max, PencilPlaybook, landing generators) conflicts with this file, **this file wins**. Skills supply intelligence. They do not replace EchoChat product logic.
 
-How agents execute UI work: [docs/design/AGENT_DESIGN_PROTOCOL.md](docs/design/AGENT_DESIGN_PROTOCOL.md).
+Skill availability is environment-dependent. EchoChat design authority is repository-dependent. Which skills exist, where they are installed, licenses, and whether they may be declared **Used**: [docs/design/SKILL_REGISTRY.md](docs/design/SKILL_REGISTRY.md). How to load them: [docs/design/AGENT_DESIGN_PROTOCOL.md](docs/design/AGENT_DESIGN_PROTOCOL.md).
+
+Installing or upgrading a design skill is **infrastructure**. It is not a reason to reopen validated UI (commits `9708023`, `a33be33`) unless browser evidence or an explicit design conflict says otherwise.
 
 ---
 

@@ -18,6 +18,80 @@ This file is **procedure**. [DESIGN.md](../../DESIGN.md) is **authority**. [AGEN
 
 If a skill recommends a pattern that fights product purpose (dashboard widgets, XP meters, ChatGPT chrome, landing-page heroes in `/app/`), discard the skill’s pattern.
 
+Skill availability is environment-dependent. EchoChat design authority is repository-dependent.
+
+---
+
+## Skill Loading Protocol
+
+Future agents execute this **before** claiming a named skill was used.
+
+### Step 1 — Authority
+
+Read [DESIGN.md](../../DESIGN.md).
+
+### Step 2 — Contract
+
+Read [SKILL_REGISTRY.md](SKILL_REGISTRY.md). That file is the contract: name, upstream, version/commit, license, local path, status, triggers, limitations. It is **not** the third-party skill body.
+
+### Step 3 — Classify the task
+
+Exactly one primary class:
+
+- redesign
+- audit
+- visual polish
+- typography
+- layout
+- UX architecture
+- motion
+- cinematic transition
+- accessibility
+- responsive
+- design research
+- landing (`/` only)
+
+### Step 4 — Design Lead
+
+Pick **one** lead from the matrix below. DESIGN.md remains authority even when the lead is Hallmark.
+
+### Step 5 — Supporting skills
+
+At most **2–3**. Never let every installed skill co-author a page.
+
+### Step 6 — Status check
+
+For each selected skill, read its row in `SKILL_REGISTRY.md`, then check whether the **local path** (or this agent’s equivalent) is actually readable.
+
+| Status | Meaning | May declare |
+|--------|---------|-------------|
+| `INSTALLED` | This machine has the skill files; they can be loaded | **Used** (after loading) |
+| `AVAILABLE` | Readable in this agent environment without a project install | **Used** (after loading) |
+| `RESEARCH-ONLY` | Principles were studied; the skill cannot be invoked here | **Referenced** |
+| `UNAVAILABLE` | No reliable upstream, or this environment cannot use it | **Unavailable** |
+| `EXTERNAL TOOL` | Browser extension / GUI app, not an agent skill | **Referenced** (tool), never **Used** as a skill |
+| `NOT VERIFIED` | Files exist locally but origin/license/version is unconfirmed | **Referenced** unless you verify first |
+
+### Step 7 — Claim language
+
+Only `INSTALLED` / `AVAILABLE` skills that were actually opened may be declared **Used**.
+
+Otherwise write **Referenced** or **Unavailable**. Do not write **Used** for a skill you did not load.
+
+### Update policy
+
+Skill installation is **infrastructure**, not a UI task. Re-run install/update only when: a skill version changes, a skill becomes unavailable, upstream moves, or the agent environment changes. Normal UI work reads the already-installed skill.
+
+Do not reopen validated `/app/` UI from `a33be33` because a skill was newly installed. Need browser evidence or an explicit design conflict.
+
+### GSAP / Open Design / extensions
+
+- **GSAP skill installed ≠ GSAP runtime dependency.** EchoChat motion is CSS-first (`docs/design/MOTION.md`). Do not add `gsap` to the app because the skill exists.
+- **Open Design:** do not clone the whole library into this repo. Use only the modules listed in the registry.
+- **design-md-chrome:** Chrome extension. Not an EchoChat dependency. Record as `EXTERNAL TOOL`.
+- **PencilPlaybook:** Pencil.dev canvas workflows. Not EchoChat runtime.
+- **Landing Page Generator:** no single official upstream. EchoChat landing is `index.html` / `landing-v3.html` under DESIGN.md + Hallmark.
+
 ---
 
 ## When this protocol fires
@@ -45,12 +119,12 @@ Pick **one Design Lead** and at most **2–3 supporting** skills. Never let ever
 | Design research | recorded in `docs/design/references/` | DESIGN.md |
 | Wireframe / alt directions | PencilPlaybook if loaded | DESIGN.md |
 | Accessibility / responsive heuristics | DESIGN.md | UI/UX Pro Max if actually loaded |
-| Marketing landing `/` | Landing generator or Hallmark | DESIGN.md (shared language only) |
+| Marketing landing `/` | Hallmark (landing generator is `UNAVAILABLE`) | DESIGN.md (shared language only) |
 | App core UI | **DESIGN.md** | Hallmark + Taste |
 
 Project skill `echo-references` still applies to `src/ui` and `src/styles`: reuse tokens/sheets; do not pick a Hallmark catalog theme for `/app/`.
 
-If a named skill is **not installed or not readable**, do not pretend it was used. Record it as researched/unavailable in the review.
+If a named skill is **not installed or not readable**, do not pretend it was used. Record **Referenced** or **Unavailable** in the review. See Skill Loading Protocol above.
 
 ---
 
@@ -61,7 +135,8 @@ If a named skill is **not installed or not readable**, do not pretend it was use
 Required:
 
 - `DESIGN.md`
-- this file
+- this file (including Skill Loading Protocol)
+- `SKILL_REGISTRY.md` when an external skill might be used
 - relevant specialist doc (`MOTION.md`, `COMPONENT_GUIDELINES.md`, `UX_AUDIT.md`)
 - the component / view / CSS you will touch
 - covering tests under `tests/ui_*.mjs`

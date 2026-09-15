@@ -7,6 +7,11 @@ node_modules/
 .claude/
 .superpowers/
 .hallmark/
+.agents/
+.codex/
+.gemini/
+.skills/
+skills-lock.json
 backups/
 build/
 dist/

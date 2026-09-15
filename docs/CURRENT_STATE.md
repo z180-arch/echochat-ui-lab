@@ -106,7 +106,7 @@ The service worker leaves `/`, `/index.html`, `/landing-v3.html`, and `/landing.
 
 ## Design
 
-In-app language is **Morning Mint** (`src/styles/tokens.css`) plus quiet Ripple motion (`src/styles/motion.css`). Authority: [DESIGN.md](../DESIGN.md). Procedure: [design/AGENT_DESIGN_PROTOCOL.md](design/AGENT_DESIGN_PROTOCOL.md).
+In-app language is **Morning Mint** (`src/styles/tokens.css`) plus quiet Ripple motion (`src/styles/motion.css`). Authority: [DESIGN.md](../DESIGN.md). Procedure: [design/AGENT_DESIGN_PROTOCOL.md](design/AGENT_DESIGN_PROTOCOL.md). External skills: [design/SKILL_REGISTRY.md](design/SKILL_REGISTRY.md) (contract, not vendored implementations).
 
 Do not add a new theme kit, animation engine, component library, or particle-demo chat background. Do not pick a Hallmark catalog theme for `/app/`.
 

@@ -1,10 +1,23 @@
 # EchoChat Current State Audit
 
 **Date:** 2026-09-15  
-**Branch:** `main` @ `e10dca9` (working tree was clean at audit start)  
+**Branch:** `main` (audit started at `e10dca9`)  
 **Rule:** code + tests win over Markdown. Historical claims are marked Confirmed / Resolved / Outdated / Needs Investigation.
 
 This file is a research snapshot. It is not a rewrite plan.
+
+### Remediation in this pass (P0 only)
+
+| ID | Result | Commit |
+|----|--------|--------|
+| P-01 | Domain satellites/backup import `src/repository/persistence.js` instead of infrastructure | `fix(domain): stop importing infrastructure from domain modules` |
+| P-02 | `CharacterRepository.permanentDelete` no longer imports domain | `fix(repository): remove domain cascade imports from character delete` |
+| P-03 | `DATA_OWNERSHIP.md` matches Dexie-canonical storage and current plugins | `docs(ownership): align DATA_OWNERSHIP with Dexie-canonical storage` |
+| P-04 | CURRENT_STATE records satellite Dexie-only persist + migrate flag key | `docs(current-state): record satellite Dexie-only persist and migrate flag key` |
+| P-05 | Dexie migration status/rollback APIs import satellite flag helpers | `fix(migration): wire Dexie rollback status APIs to satellite flags` |
+| P-06 | `storeBlob` writes `(id, blob)`; Dexie adapter has `updateMetadata` | `fix(assets): persist blobs under the repository-generated id` |
+
+P-07 and P-08 remain open (P1). See `ARCHITECTURE_IMPROVEMENT_PROPOSAL.md`.
 
 ---
 

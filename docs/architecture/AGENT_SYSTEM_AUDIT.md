@@ -51,7 +51,7 @@ The developer machine may have **global** skills (superpowers, Cloudflare, story
 | Freeze can be misread as “never touch `memory.js`” | Possible Improvement | The freeze is schema/retrieval, not “no import-path fix”. P-01 in the architecture audit is exactly that misread risk. |
 | Duplicate debt lists live in four docs | Possible Improvement | `CURRENT_STATE`, `DEVELOPMENT_STATUS`, `PRODUCT_BASE`, and this audit. Agents reconcile them. |
 | “Do not commit leftover `landing.html`” | Outdated path | File is already absent. `sw.js` still exempts `/landing.html`. Harmless. |
-| No pointer to `DATA_OWNERSHIP.md` | Confirmed until that doc is fixed | If an agent finds it anyway, the storage section is **wrong**. |
+| No pointer to `DATA_OWNERSHIP.md` | **Resolved this pass** | Storage/plugin sections were rewritten to match Dexie + extra-notes. |
 
 ### Over-wide / conflicting / repetitive?
 

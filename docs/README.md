@@ -13,7 +13,11 @@ Source of truth is **running code**, then this folder.
 | [architecture/CURRENT_STATE_AUDIT.md](architecture/CURRENT_STATE_AUDIT.md) | 2026-09-15 architecture audit (code-verified) |
 | [architecture/AGENT_SYSTEM_AUDIT.md](architecture/AGENT_SYSTEM_AUDIT.md) | 2026-09-15 agent-rules / skills / docs-loading audit |
 | [architecture/ARCHITECTURE_IMPROVEMENT_PROPOSAL.md](architecture/ARCHITECTURE_IMPROVEMENT_PROPOSAL.md) | Follow-ups after P0; remaining P1 |
-| [design.md](design.md) | Morning Mint / Ripple — frozen in-app language |
+| [../DESIGN.md](../DESIGN.md) | Design authority — visual / UX / motion / anti-slop |
+| [design.md](design.md) | Pointer to DESIGN.md (old path) |
+| [design/AGENT_DESIGN_PROTOCOL.md](design/AGENT_DESIGN_PROTOCOL.md) | How agents change UI |
+| [design/UX_AUDIT.md](design/UX_AUDIT.md) | Latest visual/UX audit |
+| [design/MOTION.md](design/MOTION.md) | Motion language |
 | [ROADMAP.md](ROADMAP.md) | CURRENT / NEXT / LATER |
 
 Root files: [README.md](../README.md), [AGENTS.md](../AGENTS.md), [THIRD_PARTY_SOURCES.md](../THIRD_PARTY_SOURCES.md), [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).

@@ -52,7 +52,7 @@ UI  →  Domain  →  Repository  →  Dexie / Provider  →  OpenAI-compatible 
 | Plugin | Builtin `extra-notes` as last-stage `extraPrompt` |
 | Reconstruction | Import an existing transcript into a character |
 | Voice | TTS: `speechSynthesis`. STT: Web Speech into the composer (not the chat Provider) |
-| Design | Morning Mint / Ripple **frozen**. Component-scope only |
+| Design | Morning Mint evolved under [DESIGN.md](../DESIGN.md). Component-scope; no new theme kit |
 
 Do not change Memory schema, retrieval, `assembleTurnContext`, Provider architecture, or Dexie schema unless a dedicated work package says so.
 
@@ -106,9 +106,9 @@ The service worker leaves `/`, `/index.html`, `/landing-v3.html`, and `/landing.
 
 ## Design
 
-In-app language is **Morning Mint** (`src/styles/tokens.css`) plus quiet Ripple motion (`src/styles/motion.css`). Spec: [design.md](design.md).
+In-app language is **Morning Mint** (`src/styles/tokens.css`) plus quiet Ripple motion (`src/styles/motion.css`). Authority: [DESIGN.md](../DESIGN.md). Procedure: [design/AGENT_DESIGN_PROTOCOL.md](design/AGENT_DESIGN_PROTOCOL.md).
 
-Do not add a new theme kit, animation system, component library, or particle-demo chat background.
+Do not add a new theme kit, animation engine, component library, or particle-demo chat background. Do not pick a Hallmark catalog theme for `/app/`.
 
 ---
 

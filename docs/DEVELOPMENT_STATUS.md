@@ -17,7 +17,7 @@ Not a roadmap. Facts for the next work package.
 - Reconstruction import; Character Card V2 import/export
 - Long-chat tail window + virtual list; stream paint
 - STT into composer (Web Speech); TTS via `speechSynthesis`
-- Morning Mint / Ripple in-app UI
+- Morning Mint / Ripple in-app UI (evolved under DESIGN.md; not a second brand)
 - First-run starters fill composer only (no auto-send, no fake Memory)
 - Reunion / resume copy from real last talk, moments, memory, stage
 
@@ -36,8 +36,9 @@ Do not change unless a task explicitly asks:
 - `assembleTurnContext`
 - Provider architecture
 - Dexie schema / `echodownload_*` key names
-- Morning Mint design system
 - Product Core as host (no Agent OS / Chatbox / DSH / SillyTavern runtime)
+
+Morning Mint **tokens and type** stay the brand. Hierarchy, density, and card-stacking may change under [DESIGN.md](../DESIGN.md).
 
 ---
 

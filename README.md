@@ -69,9 +69,9 @@ Do not commit API keys. Do not put keys in `config.js`, `.env`, docs, or tests. 
 
 ## Design
 
-In-app UI is **Morning Mint** with quiet Ripple motion. The system is frozen: no new theme kit, animation engine, or component library.
+In-app UI is **Morning Mint** with quiet Ripple motion. Authority: [DESIGN.md](DESIGN.md). No new theme kit, animation engine, or component library.
 
-See [docs/design.md](docs/design.md).
+See [DESIGN.md](DESIGN.md) and [docs/design/AGENT_DESIGN_PROTOCOL.md](docs/design/AGENT_DESIGN_PROTOCOL.md).
 
 ---
 

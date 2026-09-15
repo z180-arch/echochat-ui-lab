@@ -69,13 +69,30 @@ repository → infrastructure / core
 
 No `domain → infrastructure`, `domain → ui`, `ui → Dexie/idb`, `repository → domain`.
 
+## Design (UI / UX / visual / motion)
+
+Before any in-app UI change (`src/ui`, `src/styles`, chat chrome in `src/main.js`, first-run welcome):
+
+1. Read [DESIGN.md](DESIGN.md) — design authority
+2. Read [docs/design/AGENT_DESIGN_PROTOCOL.md](docs/design/AGENT_DESIGN_PROTOCOL.md) — how to work
+3. Pick **one** Design Lead and at most 2–3 supporting skills (matrix in the protocol)
+4. External skills must not override EchoChat product logic (companion continuity, no XP meters, no fake Memory/Moments)
+5. If a named skill is not installed, do not claim you used it
+6. Browser visual QA when tools exist; otherwise say what you could not verify
+7. Responsive QA at 390–1440 and `prefers-reduced-motion`
+8. DESIGN.md compliance + anti-slop before the commit
+9. Reuse verified decisions in DESIGN.md; do not re-invent the visual system
+10. Do not add features or fake data to fill a sparse page
+
+Landing `/` may use Hallmark marketing macros. Do not restyle `/app/` to match the landing.
+
 ## Skills
 
 Project skills live in `.cursor/skills/`. Triggers are narrow. Do not load Hallmark on a storage/provider bug.
 
 | Skill | When |
 |-------|------|
-| `echo-references` | In-app UI (`src/ui`, `src/styles`) or companion chat chrome |
+| `echo-references` | In-app UI (`src/ui`, `src/styles`) or companion chat chrome — after DESIGN.md |
 | `echo-architecture` | New modules or cross-layer imports |
 | `echo-storage` | Dexie, repository, migration, backup, restore |
 | `echo-context` | `assembleTurnContext`, memory/worldbook/relationship **injection** |

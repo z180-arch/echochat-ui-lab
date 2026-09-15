@@ -159,7 +159,7 @@ const THREAD = `(() => (async () => {
     nameUnchanged: updated.name === '林夏',
     okRename,
     count: list.length,
-    hint: (document.querySelector('.conv-hint')?.textContent || '').trim(),
+    hint: (document.querySelector('.chat-header-actions .chip-btn span')?.textContent || '').trim(),
   };
 })())()`;
 

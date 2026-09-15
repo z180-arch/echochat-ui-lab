@@ -39,6 +39,7 @@ import {
   renderWorldbookEditorHtml,
   renderMessage,
   renderCharacterShareCard,
+  renderConversationThreadList,
 } from "./ui/views/index.js";
 import {
   streamingMarkdown,
@@ -1321,19 +1322,11 @@ const App = {
     import("./domain/character-hub.js").then(({ listActiveConversations }) => {
       const convos = listActiveConversations(roleId);
       openModal({
-        title: "相处线",
+        title: chat.name ? `${chat.name}的相处` : "相处线",
         width: "420px",
         content: `
-          <p class="recon-lead">TA 是这个角色。每条线是一次聊天。记忆和关系跟着 TA，不跟着某一条线。</p>
-          ${convos.map((c) => `
-            <div class="conv-row">
-              <button type="button" class="conv-item ${c.id === chat.id ? "on" : ""}" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openConversation('${c.id}')">
-                <span class="n">${esc(c.threadTitle || "日常相处")}</span>
-                <span class="d">${esc((c.lastPreview || "还没有聊过").slice(0, 48))}</span>
-              </button>
-              <button type="button" class="conv-del" onclick="window.EchoApp.openThreadRename('${c.id}')">改名</button>
-            </div>
-          `).join("")}
+          <p class="recon-lead">同一位角色的不同聊天。记忆和关系跟着 TA，不跟着某一条线。</p>
+          ${renderConversationThreadList({ convos, currentId: chat.id })}
         `,
         footer: `
           <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">关闭</button>

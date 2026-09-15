@@ -58,6 +58,7 @@ const SUITES = [
   "tests/ui_profile_hierarchy_test.mjs",
   "tests/ui_moments_timeline_test.mjs",
   "tests/ui_moments_empty_test.mjs",
+  "tests/ui_conversation_list_test.mjs",
   "tests/companion_ux_test.mjs",
 ];
 

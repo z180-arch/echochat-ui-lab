@@ -291,6 +291,8 @@ function renderChatPane(chat, hideChatMobile) {
   const slots = getCharacterSlots(chat);
   const greeting = definedGreeting(chat);
   const starters = meetStarterPrompts(slots);
+  const currentThreadTitle = convos.find((c) => c.id === chat.id)?.threadTitle || "日常相处";
+  const threadChipLabel = convos.length > 1 ? currentThreadTitle : "相处线";
   const ritualClick =
     ritual.kind === "recall"
       ? `window.EchoApp.openContinuitySheet('${esc(roleId)}','${chat.id}')`
@@ -322,7 +324,7 @@ function renderChatPane(chat, hideChatMobile) {
       </div>
       <div class="chat-header-actions">
         ${showThreadChip
-          ? `<button class="chip-btn" onclick="window.EchoApp.openConversationSwitcher()">${Icons.switch}<span>相处线</span></button>`
+          ? `<button type="button" class="chip-btn" onclick="window.EchoApp.openConversationSwitcher()">${Icons.switch}<span>${esc(threadChipLabel)}</span></button>`
           : ""}
         ${IconButton({ icon: Icons.more, title: "相处中", onClick: "window.EchoApp.toggleProfile()" })}
       </div>
@@ -340,7 +342,6 @@ function renderChatPane(chat, hideChatMobile) {
         ? `<button type="button" class="recall-chip recall-chip-${ritual.kind}" aria-live="polite" onclick="${ritualClick}">${esc(ritual.text)}</button>`
         : ""
     }
-    ${convos.length > 1 ? `<button type="button" class="conv-hint" onclick="window.EchoApp.openConversationSwitcher()">当前 · ${esc(convos.find((c) => c.id === chat.id)?.threadTitle || "日常相处")}</button>` : ""}
     ${needsApiSetup(chat)
       ? `<div class="composer-hint">
           <span>连接模型后即可开始对话</span>
@@ -780,6 +781,44 @@ export function renderContinuitySheetContent(roleId, chatId) {
     </div>`;
 }
 
+export function renderConversationThreadList({ convos = [], currentId = "" } = {}) {
+  if (!convos.length) {
+    return `<p class="profile-muted">还没有相处线。开一条新的就可以开始聊。</p>`;
+  }
+  return `<div class="conv-list">${convos
+    .map((c) => {
+      const on = c.id === currentId;
+      const preview = String(c.lastPreview || "").trim();
+      const when = c.lastAt ? relativeTime(c.lastAt) : "";
+      const detail = preview ? clipPreview(preview, 42) : "还没有聊过";
+      return `
+        <div class="conv-row">
+          <button type="button" class="conv-item ${on ? "on" : ""}" onclick="window.EchoApp.openConversation('${c.id}');this.closest('.modal-overlay')?.remove()">
+            <span class="conv-item-head">
+              <span class="n">${esc(c.threadTitle || "日常相处")}</span>
+              ${on ? `<span class="conv-now">正在聊</span>` : ""}
+            </span>
+            <span class="d">${esc(detail)}${when ? `<span class="conv-when"> · ${esc(when)}</span>` : ""}</span>
+          </button>
+          <div class="conv-tools">
+            ${IconButton({
+              icon: Icons.edit,
+              title: "改名",
+              onClick: `window.EchoApp.openThreadRename('${c.id}')`,
+              className: "conv-tool",
+            })}
+            ${IconButton({
+              icon: Icons.trash,
+              title: "删除这条相处线",
+              onClick: `window.EchoApp.deleteChat('${c.id}')`,
+              className: "conv-tool conv-tool-danger",
+            })}
+          </div>
+        </div>`;
+    })
+    .join("")}</div>`;
+}
+
 export function renderPreferencesSheetContent(chat) {
   const roleId = getRoleId(chat);
   const convos = roleId ? listActiveConversations(roleId) : [];
@@ -797,20 +836,7 @@ export function renderPreferencesSheetContent(chat) {
     <div class="sheet-section">
       <div class="sheet-section-title">相处线</div>
       <p class="profile-muted">同一位角色的不同聊天。记忆和关系跟着角色走。</p>
-      ${convos
-        .map(
-          (c) => `
-          <div class="conv-row">
-            <button type="button" class="conv-item ${c.id === chat.id ? "on" : ""}" onclick="window.EchoApp.openConversation('${c.id}');this.closest('.modal-overlay').remove()">
-              <div class="n">${esc(c.threadTitle || c.name || "日常相处")}</div>
-              <div class="d">${esc((c.lastPreview || "还没有聊过").slice(0, 42))}</div>
-            </button>
-            <button type="button" class="conv-del" onclick="window.EchoApp.openThreadRename('${c.id}')">改名</button>
-            <button type="button" class="conv-del" onclick="window.EchoApp.deleteChat('${c.id}')">删除</button>
-          </div>
-        `
-        )
-        .join("")}
+      ${renderConversationThreadList({ convos, currentId: chat.id })}
       ${roleId ? `<button type="button" class="btn btn-secondary btn-sm sheet-action" onclick="window.EchoApp.startNewConversation('${esc(roleId)}');this.closest('.modal-overlay').remove()">开一条新的相处线</button>` : ""}
     </div>`;
 }

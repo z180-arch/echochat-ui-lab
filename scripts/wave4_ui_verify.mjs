@@ -301,6 +301,25 @@ const BRING_SNAP = `(() => {
   };
 })()`;
 
+const CONVO_SNAP = `(() => {
+  const overlay = document.querySelector('.modal-overlay');
+  const rows = [...document.querySelectorAll('.conv-row')];
+  const overflowDoc = document.documentElement.scrollWidth > window.innerWidth + 2;
+  return {
+    open: !!overlay,
+    title: (overlay?.querySelector('.modal-title')?.textContent || '').trim(),
+    lead: (overlay?.querySelector('.recon-lead')?.textContent || '').trim(),
+    rowCount: rows.length,
+    now: !!overlay?.querySelector('.conv-now'),
+    rename: !!(overlay && overlay.querySelector('[aria-label="改名"]')),
+    del: !!(overlay && overlay.querySelector('[aria-label="删除这条相处线"]')),
+    overflowX: overflowDoc,
+    itemMin: rows.length
+      ? Math.min(...[...overlay.querySelectorAll('.conv-item')].map((el) => Math.round(el.getBoundingClientRect().height)))
+      : 0,
+  };
+})()`;
+
 const TEMPLATE_SNAP = `(() => {
   const cards = [...document.querySelectorAll('.create-secondary-btn')];
   const iconsOk = cards.length > 0 && cards.every((c) => {
@@ -538,6 +557,40 @@ async function runWidth(send, width, expect) {
     `${width} · memory empty`,
     mem.title === "没有可提取的条目" && mem.close && !mem.write && !mem.overflowX ? "PASS" : "FAIL",
     JSON.stringify(mem)
+  );
+  await evalExpr(send, `document.querySelectorAll('.modal-overlay').forEach((m) => m.remove()); true`);
+
+  await evalExpr(
+    send,
+    `(() => (async () => {
+      const { store } = await import('/src/core/store.js');
+      const chat = (store.getState().chats || []).find((c) => c.name === '林晚') || store.getState().chats[0];
+      if (chat) {
+        store.selectChat(chat.id);
+        store.setActiveTab('companion');
+        window.EchoApp.view = 'app';
+        window.EchoApp.render();
+      }
+      window.EchoApp.openConversationSwitcher();
+      return true;
+    })())()`
+  );
+  await sleep(500);
+  const convo = await evalExpr(send, CONVO_SNAP);
+  record(
+    `${width} · conversation list`,
+    convo.open &&
+      /的相处/.test(convo.title) &&
+      /跟着 TA/.test(convo.lead) &&
+      convo.rowCount >= 1 &&
+      convo.now &&
+      convo.rename &&
+      convo.del &&
+      convo.itemMin >= 44 &&
+      !convo.overflowX
+      ? "PASS"
+      : "FAIL",
+    JSON.stringify(convo)
   );
   await evalExpr(send, `document.querySelectorAll('.modal-overlay').forEach((m) => m.remove()); true`);
 

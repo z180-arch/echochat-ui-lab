@@ -1,5 +1,5 @@
 import { strict as assert } from "node:assert";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -320,6 +320,24 @@ test("Domain layer: asset.js does not import idb directly", () => {
   const content = readFileSync(srcPath("src/domain/asset.js"), "utf-8");
   assert.ok(!content.includes("idb.putBlob"), "asset.js should not use idb.putBlob directly");
   assert.ok(!content.includes("idb.getBlob"), "asset.js should not use idb.getBlob directly");
+});
+
+test("Domain layer does not import infrastructure", () => {
+  const infraImport = /from\s+["'][^"']*infrastructure\//;
+  const infraDynamic = /import\s*\(\s*["'][^"']*infrastructure\//;
+  function walk(dir) {
+    const out = [];
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) out.push(...walk(full));
+      else if (entry.name.endsWith(".js")) out.push(full);
+    }
+    return out;
+  }
+  for (const file of walk(srcPath("src/domain"))) {
+    const content = readFileSync(file, "utf-8");
+    assert.ok(!infraImport.test(content) && !infraDynamic.test(content), `${file} must not import src/infrastructure`);
+  }
 });
 
 test("Repository layer: interfaces defined", () => {

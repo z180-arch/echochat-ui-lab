@@ -12,7 +12,7 @@ import {
   isEntityMigrated,
   markEntityMigrated,
   markEntityFailed,
-} from "../infrastructure/satellite-reconcile.js";
+} from "../repository/persistence.js";
 
 const AFFINITY_THRESHOLD = 5;
 const PROACTIVE_CHANCE = 0.3;

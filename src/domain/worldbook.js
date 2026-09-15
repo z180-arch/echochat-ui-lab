@@ -13,7 +13,7 @@ import {
   markEntityMigrated,
   markEntityFailed,
   mergeById,
-} from "../infrastructure/satellite-reconcile.js";
+} from "../repository/persistence.js";
 
 const HARD_CAP = 1200;
 const ENTITY = "worldbook";

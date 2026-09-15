@@ -9,8 +9,7 @@ import { loadMoments, saveMoments, resetMomentsRuntime } from "./moments.js";
 import { loadRelations, saveRelations, resetRelationsRuntime } from "./relations.js";
 import { loadWorldbook, saveWorldbook, resetWorldbookRuntime } from "./worldbook.js";
 import { exportMemorySnapshot, replaceMemorySnapshot, resetMemoriesRuntime, flushMemoriesPersist } from "./memory.js";
-import { deleteDb } from "../infrastructure/dexie-db.js";
-import { clearMigrationFlags } from "../infrastructure/satellite-reconcile.js";
+import { deleteDb, clearMigrationFlags } from "../repository/persistence.js";
 import {
   resetRuntime as resetMessageRuntime,
   getMessages,

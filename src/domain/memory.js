@@ -18,7 +18,7 @@ import {
   reconcileAndCommit,
   markEntityFailed,
   mergeById,
-} from "../infrastructure/satellite-reconcile.js";
+} from "../repository/persistence.js";
 
 const ENTITY = "memories";
 let cache = {};

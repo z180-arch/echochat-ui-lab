@@ -66,7 +66,7 @@ runtime → core
 repository → infrastructure / core
 ```
 
-There is **no** `ui → Dexie` and **no** `domain → ui`.
+There is **no** `ui → Dexie` and **no** `domain → ui`. Domain persistence goes through `src/repository/persistence.js` and `getStorageHooks()`; it does not import `src/infrastructure`.
 
 ---
 

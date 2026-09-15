@@ -15,7 +15,7 @@ import {
   reconcileAndCommit,
   markEntityFailed,
   mergeById,
-} from "../infrastructure/satellite-reconcile.js";
+} from "../repository/persistence.js";
 
 const MAX_MOMENTS = 200;
 const CONTENT_SOFT_CAP = 80;

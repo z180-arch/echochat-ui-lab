@@ -5,6 +5,7 @@ Source of truth is **running code**, then this folder.
 | File | Read when |
 |------|-----------|
 | [CURRENT_STATE.md](CURRENT_STATE.md) | What is shipped, storage names, PWA, tests, debt |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Production host: Cloudflare Pages. GitHub Pages is not used. |
 | [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md) | Stable / risks / next P0–P2 |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Layers and the turn-context door |
 | [architecture/PRODUCT_BASE.md](architecture/PRODUCT_BASE.md) | Why EchoChat is the host, not an agent OS |

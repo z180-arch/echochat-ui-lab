@@ -151,7 +151,11 @@ Development snapshot: [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
 ## Deploy
 
-`main` deploys on Vercel as a static site. Configure the model in-app: **我的 → API 与模型**.
+Production is **Cloudflare Pages**, sourced from GitHub `main`. GitHub Pages is not used.
+
+Detail: [DEPLOYMENT.md](DEPLOYMENT.md).
+
+Configure the model in-app: **我的 → API 与模型**.
 
 ---
 

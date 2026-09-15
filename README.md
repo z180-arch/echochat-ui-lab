@@ -57,6 +57,24 @@ Windows landing helper: `preview-landing.bat`. If port 8080 is taken, use anothe
 
 ---
 
+## Deployment
+
+EchoChat is deployed through **Cloudflare Pages**. GitHub Pages is not used.
+
+Production source: GitHub `main`
+
+```text
+GitHub main
+  → Cloudflare Pages
+  → Production
+```
+
+Live URL: https://echochat-f4j.pages.dev/
+
+Rules, build facts, and what this environment could (and could not) verify: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+---
+
 ## Provider
 
 In the app: **我的 → API 与模型**.

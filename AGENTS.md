@@ -10,6 +10,7 @@ This file is for Codex / Cursor / Claude / Gemini and similar agents. It is not 
 2. Tests under `tests/` — local entry is `npm test` only
 3. [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md) — shipped facts (read when unsure what exists)
 4. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — layers (read when adding files or imports)
+5. Hosting: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — Cloudflare Pages only; do not switch hosts
 
 Host decision (only when changing plugins / product base): [docs/architecture/PRODUCT_BASE.md](docs/architecture/PRODUCT_BASE.md).
 
@@ -41,6 +42,7 @@ Stop and ask before:
 - Deleting Character / Conversation / Memory / Moments / Relationship / Worldbook / Continuity
 - Changing product identity (companion → Agent OS, RAG demo, marketplace, ChatGPT clone)
 - SQLite / Tauri / new platform runtime as the host
+- Moving production off Cloudflare Pages, adding GitHub Pages, or changing Pages root/build settings
 
 ## Do not ask for
 
@@ -96,6 +98,17 @@ Do not vendor third-party skill trees into this repo. The registry is the contra
 Do not add GSAP (or any other motion library) to the production runtime because a GSAP *skill* is installed.
 
 Landing `/` may use Hallmark marketing macros. Do not restyle `/app/` to match the landing.
+
+## Deployment Authority
+
+- Production platform: **Cloudflare Pages**
+- Source repository: GitHub https://github.com/z180-arch/echochat-ui-lab
+- Production branch: `main`
+- Detail: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+- Do not introduce GitHub Pages unless the product owner explicitly requests it.
+- Do not migrate hosting or deployment infrastructure as ordinary feature, UI, or docs-adjacent work.
+
+Hosting is an infrastructure fact. It must not change because an agent prefers GitHub Pages, Vercel, Netlify, or a new Wrangler project.
 
 ## Skills
 

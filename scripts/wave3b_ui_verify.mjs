@@ -166,8 +166,8 @@ const SNAP = `(() => {
     profileStatus: (status?.innerText || '').trim(),
     profileStatusHasDays: /相处/.test(status?.innerText || ''),
     exportInTools: !!(tools && /导出/.test(tools.innerText || '')),
-    exportInMore: !!(document.querySelector('.profile-rows') && /导出角色卡/.test(document.querySelector('.profile-rows')?.innerText || '')),
-    profileHasHome: !!(profile && /关于 TA/.test(profile.innerText) && /关系/.test(profile.innerText)),
+    exportInMore: !!(document.querySelector('.profile-rows') && /更多/.test(document.querySelector('.profile-rows')?.innerText || '')),
+    profileHasHome: !!(profile && /正在聊/.test(profile.innerText) && /我们/.test(profile.innerText) && /关于你/.test(profile.innerText)),
   };
 })()`;
 

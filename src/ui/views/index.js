@@ -478,77 +478,96 @@ function peekWorldbook(roleId) {
   return rows;
 }
 
-function replyPaceLabel(chat) {
-  const pace = getReplyPace(chat);
-  const opt = REPLY_PACE_OPTIONS.find((o) => o.value === pace);
-  return opt ? opt.label : "自然";
-}
-
 function renderProfilePane(chat) {
   const roleId = getRoleId(chat);
   const memories = roleId ? getMemoryList(roleId, 8) : [];
   const roleMoments = roleId ? listMoments(roleId) : [];
   const latestMoment = roleMoments[0] || null;
+  const latestMemory = memories[0] || null;
   const affinity = roleId ? getAffinity(roleId, { moments: roleMoments }) : null;
   const slots = getCharacterSlots(chat);
-  const hasTalk = (peekMessages(chat.id) || []).length > 0;
+  const convos = roleId ? listActiveConversations(roleId) : [];
+  const currentThread = convos.find((c) => c.id === chat.id) || convos[0];
+  const lastPreview = clipPreview(currentThread?.lastPreview || chat.lastPreview || "", 36);
+  const hasTalk = (peekMessages(chat.id) || []).length > 0 || !!lastPreview;
   const worldPeek = roleId ? peekWorldbook(roleId) : [];
   const presented = presentCompanionStage(affinity, hasTalk);
-  const mobile = typeof window !== "undefined" && window.innerWidth < 768;
-
-  const tracePeek = latestMoment
-    ? `<button type="button" class="profile-peek" onclick="window.EchoApp.openMomentsFeed('${esc(roleId || "")}')">
-        <div class="profile-peek-line"><span class="profile-peek-tag">瞬间</span>${esc(latestMoment.content.slice(0, 48))}${latestMoment.content.length > 48 ? "…" : ""}</div>
-      </button>`
-    : `<p class="profile-muted profile-peek-empty">一起经历过的片段会留在这里，不是聊天记录。</p>`;
-
-  const memoryMeta = memories.length ? `${memories.length} 条关于你的事` : "还没有记下";
-  const prefMeta = `${replyPaceLabel(chat)} · ${listActiveConversations(roleId).length} 条相处线`;
+  const overlay = typeof window !== "undefined" && window.innerWidth < PROFILE_PERSIST_MIN_WIDTH;
   const identity = String(slots.identity || "").trim();
+  const threadTitle = currentThread?.threadTitle || "日常相处";
+  const reunion = reunionLine(chat.lastMessageAt);
+  const nowClick = overlay
+    ? "window.EchoApp.toggleProfile()"
+    : convos.length > 1
+      ? "window.EchoApp.openConversationSwitcher()"
+      : "";
+
+  const nowInner = lastPreview
+    ? `<div class="profile-peek-line">${esc(threadTitle)}</div>
+        <div class="profile-peek-line profile-muted">${esc(lastPreview)}</div>`
+    : `<p class="profile-muted profile-peek-empty">${hasTalk ? "这条线还没有留下一句。" : "开口第一句，就会出现在这里。"}</p>`;
+  const nowPeek = lastPreview && nowClick
+    ? `<button type="button" class="profile-peek" onclick="${nowClick}">${nowInner}</button>`
+    : `<div class="profile-peek is-static">${nowInner}</div>`;
+
+  const recentPeek = latestMoment
+    ? `<button type="button" class="profile-peek" onclick="window.EchoApp.openMomentsFeed('${esc(roleId || "")}')">
+        <div class="profile-peek-line">${esc(clipPreview(latestMoment.content, 48))}</div>
+      </button>`
+    : lastPreview
+      ? `<p class="profile-muted profile-peek-empty">还没有一起留下痕迹。聊过具体的事，会记在这里。</p>`
+      : `<p class="profile-muted profile-peek-empty">一起经历过的片段会留在这里，不是聊天记录。</p>`;
+
+  const youPeek = latestMemory
+    ? `<button type="button" class="profile-peek" onclick="window.EchoApp.openContinuitySheet('${esc(roleId)}','${chat.id}')">
+        <div class="profile-peek-line">${esc(clipPreview(latestMemory.content, 48))}</div>
+      </button>`
+    : roleId
+      ? `<p class="profile-muted profile-peek-empty">TA 还没有记下关于你的事。</p>`
+      : "";
+
+  const worldPeekLine = worldPeek.length
+    ? `<button type="button" class="profile-peek" onclick="window.EchoApp.openCharacterWorldbook('${esc(roleId)}')">
+        <div class="profile-peek-line">${esc(worldPeek[0].label)}${worldPeek.length > 1 ? `<span class="profile-muted"> · 还有 ${worldPeek.length - 1} 条</span>` : ""}</div>
+      </button>`
+    : `<p class="profile-muted profile-peek-empty">还没有只属于这个角色的设定。</p>`;
 
   return `
-  <aside class="profile-pane open">
+  <aside class="profile-pane companion-home open">
     <div class="profile-scroll">
       <div class="profile-header">
         <button class="icon-btn profile-close" onclick="window.EchoApp.toggleProfile()" aria-label="关闭">${Icons.close}</button>
         ${CharacterAvatar({ src: getRoleAvatar(chat), size: "lg", className: "profile-avatar", alt: chat.name || "角色", name: chat.name || "角色" })}
         <div class="profile-name">${esc(chat.name || "角色")}</div>
         <div class="profile-status">${StageChip({ label: presented.label, stage: presented.stage })}</div>
-        ${reunionLine(chat.lastMessageAt) ? `<p class="profile-muted">${esc(reunionLine(chat.lastMessageAt))}</p>` : ""}
-        <p class="profile-kicker">关于 TA</p>
+        ${reunion ? `<p class="profile-muted profile-reunion">${esc(reunion)}</p>` : ""}
         ${identity
           ? `<p class="profile-lead">${esc(identity.slice(0, 120))}${identity.length > 120 ? "…" : ""}</p>`
           : `<p class="profile-muted profile-lead">还没写下 TA 是谁。</p>`}
       </div>
-      <section class="profile-relate profile-section">
-        <p class="profile-kicker">关系</p>
-        ${RelationshipBrief({ affinity, hasTalk, compact: true })}
+      <section class="profile-now profile-section">
+        <p class="profile-kicker">正在聊</p>
+        ${nowPeek}
       </section>
       <section class="profile-together profile-section profile-section-peek">
-        <button type="button" class="profile-kicker profile-kicker-link" onclick="window.EchoApp.openMomentsFeed('${esc(roleId || "")}')">一起经历过</button>
-        ${tracePeek}
-        ${roleId ? ProfileRow({
-          title: "关于你的记忆",
-          meta: memoryMeta,
-          onClick: `window.EchoApp.openContinuitySheet('${esc(roleId)}','${chat.id}')`,
-        }) : ""}
+        <button type="button" class="profile-kicker profile-kicker-link" onclick="window.EchoApp.openMomentsFeed('${esc(roleId || "")}')">最近</button>
+        ${recentPeek}
+      </section>
+      <section class="profile-relate profile-section">
+        <p class="profile-kicker">我们</p>
+        ${RelationshipBrief({ affinity, hasTalk, compact: true })}
       </section>
       ${roleId ? `
-      <section class="profile-support">
+      <section class="profile-you profile-section">
+        <button type="button" class="profile-kicker profile-kicker-link" onclick="window.EchoApp.openContinuitySheet('${esc(roleId)}','${chat.id}')">关于你</button>
+        ${youPeek}
+      </section>
+      <section class="profile-world profile-support profile-section">
+        <button type="button" class="profile-kicker profile-kicker-link" onclick="window.EchoApp.openCharacterWorldbook('${esc(roleId)}')">这个世界</button>
+        ${worldPeekLine}
         <div class="profile-rows">
           ${ProfileRow({
-            title: "角色世界书",
-            meta: worldPeek.length ? `${worldPeek.length} 条设定` : "只属于 TA",
-            onClick: `window.EchoApp.openCharacterWorldbook('${esc(roleId)}')`,
-          })}
-          ${ProfileRow({
-            title: "相处偏好",
-            meta: prefMeta,
-            onClick: `window.EchoApp.openPreferencesSheet('${esc(roleId)}')`,
-          })}
-          ${ProfileRow({
             title: "更多",
-            meta: "导出角色卡",
             onClick: `window.EchoApp.openProfileMoreSheet('${esc(roleId)}')`,
           })}
         </div>
@@ -556,7 +575,7 @@ function renderProfilePane(chat) {
       ` : ""}
     </div>
     <div class="profile-actions">
-      ${mobile ? `<button type="button" class="btn btn-primary btn-block" onclick="window.EchoApp.toggleProfile()">继续聊天</button>` : ""}
+      ${overlay ? `<button type="button" class="btn btn-primary btn-block" onclick="window.EchoApp.toggleProfile()">${hasTalk ? "继续聊天" : "开始聊天"}</button>` : ""}
       ${roleId ? `<button type="button" class="btn btn-ghost btn-sm" onclick="window.EchoApp.editCharacter('${roleId}')">编辑人设</button>` : ""}
     </div>
   </aside>`;
@@ -847,6 +866,7 @@ export function renderPreferencesSheetContent(chat) {
 export function renderProfileMoreContent(roleId) {
   return `
     <div class="sheet-section">
+      <button type="button" class="btn btn-ghost btn-block" onclick="this.closest('.modal-overlay').remove();window.EchoApp.openPreferencesSheet('${esc(roleId)}')">相处偏好</button>
       <button type="button" class="btn btn-secondary btn-block" onclick="this.closest('.modal-overlay').remove();window.EchoApp.previewCharacterCard('${esc(roleId)}')">预览角色卡</button>
       <button type="button" class="btn btn-ghost btn-block" onclick="window.EchoApp.exportCharacterCard('${esc(roleId)}');this.closest('.modal-overlay').remove()">导出角色卡</button>
       <button type="button" class="btn btn-danger btn-block sheet-action" onclick="window.EchoApp.deleteCharacter('${esc(roleId)}')">删除角色</button>

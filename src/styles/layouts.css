@@ -514,6 +514,62 @@
 .profile-header .profile-kicker {
   margin-top: var(--space-5);
 }
+.companion-home {
+  background: var(--color-bg);
+}
+.companion-home .profile-lead {
+  margin-top: var(--space-3);
+  text-align: center;
+  max-width: 28em;
+  margin-left: auto;
+  margin-right: auto;
+}
+.companion-home .profile-reunion {
+  margin: var(--space-2) 0 0;
+  text-align: center;
+}
+.companion-home .profile-section {
+  padding-top: var(--space-3);
+  padding-bottom: var(--space-3);
+}
+.companion-home .profile-kicker {
+  margin-top: 0;
+}
+.companion-home .profile-peek {
+  border: none;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+.companion-home .profile-peek.is-static {
+  cursor: default;
+}
+@media (hover: hover) and (pointer: fine) {
+  .companion-home .profile-peek:hover {
+    background: transparent;
+  }
+  .companion-home button.profile-peek:hover .profile-peek-line {
+    color: var(--color-primary);
+  }
+}
+.companion-home .profile-relate {
+  margin-top: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.companion-home .profile-support .profile-rows,
+.companion-home .profile-world .profile-rows {
+  border-top: none;
+  margin-top: var(--space-2);
+}
+.companion-home .profile-world .profile-row {
+  padding-left: 0;
+  padding-right: 0;
+  border-bottom: none;
+}
+.companion-home .profile-actions {
+  background: var(--color-bg);
+  border-top: none;
+}
 button.profile-kicker-link {
   display: block;
   width: 100%;

@@ -56,6 +56,7 @@ const SUITES = [
   "tests/ui_settings_surface_test.mjs",
   "tests/ui_profile_scrim_test.mjs",
   "tests/ui_profile_hierarchy_test.mjs",
+  "tests/ui_companion_home_test.mjs",
   "tests/ui_moments_timeline_test.mjs",
   "tests/ui_moments_empty_test.mjs",
   "tests/ui_conversation_list_test.mjs",

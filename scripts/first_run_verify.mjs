@@ -160,11 +160,8 @@ const MEMORY = `(() => (async () => {
   const momentCard = (document.querySelector('.moment-content')?.textContent || '').trim();
   window.EchoApp.switchTab('companion');
   window.EchoApp.toggleProfile();
-  const peek = (document.querySelector('.profile-peek')?.textContent || '').trim();
-  const memRow = [...document.querySelectorAll('.profile-row')].map((r) => ({
-    title: (r.querySelector('.profile-row-title')?.textContent || '').trim(),
-    meta: (r.querySelector('.profile-row-meta')?.textContent || '').trim(),
-  })).find((r) => r.title === '关于你的记忆');
+  const peek = (document.querySelector('.profile-together .profile-peek, .profile-together')?.innerText || '').trim();
+  const you = (document.querySelector('.profile-you')?.innerText || '').trim();
   return {
     kept: !!kept,
     keptMark,
@@ -177,7 +174,7 @@ const MEMORY = `(() => (async () => {
     peek,
     peekHasMoment: /咖啡馆/.test(peek),
     peekHasMemory: /摄影/.test(peek),
-    memMeta: memRow?.meta || '',
+    memMeta: you,
     overflowX: document.documentElement.scrollWidth > window.innerWidth + 2,
   };
 })())()`;
@@ -242,7 +239,7 @@ try {
   record("moment visible in traces", mem.momentsTitle === "痕迹" && /咖啡馆/.test(mem.momentCard) ? "PASS" : "FAIL", JSON.stringify(mem));
   record(
     "traces peek is not memory",
-    mem.peekHasMoment && !mem.peekHasMemory && /关于你的事/.test(mem.memMeta) ? "PASS" : "FAIL",
+    mem.peekHasMoment && !mem.peekHasMemory && /关于你/.test(mem.memMeta) ? "PASS" : "FAIL",
     JSON.stringify({ peek: mem.peek, memMeta: mem.memMeta })
   );
   record("mobile no overflow", !mem.overflowX ? "PASS" : "FAIL");

@@ -179,8 +179,8 @@ const SHELL = `(() => {
       secondHer.querySelector('.msg-avatar-slot')
     ),
     profileHas:
-      /关于 TA/.test(profileText) &&
-      /关系/.test(profileText) &&
+      /正在聊/.test(profileText) &&
+      /我们/.test(profileText) &&
       /林晚/.test(profileText),
     bottomNav: document.querySelector('.bottom-nav')
       ? getComputedStyle(document.querySelector('.bottom-nav')).display

@@ -502,62 +502,61 @@ function renderProfilePane(chat) {
 
   const memoryMeta = memories.length ? `${memories.length} 条关于你的事` : "还没有记下";
   const prefMeta = `${replyPaceLabel(chat)} · ${listActiveConversations(roleId).length} 条相处线`;
+  const identity = String(slots.identity || "").trim();
 
   return `
   <aside class="profile-pane open">
-    <div class="profile-header">
-      <button class="icon-btn profile-close" onclick="window.EchoApp.toggleProfile()" aria-label="关闭">${Icons.close}</button>
-      ${CharacterAvatar({ src: getRoleAvatar(chat), size: "lg", className: "profile-avatar", alt: chat.name || "角色", name: chat.name || "角色" })}
-      <div class="profile-name">${esc(chat.name || "角色")}</div>
-      <div class="profile-status">${StageChip({ label: presented.label, stage: presented.stage })}</div>
-      ${reunionLine(chat.lastMessageAt) ? `<p class="profile-muted">${esc(reunionLine(chat.lastMessageAt))}</p>` : ""}
-    </div>
-    <div class="profile-section">
-      <div class="profile-section-title">关于 TA</div>
-      <div class="profile-section-content">
-        ${slots.identity
-          ? `<div class="persona-clip">${esc(slots.identity.slice(0, 120))}${slots.identity.length > 120 ? "…" : ""}</div>`
-          : `<p class="profile-muted">暂无设定</p>`}
+    <div class="profile-scroll">
+      <div class="profile-header">
+        <button class="icon-btn profile-close" onclick="window.EchoApp.toggleProfile()" aria-label="关闭">${Icons.close}</button>
+        ${CharacterAvatar({ src: getRoleAvatar(chat), size: "lg", className: "profile-avatar", alt: chat.name || "角色", name: chat.name || "角色" })}
+        <div class="profile-name">${esc(chat.name || "角色")}</div>
+        <div class="profile-status">${StageChip({ label: presented.label, stage: presented.stage })}</div>
+        ${reunionLine(chat.lastMessageAt) ? `<p class="profile-muted">${esc(reunionLine(chat.lastMessageAt))}</p>` : ""}
+        <p class="profile-kicker">关于 TA</p>
+        ${identity
+          ? `<p class="profile-lead">${esc(identity.slice(0, 120))}${identity.length > 120 ? "…" : ""}</p>`
+          : `<p class="profile-muted profile-lead">还没写下 TA 是谁。</p>`}
       </div>
-    </div>
-    <div class="profile-section">
-      <div class="profile-section-title">关系</div>
-      <div class="profile-section-content">
+      <section class="profile-relate profile-section">
+        <p class="profile-kicker">关系</p>
         ${RelationshipBrief({ affinity, hasTalk, compact: true })}
-      </div>
+      </section>
+      <section class="profile-together profile-section profile-section-peek">
+        <button type="button" class="profile-kicker profile-kicker-link" onclick="window.EchoApp.openMomentsFeed('${esc(roleId || "")}')">一起经历过</button>
+        ${tracePeek}
+        ${roleId ? ProfileRow({
+          title: "关于你的记忆",
+          meta: memoryMeta,
+          onClick: `window.EchoApp.openContinuitySheet('${esc(roleId)}','${chat.id}')`,
+        }) : ""}
+      </section>
+      ${roleId ? `
+      <section class="profile-support">
+        <div class="profile-rows">
+          ${ProfileRow({
+            title: "角色世界书",
+            meta: worldPeek.length ? `${worldPeek.length} 条设定` : "只属于 TA",
+            onClick: `window.EchoApp.openCharacterWorldbook('${esc(roleId)}')`,
+          })}
+          ${ProfileRow({
+            title: "相处偏好",
+            meta: prefMeta,
+            onClick: `window.EchoApp.openPreferencesSheet('${esc(roleId)}')`,
+          })}
+          ${ProfileRow({
+            title: "更多",
+            meta: "导出角色卡",
+            onClick: `window.EchoApp.openProfileMoreSheet('${esc(roleId)}')`,
+          })}
+        </div>
+      </section>
+      ` : ""}
     </div>
     <div class="profile-actions">
       ${mobile ? `<button type="button" class="btn btn-primary btn-block" onclick="window.EchoApp.toggleProfile()">继续聊天</button>` : ""}
       ${roleId ? `<button type="button" class="btn btn-ghost btn-sm" onclick="window.EchoApp.editCharacter('${roleId}')">编辑人设</button>` : ""}
     </div>
-    <div class="profile-section profile-section-peek">
-      <button type="button" class="profile-section-title profile-section-link" onclick="window.EchoApp.openMomentsFeed('${esc(roleId || "")}')">相处痕迹</button>
-      <div class="profile-section-content">${tracePeek}</div>
-    </div>
-    ${roleId ? `
-    <div class="profile-rows">
-      ${ProfileRow({
-        title: "关于你的记忆",
-        meta: memoryMeta,
-        onClick: `window.EchoApp.openContinuitySheet('${esc(roleId)}','${chat.id}')`,
-      })}
-      ${ProfileRow({
-        title: "角色世界书",
-        meta: worldPeek.length ? `${worldPeek.length} 条设定` : "只属于 TA",
-        onClick: `window.EchoApp.openCharacterWorldbook('${esc(roleId)}')`,
-      })}
-      ${ProfileRow({
-        title: "相处偏好",
-        meta: prefMeta,
-        onClick: `window.EchoApp.openPreferencesSheet('${esc(roleId)}')`,
-      })}
-      ${ProfileRow({
-        title: "更多",
-        meta: "导出角色卡",
-        onClick: `window.EchoApp.openProfileMoreSheet('${esc(roleId)}')`,
-      })}
-    </div>
-    ` : ""}
   </aside>`;
 }
 

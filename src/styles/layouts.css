@@ -444,12 +444,18 @@
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  overflow: hidden;
+}
+.profile-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .profile-header {
   padding: var(--space-6) var(--space-4) var(--space-4);
   text-align: center;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: none;
   position: relative;
 }
 .profile-close {
@@ -497,9 +503,55 @@
   color: var(--color-text-tertiary);
   margin-bottom: 2px;
 }
+.profile-kicker {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--font-micro);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.04em;
+  text-align: left;
+}
+.profile-header .profile-kicker {
+  margin-top: var(--space-5);
+}
+button.profile-kicker-link {
+  display: block;
+  width: 100%;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+.profile-lead {
+  margin: 0;
+  text-align: left;
+  font-size: var(--font-body);
+  line-height: 1.65;
+  color: var(--color-text);
+}
+.profile-relate {
+  margin: 0 var(--space-4) var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--color-mint) 24%, var(--color-border));
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-mint-soft) 78%, var(--color-surface));
+}
+.profile-relate .profile-kicker {
+  margin-top: 0;
+}
+.profile-together {
+  padding-top: var(--space-2);
+}
+.profile-together .profile-row {
+  margin-top: var(--space-2);
+  padding-left: 0;
+  padding-right: 0;
+}
+.profile-support .profile-rows {
+  border-top: 1px solid var(--color-border);
+}
 .profile-section {
   padding: var(--space-4);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: none;
 }
 .profile-section-title {
   font-size: var(--font-label);
@@ -553,7 +605,11 @@ button.profile-section-link {
   flex-direction: column;
   align-items: center;
   gap: var(--space-2);
-  padding: 0 var(--space-4) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  padding-bottom: calc(var(--space-4) + var(--safe-bottom, 0px));
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-elevated, var(--color-surface));
+  flex-shrink: 0;
 }
 .profile-actions .btn-block {
   width: 100%;

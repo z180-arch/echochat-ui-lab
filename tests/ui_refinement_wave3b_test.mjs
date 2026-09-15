@@ -114,8 +114,10 @@ test("Profile identity uses edit in actions, not duplicate tools block", () => {
 test("Export lives in more sheet, not beside identity", () => {
   assert.ok(viewsSrc.includes("renderProfileMoreContent"));
   assert.ok(viewsSrc.includes("导出角色卡"));
-  const about = viewsSrc.slice(viewsSrc.indexOf("关于 TA"), viewsSrc.indexOf("profile-actions"));
-  assert.ok(!about.includes("导出"));
+  const pane = viewsSrc.slice(viewsSrc.indexOf("function renderProfilePane"), viewsSrc.indexOf("function momentContextLine"));
+  const header = pane.slice(pane.indexOf("profile-header"), pane.indexOf("profile-relate"));
+  assert.ok(header.length > 0);
+  assert.ok(!header.includes("导出"));
 });
 
 test("Profile fold padding matches section 16px", () => {

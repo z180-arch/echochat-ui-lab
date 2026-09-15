@@ -186,7 +186,24 @@ const SNAP = `(() => {
     profileStatusHasDays: /相处/.test(status?.innerText || ''),
     exportInTools: !!(tools && /导出/.test(tools.innerText || '')),
     exportInMore: !!(document.querySelector('.profile-rows') && /导出角色卡/.test(document.querySelector('.profile-rows')?.innerText || '')),
-    profileHasHome: !!(profile && /关于 TA/.test(profile.innerText) && /关系/.test(profile.innerText)),
+    profileHasHome: !!(profile && /关于 TA/.test(profile.innerText) && /关系/.test(profile.innerText) && /一起经历过/.test(profile.innerText)),
+    profileOrder: profile
+      ? ["profile-header", "profile-relate", "profile-together", "profile-support", "profile-actions"]
+          .map((cls) => profile.querySelector("." + cls))
+          .filter(Boolean)
+          .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)
+          .map((el) =>
+            el.classList.contains("profile-header")
+              ? "header"
+              : el.classList.contains("profile-relate")
+                ? "relate"
+                : el.classList.contains("profile-together")
+                  ? "together"
+                  : el.classList.contains("profile-support")
+                    ? "support"
+                    : "actions"
+          )
+      : [],
   };
 })()`;
 
@@ -362,6 +379,11 @@ function checkHub(width, snap) {
 
 function checkProfile(width, snap) {
   record(`${width} · profile home order`, snap.profileHasHome ? "PASS" : "FAIL");
+  record(
+    `${width} · profile hierarchy`,
+    snap.profileOrder.join(",") === "header,relate,together,support,actions" ? "PASS" : "FAIL",
+    snap.profileOrder.join(",")
+  );
   record(
     `${width} · profile one stage`,
     !!snap.profileStatus && !snap.profileStatusHasDays ? "PASS" : "FAIL",

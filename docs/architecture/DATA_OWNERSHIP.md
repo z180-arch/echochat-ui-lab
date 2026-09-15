@@ -88,15 +88,15 @@
 
 ### 5. Plugin Data（插件数据）
 
-**定义**：未来插件系统中，插件创建、存储或访问的数据。
+**定义**：插件创建、存储或访问的数据。
 
-**当前状态**：插件系统尚未实现，本章节为架构原则预留。
+**当前状态**：in-process `LocalPluginRuntime` + builtin `extra-notes`。插件只能把字符串追加到 turn 的 `extraPrompt`。不是 marketplace / sandbox / Agent OS。详见 `PLUGIN_POLICY.md`。
 
 **所有权**：
-- 插件创建的数据归**插件开发者或用户**所有（取决于插件设计）
-- 插件不能默认访问用户的全部数据
+- 用户填写的「额外备注」是用户设置，归用户所有
+- 当前插件不能读写 Memory、Moments、Relationship 或 Dexie，也不能看见 API key
 
-**访问边界**：详见 `PLUGIN_POLICY.md`。
+**访问边界**：详见 `PLUGIN_POLICY.md`。权限化插件 API 是 Planned，不是当前实现。
 
 ### 6. External Provider Data（外部服务提供商数据）
 
@@ -121,13 +121,18 @@
 
 ### 当前实现
 
-- **localStorage**：应用状态、聊天记录、角色数据、记忆、关系、Moments
-- **Service Worker Cache**：静态资源缓存（HTML/CSS/JS/图片），不包含用户数据
-- **无后端服务器**：EchoChat 当前是纯前端应用，没有服务端存储
+Canonical 实体在浏览器 IndexedDB 中，不在 EchoChat 服务器上（没有应用后端）。
+
+- **Dexie `echochat`**：characters、conversations、messages、memories、relationships、moments、worldbook、asset metadata（hydrate 之后的权威数据）
+- **IndexedDB `echodownload_assets`**：头像等二进制 blob
+- **localStorage**：应用设置与聊天列表（`echodownload_lite_state_v1`）；hydrate 后的消息 UI 窗口；部分卫星实体的迁移前/应急副本；schema 元数据与草稿。卫星（moments / worldbook / relations / memory）在成功 hydrate 后**不再**把 live 数据双写回 localStorage。
+- **Service Worker Cache**：静态资源（HTML/CSS/JS/图片），不包含用户数据
+
+键名与职责以 `docs/CURRENT_STATE.md` 和 `src/core/storage.js` 为准。不要从本文件的旧表述推断存储方案。
 
 ### 数据隔离
 
-- 用户数据存储在浏览器的 localStorage 中，与其他网站隔离
+- 用户数据存在本机浏览器 origin 下（IndexedDB + localStorage），与其他网站隔离
 - 不同浏览器/设备之间的数据不自动同步
 - 用户数据不发送到 EchoChat 项目的任何服务器（因为不存在这样的服务器）
 

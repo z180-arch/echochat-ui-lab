@@ -22,6 +22,7 @@ import {
   StageChip,
   RelationshipBrief,
   EmptyState,
+  MemoryRow,
   IconButton,
   LogoMark,
   Segmented,
@@ -696,44 +697,46 @@ export function renderMomentsFeedHtml({ filterRoleId = "all", emptyAction = "" }
 
 function renderContinuityJournal(roleId, chatId) {
   const memories = roleId ? getMemoryList(roleId, 20) : [];
-  const moments = roleId ? listMoments(roleId) : [];
-  const items = [
-    ...memories.map((m) => ({
-      kind: "memory",
-      content: m.content,
-      time: Number(m.createdAt) || 0,
-      id: m.id,
-    })),
-    ...moments.map((m) => ({
-      kind: "moment",
-      content: m.content,
-      time: Number(m.createdAt) || 0,
-      id: m.id,
-    })),
-  ].sort((a, b) => b.time - a.time);
+  const moments = roleId ? listMoments(roleId).slice(0, 6) : [];
 
-  if (items.length === 0) {
+  if (!memories.length && !moments.length) {
     return `<p class="profile-muted continuity-empty">聊过具体的事后，关于你的记忆会出现在这里。一起经历过的片段会进痕迹。</p>`;
   }
 
-  return `<div class="continuity-journal lived-journal">${items
-    .map((item) => {
-      if (item.kind === "memory") {
-        return `<div class="trace-line trace-line-memory">
-        <span class="trace-tag">记忆</span>
-        <span class="trace-body">${esc(item.content)}</span>
-        ${roleId
-          ? `<button type="button" class="memory-row-del" onclick="window.EchoApp.deleteCharacterMemory('${roleId}','${item.id}');window.EchoApp.openContinuitySheet('${esc(roleId)}','${chatId}')" aria-label="删除这条记忆">${Icons.trash}</button>`
-          : `<span class="trace-when">${relativeTime(item.time)}</span>`}
-      </div>`;
-      }
-      return `<div class="trace-line trace-line-moment">
-        <span class="trace-tag">瞬间</span>
-        <span class="trace-body">${esc(item.content)}</span>
-        <span class="trace-when">${relativeTime(item.time)}</span>
-      </div>`;
-    })
-    .join("")}</div>`;
+  const memoryBlock = memories.length
+    ? `<section class="memory-block">
+        <h3 class="memory-block-label">关于你</h3>
+        <div class="memory-list">${memories
+          .map((m) =>
+            MemoryRow({
+              content: m.content,
+              source: m.source,
+              time: relativeTime(m.createdAt),
+              onDelete: roleId
+                ? `window.EchoApp.deleteCharacterMemory('${roleId}','${m.id}');window.EchoApp.openContinuitySheet('${esc(roleId)}','${chatId}')`
+                : "",
+            })
+          )
+          .join("")}</div>
+      </section>`
+    : "";
+
+  const momentBlock = moments.length
+    ? `<section class="memory-block">
+        <h3 class="memory-block-label">一起经历过</h3>
+        <div class="memory-moment-list">${moments
+          .map(
+            (m) => `<div class="trace-line trace-line-moment">
+              <span class="trace-tag">${esc(momentSourceLabel(m.source) || "痕迹")}</span>
+              <span class="trace-body">${esc(m.content)}</span>
+              <span class="trace-when">${relativeTime(m.createdAt)}</span>
+            </div>`
+          )
+          .join("")}</div>
+      </section>`
+    : "";
+
+  return `<div class="continuity-journal lived-journal">${memoryBlock}${momentBlock}</div>`;
 }
 
 export function renderContinuitySheetContent(roleId, chatId) {

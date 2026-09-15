@@ -64,9 +64,8 @@ test("comment is a circle bubble, distinct from chat message square", () => {
 });
 
 test("delete actions use trash; close stays on dismiss", () => {
-  assert.match(ui, /aria-label="删除这条记忆">\$\{Icons\.trash\}/);
+  assert.match(ui, /aria-label="删除这条记忆"[\s\S]{0,120}\$\{Icons\.trash\}/);
   assert.match(views, /aria-label="删掉这条痕迹">\$\{Icons\.trash\}/);
-  assert.match(views, /aria-label="删除这条记忆">\$\{Icons\.trash\}/);
   assert.match(views, /aria-label="删除条目">\$\{Icons\.trash\}/);
   assert.doesNotMatch(views, /aria-label="删[^"]*">\$\{Icons\.close\}/);
   assert.match(ui, /icon: Icons\.close, title: "关闭"/);

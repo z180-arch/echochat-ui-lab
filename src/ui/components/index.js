@@ -131,12 +131,27 @@ export function CharacterCard({
   </button>`;
 }
 
-export function MemoryRow({ content = "", onDelete = "" }) {
+export function memorySourceLabel(source) {
+  if (source === "manual") return "写下的";
+  if (source === "candidate") return "从对话";
+  if (source === "reconstruction") return "重逢时";
+  if (source === "auto") return "相处里";
+  return "记下了";
+}
+
+export function MemoryRow({ content = "", source = "", time = "", onDelete = "" }) {
   if (!content) return "";
-  return `<div class="mem-line memory-row">
-    <span class="memory-row-text">${esc(content)}</span>
+  const src = source ? memorySourceLabel(source) : "";
+  return `<article class="mem-line memory-row">
+    <div class="memory-row-main">
+      <p class="memory-row-text">${esc(content)}</p>
+      <div class="memory-row-meta">
+        ${src ? `<span class="memory-src-tag">${esc(src)}</span>` : ""}
+        ${time ? `<span class="memory-when">${esc(time)}</span>` : ""}
+      </div>
+    </div>
     ${onDelete ? `<button type="button" class="memory-row-del" onclick="${onDelete}" aria-label="删除这条记忆">${Icons.trash}</button>` : ""}
-  </div>`;
+  </article>`;
 }
 
 export function RelationshipBrief({ affinity = null, lastEvent = "", hasTalk = false, compact = false }) {

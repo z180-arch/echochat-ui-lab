@@ -23,7 +23,7 @@ Not a roadmap. Facts for the next work package.
 
 ### Verified
 
-- Local/CI node: `npm test` (41 suites + `src` syntax)
+- Local/CI node: `npm test` (42 suites + `src` syntax)
 - CI browser (Chrome): wave3a / wave3b / wave4, landing CTA, continuity UI, moments/worldbook, storage/memory/chat lifecycle, STT, first-run, chat actions, stream paint, long chat, bulk import, provider lifecycle
 - Optional live matrix: `node scripts/live_continuity_matrix.mjs` (gitignored key; retrieval contract only — not product proof)
 

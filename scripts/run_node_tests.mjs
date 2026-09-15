@@ -12,6 +12,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SUITES = [
   "tests/migration_atomicity_test.mjs",
   "tests/foundation_test.mjs",
+  "tests/architecture_boundary_test.mjs",
   "tests/storage_cutover_test.mjs",
   "tests/core_product_test.mjs",
   "tests/reconstruction_test.mjs",

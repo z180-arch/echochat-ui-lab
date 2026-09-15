@@ -340,6 +340,24 @@ test("Domain layer does not import infrastructure", () => {
   }
 });
 
+test("Repository layer does not import domain", () => {
+  const domainImport = /from\s+["'][^"']*\/domain\//;
+  const domainDynamic = /import\s*\(\s*["'][^"']*\/domain\//;
+  function walk(dir) {
+    const out = [];
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) out.push(...walk(full));
+      else if (entry.name.endsWith(".js")) out.push(full);
+    }
+    return out;
+  }
+  for (const file of walk(srcPath("src/repository"))) {
+    const content = readFileSync(file, "utf-8");
+    assert.ok(!domainImport.test(content) && !domainDynamic.test(content), `${file} must not import src/domain`);
+  }
+});
+
 test("Repository layer: interfaces defined", () => {
   
   const content = readFileSync(srcPath("src/repository/interfaces.js"), "utf-8");

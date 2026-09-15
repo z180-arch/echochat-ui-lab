@@ -263,15 +263,20 @@ export function ProfileRow({ title = "", meta = "", onClick = "" }) {
 }
 
 // 设置行
-export function SettingRow({ icon = "", title = "", desc = "", onClick = "", right = "" }) {
-  return `<div class="setting-row" ${onClick ? `onclick="${onClick}" style="cursor:pointer;"` : ""}>
-    ${icon ? `<div class="setting-row-icon">${icon}</div>` : ""}
-    <div class="setting-row-content">
-      ${title ? `<div class="setting-row-title">${esc(title)}</div>` : ""}
-      ${desc ? `<div class="setting-row-desc">${esc(desc)}</div>` : ""}
-    </div>
-    ${right ? `<div class="setting-row-right">${right}</div>` : `<div class="setting-row-right">${Icons.chevronRight}</div>`}
-  </div>`;
+export function SettingRow({ icon = "", title = "", desc = "", onClick = "", right = "", tone = "" }) {
+  const clickable = Boolean(onClick);
+  const tag = clickable ? "button" : "div";
+  const type = clickable ? ` type="button"` : "";
+  const handler = clickable ? ` onclick="${onClick}"` : "";
+  const toneClass = tone === "danger" ? " setting-row-danger" : "";
+  return `<${tag}${type} class="setting-row${toneClass}"${handler}>
+    ${icon ? `<span class="setting-row-icon">${icon}</span>` : ""}
+    <span class="setting-row-content">
+      ${title ? `<span class="setting-row-title">${esc(title)}</span>` : ""}
+      ${desc ? `<span class="setting-row-desc">${esc(desc)}</span>` : ""}
+    </span>
+    ${right ? `<span class="setting-row-right">${right}</span>` : `<span class="setting-row-right">${Icons.chevronRight}</span>`}
+  </${tag}>`;
 }
 
 // 分段选择（轻量；onboarding 等处也可直接用 segmented-btn 类）

@@ -287,6 +287,10 @@ const VOICE_SNAP = `(() => {
     voiceClickable: !!(voice && voice.getAttribute('onclick')),
     ttsClickable: !!(tts && tts.getAttribute('onclick')),
     voiceH: voice ? Math.round(voice.getBoundingClientRect().height) : 0,
+    rowTag: voice?.tagName || '',
+    iconBg: voice?.querySelector('.setting-row-icon')
+      ? getComputedStyle(voice.querySelector('.setting-row-icon')).backgroundColor
+      : '',
   };
 })()`;
 
@@ -446,6 +450,16 @@ async function runWidth(send, width, expect) {
       ? "PASS"
       : "FAIL",
     JSON.stringify(voice)
+  );
+  record(
+    `${width} · settings row`,
+    voice.rowTag === "BUTTON" &&
+      voice.iconBg &&
+      voice.iconBg !== "transparent" &&
+      voice.iconBg !== "rgba(0, 0, 0, 0)"
+      ? "PASS"
+      : "FAIL",
+    JSON.stringify({ rowTag: voice.rowTag, iconBg: voice.iconBg })
   );
 
   await evalExpr(

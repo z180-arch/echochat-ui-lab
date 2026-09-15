@@ -1812,8 +1812,8 @@ const App = {
         <div class="settings-group-body">
           ${SettingRow({ icon: Icons.download, title: "导出全部数据", desc: "把对话、记忆、相处和设定收成一份文件", onClick: "window.EchoApp.exportAll()" })}
           ${SettingRow({ icon: Icons.upload, title: "导入备份", desc: "从备份文件恢复，可看进度、可取消", onClick: "window.EchoApp.importAll()" })}
-          ${SettingRow({ icon: Icons.trash, title: "清空所有对话", desc: "删除全部聊天记录，保留设置与记忆", onClick: "window.EchoApp.clearAllChats()" })}
-          ${SettingRow({ icon: Icons.warning, title: "重置应用", desc: "清除所有数据并恢复初始状态", onClick: "window.EchoApp.resetApp()" })}
+          ${SettingRow({ icon: Icons.trash, title: "清空所有对话", desc: "删除全部聊天记录，保留设置与记忆", onClick: "window.EchoApp.clearAllChats()", tone: "danger" })}
+          ${SettingRow({ icon: Icons.warning, title: "重置应用", desc: "清除所有数据并恢复初始状态", onClick: "window.EchoApp.resetApp()", tone: "danger" })}
         </div>`;
       footer = `<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">返回</button>`;
     } else if (section === "notes") {

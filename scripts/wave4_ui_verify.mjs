@@ -228,6 +228,11 @@ const BRING_SNAP = `(() => {
     return ic && ic.querySelector('svg');
   });
   const overflowDoc = document.documentElement.scrollWidth > window.innerWidth + 2;
+  const modal = overlay?.querySelector('.modal');
+  const handle = overlay?.querySelector('.modal-handle');
+  const titleEl = overlay?.querySelector('.modal-title');
+  const overlayCs = overlay ? getComputedStyle(overlay) : null;
+  const handleCs = handle ? getComputedStyle(handle) : null;
   return {
     open: !!overlay,
     count: cards.length,
@@ -236,6 +241,11 @@ const BRING_SNAP = `(() => {
     iconsOk,
     overflowX: overflowDoc,
     cardMin: cards.length ? Math.min(...cards.map((c) => Math.round(c.getBoundingClientRect().height))) : 0,
+    dialog: modal?.getAttribute('role') === 'dialog',
+    handle: !!handle,
+    titleTag: titleEl?.tagName || '',
+    overlayBlur: overlayCs?.backdropFilter || overlayCs?.webkitBackdropFilter || '',
+    handleDisplay: handleCs?.display || '',
   };
 })()`;
 
@@ -389,6 +399,24 @@ async function runWidth(send, width, expect) {
     `${width} · create cards usable`,
     !bring.overflowX && bring.iconsOk && bring.cardMin >= 44 ? "PASS" : "FAIL",
     JSON.stringify(bring)
+  );
+  record(
+    `${width} · modal surface`,
+    bring.open &&
+      bring.dialog &&
+      bring.handle &&
+      bring.titleTag === "H2" &&
+      /blur/.test(bring.overlayBlur) &&
+      (!mobile || bring.handleDisplay === "block")
+      ? "PASS"
+      : "FAIL",
+    JSON.stringify({
+      dialog: bring.dialog,
+      handle: bring.handle,
+      titleTag: bring.titleTag,
+      overlayBlur: bring.overlayBlur,
+      handleDisplay: bring.handleDisplay,
+    })
   );
 
   await evalExpr(send, `document.querySelectorAll('.modal-overlay').forEach((m) => m.remove()); window.EchoApp.openTemplatePicker(); true`);

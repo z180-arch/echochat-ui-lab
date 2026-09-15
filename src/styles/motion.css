@@ -1158,7 +1158,10 @@
   .welcome-screen h1,
   .welcome-actions,
   .welcome-beats,
-  .modal {
+  .modal,
+  .modal-overlay,
+  .drawer,
+  .drawer-overlay {
     animation: none !important;
   }
   .ambient-layer {

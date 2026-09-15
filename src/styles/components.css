@@ -102,22 +102,28 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: var(--control-min, 44px);
+  height: var(--control-min, 44px);
   border-radius: var(--radius-md);
   color: var(--color-text-secondary);
-  transition: all var(--motion);
+  transition: background var(--motion), color var(--motion), transform var(--dur-fast) var(--ease-out);
 }
 .icon-btn:hover {
   background: var(--color-surface-2);
   color: var(--color-text);
 }
 .icon-btn:active {
-  transform: scale(0.92);
+  transform: scale(0.94);
 }
-.icon-btn svg {
-  width: 20px;
-  height: 20px;
+.icon-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.icon-btn svg,
+.ui-icon {
+  width: var(--icon-size, 20px);
+  height: var(--icon-size, 20px);
+  flex-shrink: 0;
 }
 .chat-mic-btn.is-listening,
 .icon-btn-active.chat-mic-btn {
@@ -575,8 +581,9 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
+  background: var(--color-overlay);
+  backdrop-filter: blur(var(--overlay-blur)) saturate(1.12);
+  -webkit-backdrop-filter: blur(var(--overlay-blur)) saturate(1.12);
   z-index: var(--z-modal);
   display: flex;
   align-items: center;
@@ -584,15 +591,18 @@
   padding: var(--space-4);
   animation: fade-in var(--dur-fast);
 }
+.modal-overlay:focus {
+  outline: none;
+}
 @keyframes fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 .modal {
   background: var(--color-surface-elevated, var(--color-surface));
-  border: 1px solid var(--color-border);
+  border: 1px solid color-mix(in srgb, var(--color-mint) 28%, var(--color-border));
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-xl);
+  box-shadow: var(--shadow-xl), 0 0 0 1px color-mix(in srgb, var(--color-mint) 10%, transparent);
   width: min(100%, var(--modal-width, 560px));
   max-width: 100%;
   max-height: min(85vh, calc(100dvh - 24px));
@@ -600,17 +610,27 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   animation: modal-in var(--dur-normal) var(--ease-out);
 }
 @keyframes modal-in {
   from {
     opacity: 0;
-    transform: scale(0.95) translateY(10px);
+    transform: scale(0.97) translateY(12px);
   }
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
   }
+}
+.modal-handle {
+  display: none;
+  width: 36px;
+  height: 4px;
+  margin: 10px auto 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-border-strong);
+  flex-shrink: 0;
 }
 .modal-header {
   display: flex;
@@ -618,13 +638,16 @@
   justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 80%, transparent);
+  background: color-mix(in srgb, var(--color-mint) 9%, var(--color-surface-elevated, var(--color-surface)));
   flex-shrink: 0;
   min-width: 0;
 }
 .modal-title {
+  margin: 0;
   font-size: var(--font-section);
   font-weight: var(--weight-semibold);
+  color: var(--color-text);
   min-width: 0;
   line-height: 1.35;
 }
@@ -637,15 +660,21 @@
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
+.modal-copy {
+  margin: 0;
+  font-size: var(--font-body);
+  line-height: var(--line-relaxed);
+  color: var(--color-text-secondary);
+}
 .modal-footer {
   padding: var(--space-4) var(--space-5);
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 80%, transparent);
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
   justify-content: flex-end;
   flex-shrink: 0;
-  background: var(--color-surface-elevated, var(--color-surface));
+  background: color-mix(in srgb, var(--color-mint-soft) 70%, var(--color-surface-elevated, var(--color-surface)));
 }
 .modal-footer .btn {
   min-width: 0;
@@ -724,7 +753,9 @@
 .drawer-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--color-overlay);
+  backdrop-filter: blur(var(--overlay-blur)) saturate(1.12);
+  -webkit-backdrop-filter: blur(var(--overlay-blur)) saturate(1.12);
   z-index: var(--z-drawer);
   animation: fade-in var(--dur-fast);
 }
@@ -735,8 +766,9 @@
   bottom: 0;
   width: var(--profile-width);
   max-width: 90vw;
-  background: var(--color-surface);
-  box-shadow: var(--shadow-lg);
+  background: var(--color-surface-elevated, var(--color-surface));
+  border-left: 1px solid color-mix(in srgb, var(--color-mint) 28%, var(--color-border));
+  box-shadow: var(--shadow-xl);
   z-index: var(--z-drawer);
   display: flex;
   flex-direction: column;

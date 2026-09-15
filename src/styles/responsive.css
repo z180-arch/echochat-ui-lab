@@ -57,7 +57,9 @@
     right: 0;
     bottom: 0;
     z-index: var(--z-drawer);
-    box-shadow: var(--shadow-lg);
+    background: var(--color-surface-elevated, var(--color-surface));
+    border-left: 1px solid color-mix(in srgb, var(--color-mint) 28%, var(--color-border));
+    box-shadow: var(--shadow-xl);
   }
 }
 
@@ -93,7 +95,9 @@
     right: 0;
     bottom: 0;
     z-index: var(--z-drawer);
-    box-shadow: var(--shadow-lg);
+    background: var(--color-surface-elevated, var(--color-surface));
+    border-left: 1px solid color-mix(in srgb, var(--color-mint) 28%, var(--color-border));
+    box-shadow: var(--shadow-xl);
   }
 }
 
@@ -178,7 +182,9 @@
     width: 85vw;
     max-width: 320px;
     z-index: var(--z-drawer);
-    box-shadow: var(--shadow-lg);
+    background: var(--color-surface-elevated, var(--color-surface));
+    border-left: 1px solid color-mix(in srgb, var(--color-mint) 28%, var(--color-border));
+    box-shadow: var(--shadow-xl);
     animation: drawer-in var(--dur-normal) var(--ease-out);
   }
 
@@ -222,6 +228,9 @@
     max-height: min(92dvh, calc(100dvh - var(--safe-bottom)));
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
     animation: motion-sheet var(--dur-normal) var(--ease-drawer, var(--ease-out));
+  }
+  .modal-handle {
+    display: block;
   }
   .modal-header,
   .modal-body {

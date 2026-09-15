@@ -218,18 +218,32 @@ export function showToast({ message, type = "info", action = null, duration = 30
 }
 
 // Modal
+let _modalSeq = 0;
 export function openModal({ title, content, footer = "", width = "560px" }) {
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
-  overlay.innerHTML = `<div class="modal modal-split" style="--modal-width:${width}">
-    ${title ? `<div class="modal-header"><span class="modal-title">${esc(title)}</span>${IconButton({ icon: Icons.close, title: "关闭", onClick: "this.closest('.modal-overlay').remove()" })}</div>` : ""}
+  overlay.setAttribute("role", "presentation");
+  const titleId = title ? `echo-modal-title-${++_modalSeq}` : "";
+  overlay.innerHTML = `<div class="modal modal-split" style="--modal-width:${width}" role="dialog" aria-modal="true"${titleId ? ` aria-labelledby="${titleId}"` : ""}>
+    <div class="modal-handle" aria-hidden="true"></div>
+    ${title ? `<div class="modal-header"><h2 class="modal-title" id="${titleId}">${esc(title)}</h2>${IconButton({ icon: Icons.close, title: "关闭", onClick: "this.closest('.modal-overlay').remove()" })}</div>` : ""}
     <div class="modal-body">${content}</div>
     ${footer ? `<div class="modal-footer">${footer}</div>` : ""}
   </div>`;
+  const dismiss = () => overlay.remove();
   overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) overlay.remove();
+    if (e.target === overlay) dismiss();
+  });
+  overlay.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      dismiss();
+    }
   });
   document.body.appendChild(overlay);
+  overlay.tabIndex = -1;
+  const focusable = overlay.querySelector(".icon-btn, [data-confirm], .btn, input, textarea, select");
+  (focusable || overlay).focus?.();
   return overlay;
 }
 
@@ -290,7 +304,7 @@ export function openConfirm({
   const btnClass = variant === "danger" ? "btn-danger" : "btn-primary";
   const overlay = openModal({
     title,
-    content: `<p style="margin:0;line-height:1.6;color:var(--color-text-secondary);">${esc(message)}</p>`,
+    content: `<p class="modal-copy">${esc(message)}</p>`,
     footer: `
       <button type="button" class="btn btn-ghost" data-confirm="cancel">${esc(cancelText)}</button>
       <button type="button" class="btn ${btnClass}" data-confirm="ok">${esc(confirmText)}</button>

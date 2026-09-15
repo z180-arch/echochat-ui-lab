@@ -35,6 +35,11 @@
   --color-input: #ffffff;
   --color-surface-elevated: #ffffff;
   --color-primary-fg: #ffffff;
+  --color-overlay: color-mix(in srgb, var(--color-text) 28%, transparent);
+  --overlay-blur: 16px;
+  --icon-size: 20px;
+  --icon-size-sm: 16px;
+  --control-min: 44px;
 
   /* ---- 字号 ---- */
   --font-display: 28px;
@@ -136,6 +141,7 @@
   --color-input: #1a2028;
   --color-surface-elevated: #1e252e;
   --color-primary-fg: #ffffff;
+  --color-overlay: color-mix(in srgb, #02060a 62%, transparent);
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.4);

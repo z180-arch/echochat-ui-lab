@@ -1172,23 +1172,65 @@ button.profile-section-link {
 .moments-feed {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-2) var(--space-5) var(--space-8);
+  padding: var(--space-2) var(--space-4) var(--space-8);
   max-width: 560px;
   margin: 0 auto;
   width: 100%;
+}
+.moment-day {
+  position: relative;
+  padding-left: var(--space-5);
+  margin-bottom: var(--space-6);
+}
+.moment-day:last-child {
+  margin-bottom: 0;
+}
+.moment-day::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 28px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-mint) 48%, var(--color-border));
+}
+.moment-day-label {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-label);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-secondary);
+  letter-spacing: 0;
+}
+.moment-day-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 .moment-entry {
   padding: 16px 0;
   border-bottom: 1px solid var(--color-border);
 }
 .moment-entry.lived-card {
+  position: relative;
   padding: var(--space-4);
-  margin-bottom: var(--space-3);
+  margin-bottom: 0;
   border: 1px solid var(--color-border);
   border-bottom-color: var(--color-border);
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--color-surface) 92%, transparent);
   box-shadow: var(--shadow-sm);
+}
+.moment-entry.lived-card::before {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--space-5) + 2px);
+  top: 22px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-mint);
+  box-shadow: 0 0 0 3px var(--color-bg);
 }
 .moment-header {
   display: flex;
@@ -1200,9 +1242,25 @@ button.profile-section-link {
   flex: 1;
   min-width: 0;
 }
+.moment-who-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
 .moment-who {
-  font-weight: 600;
-  font-size: 14px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--weight-semibold);
+  font-size: var(--font-caption);
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 .moment-when {
   font-size: 12px;
@@ -1211,6 +1269,16 @@ button.profile-section-link {
 }
 .moment-src {
   color: var(--color-text-tertiary);
+}
+.moment-src-tag {
+  flex-shrink: 0;
+  font-size: var(--font-micro);
+  font-weight: var(--weight-semibold);
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+  line-height: 1.4;
 }
 .moment-del {
   width: 44px;

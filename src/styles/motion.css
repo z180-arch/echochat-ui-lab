@@ -230,14 +230,20 @@
 .tab-enter .moment-entry {
   animation: moment-in var(--dur-normal) var(--ease-out) both;
 }
-.tab-enter .moment-entry:nth-child(2) {
+.tab-enter .moment-day:nth-child(2) .moment-entry {
   animation-delay: 0.04s;
 }
-.tab-enter .moment-entry:nth-child(3) {
+.tab-enter .moment-day:nth-child(3) .moment-entry {
   animation-delay: 0.08s;
 }
-.tab-enter .moment-entry:nth-child(4) {
+.tab-enter .moment-day:nth-child(4) .moment-entry {
   animation-delay: 0.12s;
+}
+.tab-enter .moment-day-rail .moment-entry:nth-child(2) {
+  animation-delay: 0.04s;
+}
+.tab-enter .moment-day-rail .moment-entry:nth-child(3) {
+  animation-delay: 0.08s;
 }
 @keyframes moment-in {
   from {
@@ -1137,7 +1143,8 @@
   .modal-overlay,
   .drawer,
   .drawer-overlay,
-  .profile-mask {
+  .profile-mask,
+  .tab-enter .moment-entry {
     animation: none !important;
   }
   .ambient-layer {

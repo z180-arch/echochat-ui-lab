@@ -13,7 +13,7 @@
 // ============================================================
 
 import { store } from "../../core/store.js";
-import { esc, formatDateTime, relativeTime, renderMarkdown } from "../../core/utils.js";
+import { esc, formatDateTime, relativeTime, renderMarkdown, todayStr, dayDiff } from "../../core/utils.js";
 import {
   Icons,
   Avatar,
@@ -560,15 +560,41 @@ function renderProfilePane(chat) {
   </aside>`;
 }
 
-function momentContextLine(m) {
-  const bits = [];
-  const src = momentSourceLabel(m.source);
-  if (src) bits.push(src);
-  if (m.chatId) {
-    const chat = (store.getState().chats || []).find((c) => c.id === m.chatId);
-    if (chat?.name) bits.push(chat.name);
+function momentDayLabel(ts) {
+  const key = todayStr(ts);
+  const today = todayStr();
+  const diff = dayDiff(key, today);
+  if (diff === 0) return "今天";
+  if (diff === 1) return "昨天";
+  const d = new Date(Number(ts) || Date.now());
+  const mo = d.getMonth() + 1;
+  const day = d.getDate();
+  if (d.getFullYear() !== new Date().getFullYear()) {
+    return `${d.getFullYear()}年${mo}月${day}日`;
   }
-  return bits.join(" · ");
+  return `${mo}月${day}日`;
+}
+
+function groupMomentsByDay(moments) {
+  const groups = [];
+  const seen = new Map();
+  for (const m of moments) {
+    const key = todayStr(m.createdAt);
+    let group = seen.get(key);
+    if (!group) {
+      group = { key, label: momentDayLabel(m.createdAt), items: [] };
+      seen.set(key, group);
+      groups.push(group);
+    }
+    group.items.push(m);
+  }
+  return groups;
+}
+
+function momentContextLine(m) {
+  if (!m.chatId) return "";
+  const chat = (store.getState().chats || []).find((c) => c.id === m.chatId);
+  return chat?.name || "";
 }
 
 function renderMomentsPane() {
@@ -616,16 +642,22 @@ export function renderMomentsFeedHtml({ filterRoleId = "all", emptyAction = "" }
     });
   }
 
-  return `<div class="moments-feed">${moments
-    .map((m) => {
-      const context = momentContextLine(m);
-      const when = relativeTime(m.createdAt);
-      return `
+  return `<div class="moments-feed">${groupMomentsByDay(moments)
+    .map((group) => {
+      const items = group.items
+        .map((m) => {
+          const context = momentContextLine(m);
+          const when = relativeTime(m.createdAt);
+          const src = momentSourceLabel(m.source);
+          return `
           <article class="moment-entry lived-card">
             <div class="moment-header">
               ${CharacterAvatar({ src: resolveAvatarSrc(avatarByRole[m.roleId] || m.avatar), size: "sm", alt: m.roleName, name: m.roleName })}
               <div class="moment-head-copy">
-                <button type="button" class="moment-who" onclick="window.EchoApp.selectCharacter('${m.roleId || ""}')">${esc(m.roleName)}</button>
+                <div class="moment-who-row">
+                  <button type="button" class="moment-who" onclick="window.EchoApp.selectCharacter('${m.roleId || ""}')">${esc(m.roleName)}</button>
+                  ${src ? `<span class="moment-src-tag">${esc(src)}</span>` : ""}
+                </div>
                 <div class="moment-when">${esc(when)}${context ? `<span class="moment-src"> · ${esc(context)}</span>` : ""}</div>
               </div>
               <button type="button" class="moment-del" onclick="window.EchoApp.deleteMomentEntry('${m.id}')" aria-label="删掉这条痕迹">${Icons.trash}</button>
@@ -651,6 +683,12 @@ export function renderMomentsFeedHtml({ filterRoleId = "all", emptyAction = "" }
             </div>
           </article>
         `;
+        })
+        .join("");
+      return `<section class="moment-day" aria-label="${esc(group.label)}">
+        <h2 class="moment-day-label">${esc(group.label)}</h2>
+        <div class="moment-day-rail">${items}</div>
+      </section>`;
     })
     .join("")}</div>`;
 }

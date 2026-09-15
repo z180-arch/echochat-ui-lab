@@ -116,7 +116,10 @@ const SEED = `(() => (async () => {
   const { storage, KEYS } = await import('/src/core/storage.js');
   const { store } = await import('/src/core/store.js');
   const { messageStore } = await import('/src/domain/message-store.js');
+  const { addMoment, resetMomentsRuntime, saveMoments } = await import('/src/domain/moments.js');
   store.reset();
+  resetMomentsRuntime();
+  saveMoments({ version: 2, moments: [] });
   store.updateSettings({ apiKey: 'sk-test-key', baseUrl: 'https://api.example.com/v1', model: 'x' });
   const chat = await createFromTemplate({ name: '林晚', persona: '温柔的咖啡店员', firstMessage: '第一段' });
   await createFromTemplate({ name: '周宁', persona: '安静的书店店员', firstMessage: '你好' });
@@ -127,6 +130,9 @@ const SEED = `(() => (async () => {
   await messageStore.addMessage(chat.id, { role: 'her', text: '还在', status: 'sent' });
   await messageStore.addMessage(chat.id, { role: 'me', text: '我在听', status: 'sent' });
   await messageStore.addMessage(chat.id, { role: 'her', text: ${JSON.stringify(LONG_CJK)}, status: 'sent' });
+  const now = Date.now();
+  addMoment({ roleId: chat.roleId, roleName: '林晚', content: '今天下午一起去了咖啡馆', source: 'lived', createdAt: now });
+  addMoment({ roleId: chat.roleId, roleName: '林晚', content: '昨天晚上走过那条小路', source: 'auto_summary', chatId: chat.id, createdAt: now - 86400000 });
   storage.setRaw(KEYS.ONBOARD_DONE, '1');
   window.EchoApp.view = 'app';
   window.EchoApp.render();
@@ -204,6 +210,26 @@ const SNAP = `(() => {
                     : "actions"
           )
       : [],
+  };
+})()`;
+
+const MOMENTS_SNAP = `(() => {
+  const days = [...document.querySelectorAll('.moment-day')];
+  const labels = days.map((d) => (d.querySelector('.moment-day-label')?.textContent || '').trim());
+  const entries = [...document.querySelectorAll('.moment-entry')];
+  const tags = [...document.querySelectorAll('.moment-src-tag')].map((el) => el.textContent.trim());
+  const rail = days[0] ? getComputedStyle(days[0], '::before') : null;
+  const overflowDoc = document.documentElement.scrollWidth > window.innerWidth + 2;
+  return {
+    overflowX: overflowDoc,
+    dayCount: days.length,
+    labels,
+    entryCount: entries.length,
+    tags,
+    who: (entries[0]?.querySelector('.moment-who')?.textContent || '').trim(),
+    content: (document.querySelector('.moment-content')?.textContent || '').trim(),
+    railW: rail ? parseFloat(rail.width) : 0,
+    railContent: rail?.content || '',
   };
 })()`;
 
@@ -529,6 +555,26 @@ async function runWidth(send, width, expect) {
     me.titles.includes("对话") && me.titles.includes("体验") && me.titles.includes("数据") && me.titles.includes("高级") ? "PASS" : "FAIL",
     me.titles.join(",")
   );
+
+  await evalExpr(send, `window.EchoApp.switchTab('moments'); true`);
+  await sleep(200);
+  const moments = await evalExpr(send, MOMENTS_SNAP);
+  record(
+    `${width} · moments timeline`,
+    moments.dayCount >= 2 &&
+      moments.labels.includes("今天") &&
+      moments.labels.includes("昨天") &&
+      moments.entryCount === 2 &&
+      moments.tags.includes("一起") &&
+      moments.who === "林晚" &&
+      /咖啡馆/.test(moments.content) &&
+      moments.railW >= 1.5 &&
+      moments.railContent !== "none"
+      ? "PASS"
+      : "FAIL",
+    JSON.stringify(moments)
+  );
+  record(`${width} · moments no overflow`, !moments.overflowX ? "PASS" : "FAIL");
 
   await evalExpr(send, `window.EchoApp.switchTab('companion'); window.EchoApp.backToList(); true`);
   await sleep(200);

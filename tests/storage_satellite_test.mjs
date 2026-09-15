@@ -43,7 +43,7 @@ if (typeof globalThis.performance?.now !== "function") {
 
 const { KEYS } = await import(srcHref("src/core/storage.js"));
 const { store } = await import(srcHref("src/core/store.js"));
-const { installStorageTestHooks, resetStorageTestHooks } = await import(srcHref("src/repository/test-hooks.js"));
+const { installStorageTestHooks, resetStorageTestHooks } = await import(srcHref("src/repository/storage-hooks.js"));
 const {
   addMoment,
   listMoments,

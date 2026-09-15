@@ -48,7 +48,7 @@ global.URL = { createObjectURL: () => "blob:mock" };
 const { storage, KEYS } = await import(srcHref("src/core/storage.js"));
 const { store } = await import(srcHref("src/core/store.js"));
 const { installStorageTestHooks, resetStorageTestHooks } = await import(
-  srcHref("src/repository/test-hooks.js")
+  srcHref("src/repository/storage-hooks.js")
 );
 const { MessageRepository } = await import(srcHref("src/repository/message.js"));
 const { ConversationRepository } = await import(srcHref("src/repository/conversation.js"));

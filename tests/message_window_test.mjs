@@ -38,7 +38,7 @@ global.performance = { now: () => Date.now() };
 global.URL = { createObjectURL: () => "blob:mock", revokeObjectURL: () => {} };
 
 const { store } = await import(srcHref("src/core/store.js"));
-const { installStorageTestHooks, resetStorageTestHooks } = await import(srcHref("src/repository/test-hooks.js"));
+const { installStorageTestHooks, resetStorageTestHooks } = await import(srcHref("src/repository/storage-hooks.js"));
 const {
   hydrateChat,
   peekMessages,

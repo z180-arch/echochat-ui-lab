@@ -8,7 +8,7 @@ import { storage, KEYS } from "../core/storage.js";
 import { recordRelationshipEvent } from "./relations.js";
 import { events, EVT } from "../core/events.js";
 import { uid, todayStr } from "../core/utils.js";
-import { getStorageHooks } from "../repository/test-hooks.js";
+import { getStorageHooks } from "../repository/storage-hooks.js";
 import {
   parseJsonSafe,
   isEntityMigrated,

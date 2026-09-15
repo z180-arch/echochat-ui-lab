@@ -11,7 +11,7 @@
 
 import { store } from "../core/store.js";
 import { uid } from "../core/utils.js";
-import { getStorageHooks } from "../repository/test-hooks.js";
+import { getStorageHooks } from "../repository/storage-hooks.js";
 import { cleanAssistantReply } from "./reply-clean.js";
 
 export const UI_WINDOW = 80;

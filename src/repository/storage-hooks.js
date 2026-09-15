@@ -1,11 +1,7 @@
 /**
- * Storage backend hooks for Repository / messageStore.
- *
- * Production uses Dexie adapters. Tests may replace backends with an
- * in-memory fake so Node (no IndexedDB) can exercise the Dexie-first
- * read path without inventing a second architecture.
+ * Production Dexie storage hooks for domain and repository.
+ * Tests call installStorageTestHooks() with an in-memory fake.
  */
-
 import { dexieAdapter, dexieCharacterAdapter, dexieMomentAdapter, dexieWorldbookAdapter } from "../infrastructure/dexie-adapter.js";
 import { isDbAvailable } from "../infrastructure/dexie-db.js";
 

@@ -17,7 +17,7 @@ import {
   deleteAllMessages,
   UI_WINDOW,
 } from "./message-store.js";
-import { getStorageHooks } from "../repository/test-hooks.js";
+import { getStorageHooks } from "../repository/storage-hooks.js";
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));

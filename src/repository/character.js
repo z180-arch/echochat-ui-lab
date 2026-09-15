@@ -8,7 +8,7 @@
  */
 
 import { legacyAdapter } from "./legacy-adapter.js";
-import { getStorageHooks } from "./test-hooks.js";
+import { getStorageHooks } from "./storage-hooks.js";
 
 function chatToCharacter(chat) {
   const raw = chat.config?.persona;

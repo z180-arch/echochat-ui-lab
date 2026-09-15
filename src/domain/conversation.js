@@ -19,7 +19,7 @@ import { uid } from "../core/utils.js";
 import { getRoleId, getPersona, getRoleName } from "./persona.js";
 import { messageStore } from "./message-store.js";
 import { ConversationRepository } from "../repository/conversation.js";
-import { getStorageHooks } from "../repository/test-hooks.js";
+import { getStorageHooks } from "../repository/storage-hooks.js";
 import { deleteMomentsForChat } from "./moments.js";
 
 // ============================================================

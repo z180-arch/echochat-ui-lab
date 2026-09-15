@@ -55,7 +55,7 @@ const { sendMessage, isSending, stopGeneration } = await import(srcHref("src/dom
 const { messageStore } = await import(srcHref("src/domain/message-store.js"));
 const { setReplyPaceForCharacter } = await import(srcHref("src/domain/reply-pace.js"));
 const { installStorageTestHooks, resetStorageTestHooks } = await import(
-  srcHref("src/repository/test-hooks.js")
+  srcHref("src/repository/storage-hooks.js")
 );
 
 let passed = 0;

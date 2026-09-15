@@ -8,7 +8,7 @@ description: Guide Dexie, repository hooks, satellite hydrate, localStorage keys
 Dexie `echochat` is canonical after hydrate. Do not migrate to SQLite.
 
 - Keys: `src/core/storage.js`. Do not rename `echodownload_*` unless the user confirmed.
-- Hooks: `getStorageHooks()` in `src/repository/` (production Dexie adapters; tests may replace).
+- Hooks: `src/repository/storage-hooks.js` (`getStorageHooks` / test installers).
 - Satellites (moments / worldbook / relations / memory): Dexie-only after `usingCanonical`. Legacy LS is recovery, not a live mirror.
 - Messages: Dexie full history; UI peeks `UI_WINDOW` (80). Do not shrink the store fallback on hydrate.
 - Backup: `src/domain/backup.js` `exportProductBackup` / `importProductBackup` / `resetProductData`.

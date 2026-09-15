@@ -204,7 +204,7 @@ Documented claims that still hold:
 
 ### Naming smell (not a cycle)
 
-Domain modules import `getStorageHooks` from `src/repository/test-hooks.js`. That file **is** the production hook bag; tests replace it. The filename reads as test-only.
+Domain modules import `getStorageHooks` from `src/repository/storage-hooks.js`. Tests replace the production Dexie adapters with in-memory fakes.
 
 ### Unused repository shells
 
@@ -279,7 +279,7 @@ Classification rule used here: **Confirmed Problem** requires at least one of: e
 ### Possible Improvement
 
 - Split `main.js` by view only if a concrete feature cannot land safely. Size alone is not a rewrite trigger.
-- Rename `repository/test-hooks.js` → `storage-hooks.js`.
+- Rename `repository/test-hooks.js` → `storage-hooks.js`. **Done.**
 - Point live satellites at named Repositories, **or** delete unused Repository shells so the diagram matches code. Do not do both in a cleanup sweep.
 - Resume lightweight satellite LS dual-write **only if** Dexie-loss recovery is a product requirement.
 - HTTP 5xx retry policy: decide and test; do not silently change Provider architecture.

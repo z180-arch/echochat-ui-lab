@@ -40,7 +40,7 @@ if (typeof globalThis.performance?.now !== "function") {
 }
 
 const { store } = await import(srcHref("src/core/store.js"));
-const { installStorageTestHooks, resetStorageTestHooks } = await import(srcHref("src/repository/test-hooks.js"));
+const { installStorageTestHooks, resetStorageTestHooks } = await import(srcHref("src/repository/storage-hooks.js"));
 const {
   addMemory,
   getMemoryList,

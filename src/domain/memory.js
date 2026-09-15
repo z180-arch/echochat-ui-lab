@@ -12,7 +12,7 @@ import { uid } from "../core/utils.js";
 import { getRoleId, getPersona, getRoleName } from "./persona.js";
 import { chatCompletion } from "./provider.js";
 import { peekMessages } from "./message-store.js";
-import { getStorageHooks } from "../repository/test-hooks.js";
+import { getStorageHooks } from "../repository/storage-hooks.js";
 import {
   isEntityMigrated,
   reconcileAndCommit,

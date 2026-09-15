@@ -42,7 +42,7 @@ global.performance = { now: () => Date.now() };
 
 const { store } = await import(srcHref("src/core/store.js"));
 const { installStorageTestHooks, resetStorageTestHooks } = await import(
-  srcHref("src/repository/test-hooks.js")
+  srcHref("src/repository/storage-hooks.js")
 );
 const { messageStore } = await import(srcHref("src/domain/message-store.js"));
 const { createFromTemplate } = await import(srcHref("src/domain/persona.js"));

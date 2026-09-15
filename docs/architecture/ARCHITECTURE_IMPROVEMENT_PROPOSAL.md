@@ -46,9 +46,9 @@ This is not a rewrite. It is a list of follow-ups that remain after the confirme
 
 **If authorized later:** pick one — route satellites through the named Repositories, **or** delete the unused shells and say domain+hooks is the port. Not both in a cleanup PR.
 
-### 4. `getStorageHooks` lives in `test-hooks.js`
+### 4. `getStorageHooks` lives in `storage-hooks.js`
 
-**Files:** `src/repository/test-hooks.js` (production + test)
+**Status:** Done this pass. File is `src/repository/storage-hooks.js`.
 
 **Problem:** Filename tells agents the production persist port is a test helper.
 
@@ -105,7 +105,7 @@ This is not a rewrite. It is a list of follow-ups that remain after the confirme
 ## Suggested order if a next task is authorized
 
 1. Agent-contract nits (`AGENTS.md` must-confirm + freeze clarification; narrower echo-references trigger). Lowest risk.
-2. Rename `test-hooks.js` **or** decide unused Repository shells (pick one).
+2. Rename `test-hooks.js` **or** decide unused Repository shells (pick one). **Rename done** (`storage-hooks.js`).
 3. P-07 recovery test before any dual-write change.
 4. P-08 Memory emergency persist only with a dedicated Memory persist task.
 5. Storage Spike (optional, research) — only if P-07 becomes a real incident or size/perf evidence appears.

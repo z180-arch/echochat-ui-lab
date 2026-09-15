@@ -21,6 +21,6 @@ Forbidden (tests in `tests/architecture_boundary_test.mjs` and `tests/foundation
 - `src/repository` → `src/domain`
 - `src/domain/provider.js` → `src/ui`
 
-Domain persist goes through `src/repository/persistence.js` and `getStorageHooks()`.
+Domain persist goes through `src/repository/persistence.js` and `getStorageHooks()` in `src/repository/storage-hooks.js`.
 
 Do not invent CharacterIdentity splits, a second prompt pipeline, or a plugin marketplace.

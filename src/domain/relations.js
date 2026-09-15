@@ -6,7 +6,7 @@
 
 import { storage, KEYS } from "../core/storage.js";
 import { todayStr, dayDiff } from "../core/utils.js";
-import { getStorageHooks } from "../repository/test-hooks.js";
+import { getStorageHooks } from "../repository/storage-hooks.js";
 import {
   parseJsonSafe,
   isEntityMigrated,

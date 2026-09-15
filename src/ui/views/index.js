@@ -629,7 +629,7 @@ export function renderMomentsFeedHtml({ filterRoleId = "all", emptyAction = "" }
                 <button type="button" class="moment-who" onclick="window.EchoApp.selectCharacter('${m.roleId || ""}')">${esc(m.roleName)}</button>
                 <div class="moment-when">${esc(when)}${context ? `<span class="moment-src"> · ${esc(context)}</span>` : ""}</div>
               </div>
-              <button type="button" class="moment-del" onclick="window.EchoApp.deleteMomentEntry('${m.id}')" aria-label="删掉这条痕迹">${Icons.close}</button>
+              <button type="button" class="moment-del" onclick="window.EchoApp.deleteMomentEntry('${m.id}')" aria-label="删掉这条痕迹">${Icons.trash}</button>
             </div>
             <div class="moment-content">${esc(m.content)}</div>
             <div class="moment-actions">
@@ -685,7 +685,7 @@ function renderContinuityJournal(roleId, chatId) {
         <span class="trace-tag">记忆</span>
         <span class="trace-body">${esc(item.content)}</span>
         ${roleId
-          ? `<button type="button" class="memory-row-del" onclick="window.EchoApp.deleteCharacterMemory('${roleId}','${item.id}');window.EchoApp.openContinuitySheet('${esc(roleId)}','${chatId}')" aria-label="删除这条记忆">${Icons.close}</button>`
+          ? `<button type="button" class="memory-row-del" onclick="window.EchoApp.deleteCharacterMemory('${roleId}','${item.id}');window.EchoApp.openContinuitySheet('${esc(roleId)}','${chatId}')" aria-label="删除这条记忆">${Icons.trash}</button>`
           : `<span class="trace-when">${relativeTime(item.time)}</span>`}
       </div>`;
       }
@@ -936,7 +936,7 @@ export function renderWorldbookEditorHtml({ book, roleId = null, editing = null,
                 <button type="button" class="memory-row-text wb-entry-open" onclick="window.EchoApp.editWorldbookEntry('${esc(target.id)}','${esc(e.id)}')">
                   <b>${esc(label)}</b>${keys ? ` · ${esc(keys)}` : ""}${e.constant ? " · 总是" : ""}
                 </button>
-                <button type="button" class="memory-row-del" onclick="window.EchoApp.deleteWorldbookEntry('${esc(target.id)}','${esc(e.id)}')" aria-label="删除条目">${Icons.close}</button>
+                <button type="button" class="memory-row-del" onclick="window.EchoApp.deleteWorldbookEntry('${esc(target.id)}','${esc(e.id)}')" aria-label="删除条目">${Icons.trash}</button>
               </div>`;
             })
             .join("")

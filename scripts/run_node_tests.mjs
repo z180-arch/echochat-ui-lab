@@ -52,6 +52,7 @@ const SUITES = [
   "tests/ui_refinement_wave3b_test.mjs",
   "tests/ui_refinement_wave4_test.mjs",
   "tests/ui_modal_surface_test.mjs",
+  "tests/ui_icon_system_test.mjs",
   "tests/companion_ux_test.mjs",
 ];
 

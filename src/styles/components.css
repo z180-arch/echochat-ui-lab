@@ -123,6 +123,7 @@
 .ui-icon {
   width: var(--icon-size, 20px);
   height: var(--icon-size, 20px);
+  display: block;
   flex-shrink: 0;
 }
 .chat-mic-btn.is-listening,

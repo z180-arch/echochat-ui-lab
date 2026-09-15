@@ -93,6 +93,29 @@ test("timeline rail reuses mint tokens, not a second overlay kit", () => {
   assert.match(motion, /prefers-reduced-motion: reduce[\s\S]*\.tab-enter \.moment-entry/);
 });
 
+test("older days use lived narrative labels, not a calendar dump", () => {
+  resetAll();
+  const now = Date.now();
+  addMoment({
+    roleId: "role_a",
+    roleName: "林夏",
+    content: "后来一起走过那条小路",
+    source: "lived",
+    createdAt: now - 3 * 86400000,
+  });
+  addMoment({
+    roleId: "role_a",
+    roleName: "林夏",
+    content: "更早的一个雨夜",
+    source: "auto_summary",
+    createdAt: now - 10 * 86400000,
+  });
+  const html = renderMomentsFeedHtml({ filterRoleId: "all" });
+  assert.match(html, /后来 · /);
+  assert.match(html, /那天 · /);
+  assert.doesNotMatch(html, />今天</);
+});
+
 test("two calendar days render as two labeled groups", () => {
   resetAll();
   const now = Date.now();

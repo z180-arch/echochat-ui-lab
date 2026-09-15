@@ -589,10 +589,11 @@ function momentDayLabel(ts) {
   const d = new Date(Number(ts) || Date.now());
   const mo = d.getMonth() + 1;
   const day = d.getDate();
-  if (d.getFullYear() !== new Date().getFullYear()) {
-    return `${d.getFullYear()}年${mo}月${day}日`;
-  }
-  return `${mo}月${day}日`;
+  const dated = d.getFullYear() !== new Date().getFullYear()
+    ? `${d.getFullYear()}年${mo}月${day}日`
+    : `${mo}月${day}日`;
+  if (diff < 7) return `后来 · ${dated}`;
+  return `那天 · ${dated}`;
 }
 
 function groupMomentsByDay(moments) {

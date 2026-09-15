@@ -10,6 +10,8 @@ Source of truth is **running code**, then this folder.
 | [architecture/PRODUCT_BASE.md](architecture/PRODUCT_BASE.md) | Why EchoChat is the host, not an agent OS |
 | [architecture/PLUGIN_POLICY.md](architecture/PLUGIN_POLICY.md) | Plugin = `extraPrompt` only |
 | [architecture/DATA_OWNERSHIP.md](architecture/DATA_OWNERSHIP.md) | User data vs code vs brand |
+| [architecture/CURRENT_STATE_AUDIT.md](architecture/CURRENT_STATE_AUDIT.md) | 2026-09-15 architecture audit (code-verified) |
+| [architecture/AGENT_SYSTEM_AUDIT.md](architecture/AGENT_SYSTEM_AUDIT.md) | 2026-09-15 agent-rules / skills / docs-loading audit |
 | [design.md](design.md) | Morning Mint / Ripple — frozen in-app language |
 | [ROADMAP.md](ROADMAP.md) | CURRENT / NEXT / LATER |
 

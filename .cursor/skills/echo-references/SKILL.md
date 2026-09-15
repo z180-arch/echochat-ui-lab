@@ -1,14 +1,14 @@
 ---
 name: echo-references
-description: At the start of EchoChat work, consult Hallmark (UI, component-scope) and awesome-llm-apps (LLM app patterns). Never import those agent stacks into Product Core.
+description: Apply Morning Mint component-scope UI rules when changing EchoChat in-app UI under src/ui, src/styles, or chat chrome in src/main.js. Use when editing views, tokens, motion, composer, or landing visual language. Do not use for storage, Dexie, provider HTTP, tests-only, or docs-only work.
 ---
 
-# EchoChat agent references
+# EchoChat UI references
 
-Check these before UI or companion-loop work:
+In-app UI is **Morning Mint** (`src/styles/tokens.css`) plus quiet Ripple (`src/styles/motion.css`). Frozen: no new theme kit, animation engine, or component library.
 
-1. [Hallmark](https://github.com/Nutlope/hallmark) — anti-AI-slop design. EchoChat already has Morning Mint. New in-app UI is **component-scope**: reuse existing tokens, fields, chips. Do not pick a Hallmark catalog theme for `/app/`. Landing `/` may use Hallmark if the task is a landing redesign.
+1. Reuse existing tokens, fields, chips, sheets. Do not pick a Hallmark catalog theme for `/app/`.
+2. Landing `/` may use Hallmark if the task is a landing redesign. Do not restyle the app to match the landing layout.
+3. Do not import CrewAI, AutoGen, LangGraph, or similar as the host.
 
-2. [awesome-llm-apps](https://github.com/Shubhamsaboo/awesome-llm-apps) — study companion/chat UX. Do not add CrewAI, AutoGen, LangGraph, or similar as the host.
-
-Product Core stays: `assembleTurnContext` is the only context door. No GPL/AGPL copies.
+`assembleTurnContext` is the only context door. No GPL/AGPL copies.

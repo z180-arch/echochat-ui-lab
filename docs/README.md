@@ -12,10 +12,12 @@ Source of truth is **running code**, then this folder.
 | [architecture/DATA_OWNERSHIP.md](architecture/DATA_OWNERSHIP.md) | User data vs code vs brand |
 | [architecture/CURRENT_STATE_AUDIT.md](architecture/CURRENT_STATE_AUDIT.md) | 2026-09-15 architecture audit (code-verified) |
 | [architecture/AGENT_SYSTEM_AUDIT.md](architecture/AGENT_SYSTEM_AUDIT.md) | 2026-09-15 agent-rules / skills / docs-loading audit |
-| [architecture/ARCHITECTURE_IMPROVEMENT_PROPOSAL.md](architecture/ARCHITECTURE_IMPROVEMENT_PROPOSAL.md) | Follow-ups after P0; do not implement from the file alone |
+| [architecture/ARCHITECTURE_IMPROVEMENT_PROPOSAL.md](architecture/ARCHITECTURE_IMPROVEMENT_PROPOSAL.md) | Follow-ups after P0; remaining P1 |
 | [design.md](design.md) | Morning Mint / Ripple — frozen in-app language |
 | [ROADMAP.md](ROADMAP.md) | CURRENT / NEXT / LATER |
 
 Root files: [README.md](../README.md), [AGENTS.md](../AGENTS.md), [THIRD_PARTY_SOURCES.md](../THIRD_PARTY_SOURCES.md), [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
+
+Project agent skills: `.cursor/skills/` (`echo-architecture`, `echo-storage`, `echo-context`, `echo-test`, `echo-change-review`, `echo-audit`, `echo-references`). Triggers are listed in `AGENTS.md`.
 
 Do not reconstruct product decisions from git history snapshots or old stage names (Foundation, V1, V1.1).

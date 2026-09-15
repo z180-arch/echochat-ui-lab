@@ -4,14 +4,16 @@ This file is for Codex / Cursor / Claude / Gemini and similar agents. It is not 
 
 ## Source of truth
 
-1. Current source under `src/`, `app/index.html`, `index.html`, `sw.js`, `manifest.webmanifest`
-2. Current tests under `tests/` and CI in `.github/workflows/ci.yml`
-3. [README.md](README.md)
-4. [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md)
-5. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-6. [docs/DEVELOPMENT_STATUS.md](docs/DEVELOPMENT_STATUS.md)
+**Code + tests win.** For a one-file bugfix, read the files you will touch. Do not load the whole `docs/` tree.
 
-**Runtime foundation:** EchoChat Product Core. See [docs/architecture/PRODUCT_BASE.md](docs/architecture/PRODUCT_BASE.md). Foreign chat/agent projects are reference only.
+1. Current source under `src/`, `app/index.html`, `index.html`, `sw.js`, `manifest.webmanifest`
+2. Tests under `tests/` — local entry is `npm test` only
+3. [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md) — shipped facts (read when unsure what exists)
+4. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — layers (read when adding files or imports)
+
+Host decision (only when changing plugins / product base): [docs/architecture/PRODUCT_BASE.md](docs/architecture/PRODUCT_BASE.md).
+
+Doc map: [docs/README.md](docs/README.md).
 
 ## Before changes
 
@@ -19,19 +21,36 @@ This file is for Codex / Cursor / Claude / Gemini and similar agents. It is not 
 2. Read the files you will touch
 3. Run the tests that cover that area (`npm test` for Node suites)
 
-## Scope
+Do not reconstruct architecture from V1 / Phase comments or git history snapshots.
 
-Do not do unrelated refactors, UI redesigns, API replacements, or storage schema / key / migration changes unless the user asked.
+## Scope freeze
 
-Do not infer architecture from old V1 / V1.1 names or git history snapshots.
+Do not change **Memory schema**, **retrieval aliases**, **`assembleTurnContext`**, **Provider architecture**, or **Dexie table schema / `echodownload_*` key names** unless the task says so.
 
-Do not change Memory schema, retrieval, `assembleTurnContext`, Provider architecture, or Dexie schema unless the task says so.
+That freeze is schema/retrieval/keys — not “never edit `memory.js`”. Import-path, persist-failure, and test fixes in those files are allowed.
+
+Do not do unrelated refactors, UI redesigns, API replacements, or stack swaps.
+
+## Must confirm with the user
+
+Stop and ask before:
+
+- Irreversible user-data delete or wipe
+- Irreversible storage key / schema / Dexie migration
+- LICENSE changes or adding GPL/AGPL copies
+- Deleting Character / Conversation / Memory / Moments / Relationship / Worldbook / Continuity
+- Changing product identity (companion → Agent OS, RAG demo, marketplace, ChatGPT clone)
+- SQLite / Tauri / new platform runtime as the host
+
+## Do not ask for
+
+Bugfixes, tests, docs that match code, architecture import-boundary tests, renaming a misleading file, deleting **confirmed** unused modules, or independent commits when the task already requires them.
 
 ## Git
 
 Do not `git add .` or `git add -A`.
-Do not commit unless the user explicitly asked.
 Do not commit leftover `landing.html`, `.claude/`, `.superpowers/`, `.tmp-extract/`, `backups/`, or `assets/landing/` unless the task says to.
+Commit only when the user asked, or when the current task explicitly requires per-problem commits.
 
 ## Entries
 
@@ -40,7 +59,26 @@ Do not commit leftover `landing.html`, `.claude/`, `.superpowers/`, `.tmp-extrac
 /app/  → application
 ```
 
-## Agent references
+## Layers
 
-- [Hallmark](https://github.com/Nutlope/hallmark) (MIT): anti-slop UI. In-app work stays **component-scope** on Morning Mint.
-- [awesome-llm-apps](https://github.com/Shubhamsaboo/awesome-llm-apps): companion/chat patterns. Do **not** import those agent frameworks.
+```text
+ui / main.js → domain / core / runtime / plugins
+domain → core / repository / runtime
+repository → infrastructure / core
+```
+
+No `domain → infrastructure`, `domain → ui`, `ui → Dexie/idb`, `repository → domain`.
+
+## Skills
+
+Project skills live in `.cursor/skills/`. Triggers are narrow. Do not load Hallmark on a storage/provider bug.
+
+| Skill | When |
+|-------|------|
+| `echo-references` | In-app UI (`src/ui`, `src/styles`) or companion chat chrome |
+| `echo-architecture` | New modules or cross-layer imports |
+| `echo-storage` | Dexie, repository, migration, backup, restore |
+| `echo-context` | `assembleTurnContext`, memory/worldbook/relationship **injection** |
+| `echo-test` | Choosing/running/fixing `tests/*.mjs` |
+| `echo-change-review` | After source changes, before the final commit |
+| `echo-audit` | User asked for current state / git / test health only |

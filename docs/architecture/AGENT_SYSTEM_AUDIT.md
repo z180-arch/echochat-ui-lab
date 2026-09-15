@@ -117,7 +117,7 @@ Cursor always-applied workspace rule **is** the full `AGENTS.md`. That is one ex
 | `docs/DEVELOPMENT_STATUS.md` | Current snapshot. P0 there is STT honesty / model ownership slips — different from architecture P0. |
 | `docs/architecture/PRODUCT_BASE.md` | Current host decision. Still useful. |
 | `docs/architecture/PLUGIN_POLICY.md` | Current. Matches code. |
-| `docs/architecture/DATA_OWNERSHIP.md` | **Outdated / harmful.** LS-centric; “插件系统尚未实现”; storage section ignores Dexie. |
+| `docs/architecture/DATA_OWNERSHIP.md` | **Current** after P-03 (Dexie-canonical + extra-notes). |
 | `docs/ROADMAP.md` | Thin pointer. Fine. |
 | `docs/README.md` | Map. Should link this audit after it ships. |
 | Stage / V1 / Phase comments in source | Leftover language (`character.js` “Phase 5”, `dexie-migration.js` “Phase 2”). `AGENTS.md` already says do not infer architecture from those names. |
@@ -169,3 +169,19 @@ Agent-system only (Possible Improvement / proposal):
 5. Do **not** add more always-on skills.
 
 Do not create: agent OS skills, MCP marketplace skills, “migrate to SQLite” skills, or a second AGENTS.md for each tool.
+
+---
+
+## Implemented Changes
+
+**Date:** 2026-09-15 (implementation pass)
+
+| Change | Why |
+|--------|-----|
+| `AGENTS.md` must-confirm list + freeze clarification | Agents were missing an explicit confirm list; freeze could be misread as “never edit `memory.js`”. Bugfixes no longer require confirmation. |
+| `AGENTS.md` source-of-truth trimmed | One-file bugfix reads files you touch, not the whole docs set. |
+| `echo-references` trigger narrowed | Hallmark no longer matches “all EchoChat work”. |
+| Added `echo-audit`, `echo-architecture`, `echo-storage`, `echo-context`, `echo-test`, `echo-change-review` | Narrow workflow skills. Not always-on. |
+| `docs/README.md` points at the skill set | Index for humans and agents. |
+
+Still out of repo: global superpowers / story / Cloudflare skills. EchoChat `AGENTS.md` wins on conflict.

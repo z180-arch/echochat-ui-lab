@@ -150,7 +150,7 @@ export function renderAppShell() {
     ${activeTab === "me" ? renderMePane() : ""}
     ${activeTab === "companion" && currentChat ? renderChatPane(currentChat, false) : ""}
     ${activeTab === "companion" && !currentChat ? renderEmptyChat() : ""}
-    ${showMask ? `<div class="profile-mask" onclick="window.EchoApp.toggleProfile()"></div>` : ""}
+    ${showMask ? `<button type="button" class="profile-mask" onclick="window.EchoApp.toggleProfile()" aria-label="关闭角色资料"></button>` : ""}
     ${showProfile ? renderProfilePane(currentChat) : ""}
     ${hideBottom ? "" : renderBottomNav(activeTab)}
   </div>`;

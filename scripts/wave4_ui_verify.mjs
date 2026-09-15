@@ -141,6 +141,8 @@ const SNAP = `(() => {
   const inbox = document.querySelector('.inbox-head');
   const subtitle = document.querySelector('.list-item-subtitle');
   const profile = document.querySelector('.profile-pane');
+  const maskEl = document.querySelector('.profile-mask');
+  const maskCs = maskEl ? getComputedStyle(maskEl) : null;
   const status = document.querySelector('.profile-status');
   const tools = document.querySelector('.profile-tools');
   const folds = [...document.querySelectorAll('.profile-fold')];
@@ -161,6 +163,13 @@ const SNAP = `(() => {
     chat: box(chat),
     profile: box(profile),
     profileOpen: !!profile,
+    mask: maskEl
+      ? {
+          display: maskCs.display,
+          blur: maskCs.backdropFilter || maskCs.webkitBackdropFilter || "",
+          z: maskCs.zIndex,
+        }
+      : null,
     inboxPadTop: inbox ? parseFloat(getComputedStyle(inbox).paddingTop) : 0,
     listH: item ? Math.round(item.getBoundingClientRect().height) : 0,
     avatarW: (() => {
@@ -377,6 +386,15 @@ async function runWidth(send, width, expect) {
       snap.profileOpen && snap.profile?.position === "fixed" ? "PASS" : "FAIL",
       JSON.stringify(snap.profile)
     );
+    record(
+      `${width} · drawer scrim`,
+      snap.mask &&
+        snap.mask.display !== "none" &&
+        /blur/.test(snap.mask.blur)
+        ? "PASS"
+        : "FAIL",
+      JSON.stringify(snap.mask)
+    );
     if (!mobile) {
       record(`${width} · drawer keeps chat`, snap.chat && snap.chat.w >= 360 ? "PASS" : "FAIL", `chat=${snap.chat?.w}`);
     }
@@ -531,6 +549,7 @@ try {
   await send("Page.enable");
   await send("Runtime.enable");
   await runWidth(send, 390, "mobile");
+  await runWidth(send, 640, "mobile");
   await runWidth(send, 1024, "drawer");
   await runWidth(send, 1200, "drawer");
   await runWidth(send, 1280, "persist");

@@ -1102,42 +1102,17 @@
     }
   }
   .profile-mask {
-    position: fixed;
-    inset: 0;
-    z-index: calc(var(--z-drawer) - 1);
-    background: rgba(36, 50, 56, 0.32);
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
-    animation: mask-in var(--dur-normal) var(--ease-out) both;
+    display: block;
   }
-  @keyframes mask-in {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-}
-.profile-mask {
-  display: none;
 }
 @media (min-width: 768px) and (max-width: 1023px) {
   .profile-mask {
     display: block;
-    position: fixed;
-    inset: 0;
-    z-index: calc(var(--z-drawer) - 1);
-    background: rgba(36, 50, 56, 0.28);
   }
 }
 @media (min-width: 1024px) and (max-width: 1279px) {
   .profile-mask {
     display: block;
-    position: fixed;
-    inset: 0;
-    z-index: calc(var(--z-drawer) - 1);
-    background: rgba(36, 50, 56, 0.28);
   }
 }
 
@@ -1161,7 +1136,8 @@
   .modal,
   .modal-overlay,
   .drawer,
-  .drawer-overlay {
+  .drawer-overlay,
+  .profile-mask {
     animation: none !important;
   }
   .ambient-layer {

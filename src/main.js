@@ -619,10 +619,18 @@ const App = {
 
   bindGlobalEvents() {
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") {
-        document.querySelectorAll(".modal-overlay").forEach((m) => m.remove());
-        document.querySelectorAll(".msg.show-actions").forEach((m) => m.classList.remove("show-actions"));
+      if (e.key !== "Escape") return;
+      const overlays = document.querySelectorAll(".modal-overlay");
+      if (overlays.length) {
+        overlays.forEach((m) => m.remove());
+        return;
       }
+      const s = store.getState();
+      if (s.ui.profileOpen && window.innerWidth < PROFILE_PERSIST_MIN_WIDTH) {
+        store.setProfileOpen(false);
+        return;
+      }
+      document.querySelectorAll(".msg.show-actions").forEach((m) => m.classList.remove("show-actions"));
     });
     document.addEventListener("click", (e) => {
       if (e.target.closest(".msg")) return;

@@ -54,6 +54,7 @@ const SUITES = [
   "tests/ui_modal_surface_test.mjs",
   "tests/ui_icon_system_test.mjs",
   "tests/ui_settings_surface_test.mjs",
+  "tests/ui_profile_scrim_test.mjs",
   "tests/companion_ux_test.mjs",
 ];
 

@@ -302,10 +302,13 @@ export function setSetting(key, value) {
 /**
  * 存储 blob
  * @param {Blob} blob
+ * @param {string} [id]
  * @returns {Promise<string>} id
  */
-export async function storeBlob(blob) {
-  return idb.putBlob(blob);
+export async function storeBlob(blob, id) {
+  const blobId = id || `asset_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  await idb.putBlob(blobId, blob);
+  return blobId;
 }
 
 /**

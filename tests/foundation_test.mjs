@@ -474,6 +474,17 @@ test("renderMarkdown escapes HTML and rejects javascript links", () => {
   assert.ok(renderMarkdown("[ok](https://example.com)").includes('href="https://example.com"'));
 });
 
+await testAsync("AssetRepository.storeBlob persists the blob under the given id", async () => {
+  const { AssetRepository } = await import("../src/repository/asset.js");
+  const blob = new Blob(["echo-asset"], { type: "text/plain" });
+  const { id } = await AssetRepository.storeBlob(blob, { name: "note.txt", type: "attachment" });
+  assert.ok(id);
+  const got = await AssetRepository.getBlob(id);
+  assert.ok(got, "blob must be readable by the id AssetRepository generated");
+  assert.equal(await got.text(), "echo-asset");
+  await AssetRepository.updateMetadata(id, { name: "renamed.txt" });
+});
+
 // ============================================================
 //  汇总
 // ============================================================

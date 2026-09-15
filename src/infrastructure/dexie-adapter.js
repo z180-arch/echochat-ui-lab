@@ -906,6 +906,14 @@ export const dexieAssetAdapter = {
     return getById(TABLES.ASSETS, id);
   },
 
+  async updateMetadata(id, updates) {
+    const existing = await getById(TABLES.ASSETS, id);
+    if (!existing) return null;
+    const record = { ...existing, ...updates, id, updatedAt: Date.now() };
+    await put(TABLES.ASSETS, record);
+    return record;
+  },
+
   async delete(id) {
     await remove(TABLES.ASSETS, id);
   },
